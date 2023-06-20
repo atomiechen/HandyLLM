@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "HandyLLM"
+version = "0.0.1"
+authors = [
+  { name="Atomie CHEN", email="atomic_cwh@163.com" },
+]
+description = "A handy toolkit for using LLM."
+readme = "README.md"
+requires-python = ">=3.6"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    # "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = ["LLM", "Large Language Model", "Prompt", "OpenAI", "API"]
+dependencies = [
+  "requests",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/atomiechen/HandyLLM"
+"Bug Tracker" = "https://github.com/atomiechen/HandyLLM/issues"
