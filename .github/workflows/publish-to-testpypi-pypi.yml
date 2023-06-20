@@ -1,12 +1,28 @@
 name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
 
-on: push
+on:
+  workflow_dispatch:
+    inputs:
+      publish_dest:
+        type: choice
+        required: true
+        default: TestPyPI
+        description: Where to publish this package
+        options: 
+        - TestPyPI
+        - PyPI
+      ref:
+        description: 'Commit SHA or tag to package'
+        required: false
+
 jobs:
   build-n-publish:
     name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.ref || github.sha }}
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -21,12 +37,13 @@ jobs:
       run: >-
         python3 -m build
     - name: Publish distribution 📦 to Test PyPI
+      if: ${{ inputs.publish_dest == 'TestPyPI' }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
         repository-url: https://test.pypi.org/legacy/
     - name: Publish distribution 📦 to PyPI
-      if: startsWith(github.ref, 'refs/tags')
+      if: ${{ inputs.publish_dest == 'PyPI' }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         password: ${{ secrets.PYPI_API_TOKEN }}
