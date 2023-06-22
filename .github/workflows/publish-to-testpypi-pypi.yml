@@ -1,49 +1,33 @@
-name: Publish Python 🐍 distributions 📦 to PyPI and TestPyPI
+name: Publish Python 🐍 distributions 📦
 
 on:
   workflow_dispatch:
     inputs:
-      publish_dest:
-        type: choice
-        required: true
-        default: TestPyPI
-        description: Where to publish this package
-        options: 
-        - TestPyPI
-        - PyPI
-      ref:
-        description: 'Commit SHA or tag to package'
+      publish_testpypi:
+        type: boolean
+        default: false
+        description: Publish to TestPyPI
+      publish_pypi:
+        type: boolean
+        default: false
+        description: Publish to PyPI
+      publish_gh_release:
+        type: boolean
+        default: true
+        description: Publish to GitHub Release
+      release_tag:
+        type: string
+        description: Tag to package (empty for latest tag)
         required: false
 
 jobs:
   build-n-publish:
-    name: Build and publish Python 🐍 distributions 📦 to PyPI and TestPyPI
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        ref: ${{ inputs.ref || github.sha }}
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.x"
-    - name: Install pypa/build
-      run: >-
-        python3 -m
-        pip install
-        build
-        --user
-    - name: Build a binary wheel and a source tarball
-      run: >-
-        python3 -m build
-    - name: Publish distribution 📦 to Test PyPI
-      if: ${{ inputs.publish_dest == 'TestPyPI' }}
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        repository-url: https://test.pypi.org/legacy/
-    - name: Publish distribution 📦 to PyPI
-      if: ${{ inputs.publish_dest == 'PyPI' }}
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@main
+    with:
+      publish_testpypi: ${{ inputs.publish_testpypi }}
+      publish_pypi: ${{ inputs.publish_pypi }}
+      publish_gh_release: ${{ inputs.publish_gh_release }}
+      release_tag: ${{ inputs.release_tag }}
+    secrets:
+      TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
