@@ -7,7 +7,7 @@ import copy
 
 from .prompt_converter import PromptConverter
 
-pkg_logger = logging.getLogger(__name__)
+module_logger = logging.getLogger(__name__)
 
 class OpenAIAPI:
     
@@ -31,9 +31,9 @@ class OpenAIAPI:
         log_strs.append(f"API request {url}")
         log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
         if organization is not None:
-            log_strs.append(f"organization={organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
+            log_strs.append(f"organization: {organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
         log_strs.append(f"timeout: {timeout}")
-        pkg_logger.info('\n'.join(log_strs))
+        module_logger.info('\n'.join(log_strs))
 
         request_data = kwargs
         headers = {
@@ -56,7 +56,9 @@ class OpenAIAPI:
                 message = response.json()['error']['message']
             except:
                 message = response.text
-            raise Exception(f"OpenAI API error ({response.status_code} {response.reason}): {message}")
+            err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
+            module_logger.error(err_msg)
+            raise Exception(err_msg)
         return response.json()
 
     @staticmethod
