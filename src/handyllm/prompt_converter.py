@@ -35,6 +35,19 @@ class PromptConverter:
         
         return chat
     
+    def chat2raw(self, chat, raw_prompt_path: str=None):
+        # convert chat format to plain text
+        messages = []
+        for message in chat:
+            messages.append(f"${message['role']}$\n{message['content']}")
+        raw_prompt = "\n\n".join(messages)
+        
+        if raw_prompt_path is not None:
+            with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
+                fout.write(raw_prompt)
+        
+        return raw_prompt
+    
     def chat_replace_variables(self, chat, variable_map: dict, inplace=False):
         # replace every variable in chat content
         if inplace:
