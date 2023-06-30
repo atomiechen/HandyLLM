@@ -17,10 +17,7 @@ class PromptConverter:
             value = blocks[idx+1]
             self.substitute_map[key] = value.strip()
 
-    def raw2chat(self, raw_prompt_path: str):
-        with open(raw_prompt_path, 'r', encoding='utf-8') as fin:
-            raw_prompt = fin.read()
-
+    def raw2chat(self, raw_prompt: str):
         # substitute pre-defined variables
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
@@ -35,18 +32,24 @@ class PromptConverter:
         
         return chat
     
-    def chat2raw(self, chat, raw_prompt_path: str=None):
+    def rawfile2chat(self, raw_prompt_path: str):
+        with open(raw_prompt_path, 'r', encoding='utf-8') as fin:
+            raw_prompt = fin.read()
+        
+        return self.raw2chat(raw_prompt)
+    
+    def chat2raw(self, chat):
         # convert chat format to plain text
         messages = []
         for message in chat:
             messages.append(f"${message['role']}$\n{message['content']}")
         raw_prompt = "\n\n".join(messages)
-        
-        if raw_prompt_path is not None:
-            with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
-                fout.write(raw_prompt)
-        
         return raw_prompt
+    
+    def chat2rawfile(self, chat, raw_prompt_path: str):
+        raw_prompt = self.chat2raw(chat)
+        with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
+            fout.write(raw_prompt)
     
     def chat_replace_variables(self, chat, variable_map: dict, inplace=False):
         # replace every variable in chat content
