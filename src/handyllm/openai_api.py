@@ -1,11 +1,21 @@
 import os
+import time
 import requests
+import logging
+import json
+import copy
+
+from .prompt_converter import PromptConverter
+
+module_logger = logging.getLogger(__name__)
 
 class OpenAIAPI:
     
     base_url = "https://api.openai.com/v1"
     api_key = os.environ.get('OPENAI_API_KEY')
     organization = None
+    
+    converter = PromptConverter()
 
     @staticmethod
     def api_request(url, api_key, organization=None, timeout=None, **kwargs):
@@ -13,9 +23,18 @@ class OpenAIAPI:
             raise Exception("OpenAI API key is not set")
         if url is None:
             raise Exception("OpenAI API url is not set")
+
+        ## log request info
+        log_strs = []
         # 避免直接打印api_key
         plaintext_len = 8
-        print(f"API request: url={url} api_key={api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
+        log_strs.append(f"API request {url}")
+        log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
+        if organization is not None:
+            log_strs.append(f"organization: {organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
+        log_strs.append(f"timeout: {timeout}")
+        module_logger.info('\n'.join(log_strs))
+
         request_data = kwargs
         headers = {
             'Authorization': 'Bearer ' + api_key,
@@ -37,7 +56,9 @@ class OpenAIAPI:
                 message = response.json()['error']['message']
             except:
                 message = response.text
-            raise Exception(f"OpenAI API error ({response.status_code} {response.reason}): {message}")
+            err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
+            module_logger.error(err_msg)
+            raise Exception(err_msg)
         return response.json()
 
     @staticmethod
@@ -53,14 +74,86 @@ class OpenAIAPI:
         return OpenAIAPI.api_request(url, api_key, organization=organization, **kwargs)
     
     @staticmethod
-    def chat(timeout=None, endpoint_manager=None, **kwargs):
+    def chat(timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
         request_url = '/chat/completions'
-        return OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+        if logger is not None and 'messages' in kwargs:
+            arguments = copy.deepcopy(kwargs)
+            arguments.pop('messages', None)
+            input_lines = [str(item) for item in log_marks]
+            input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
+            input_lines.append(" INPUT START ".center(50, '-'))
+            input_lines.append(OpenAIAPI.converter.chat2raw(kwargs['messages']))
+            input_lines.append(" INPUT END ".center(50, '-')+"\n")
+            input_str = "\n".join(input_lines)
+        
+        start_time = time.time()
+        try:
+            response = OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            
+            if logger is not None:
+                end_time = time.time()
+                ## log this on result
+                log_strs = []
+                log_strs.append(f"Chat request result ({end_time-start_time:.2f}s)")
+                log_strs.append(input_str)
+
+                log_strs.append(" OUTPUT START ".center(50, '-'))
+                log_strs.append(response['choices'][0]['message']['content'])
+                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                logger.info('\n'.join(log_strs))
+        except Exception as e:
+            if logger is not None:
+                end_time = time.time()
+                log_strs = []
+                log_strs.append(f"Chat request error ({end_time-start_time:.2f}s)")
+                log_strs.append(input_str)
+                log_strs.append(str(e))
+                logger.error('\n'.join(log_strs))
+            raise e
+
+        return response
     
     @staticmethod
-    def completions(timeout=None, endpoint_manager=None, **kwargs):
+    def completions(timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
         request_url = '/completions'
-        return OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+        if logger is not None and 'prompt' in kwargs:
+            arguments = copy.deepcopy(kwargs)
+            arguments.pop('prompt', None)
+            input_lines = [str(item) for item in log_marks]
+            input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
+            input_lines.append(" INPUT START ".center(50, '-'))
+            input_lines.append(kwargs['prompt'])
+            input_lines.append(" INPUT END ".center(50, '-')+"\n")
+            input_str = "\n".join(input_lines)
+        
+        start_time = time.time()
+        try:
+            response = OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+            if logger is not None:
+                end_time = time.time()
+                ## log this on result
+                log_strs = []
+                log_strs.append(f"Completions request result ({end_time-start_time:.2f}s)")
+                log_strs.append(input_str)
+
+                log_strs.append(" OUTPUT START ".center(50, '-'))
+                log_strs.append(response['choices'][0]['text'])
+                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                logger.info('\n'.join(log_strs))
+        except Exception as e:
+            if logger is not None:
+                end_time = time.time()
+                log_strs = []
+                log_strs.append(f"Completions request error ({end_time-start_time:.2f}s)")
+                log_strs.append(input_str)
+                log_strs.append(str(e))
+                logger.error('\n'.join(log_strs))
+            raise e
+
+        return response
     
     @staticmethod
     def embeddings(timeout=None, endpoint_manager=None, **kwargs):
