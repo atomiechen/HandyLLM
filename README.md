@@ -16,7 +16,7 @@ pip3 install handyllm
 
 ## OpenAI API Request
 
-This toolkit uses HTTP API request instead of OpenAI's official python package to support client-side `timeout` control.
+This toolkit uses HTTP API request instead of OpenAI's official python package to support client-side `timeout` control:
 
 ```python
 from handyllm import OpenAIAPI
@@ -28,11 +28,18 @@ response = OpenAIAPI.chat(
     )
 ```
 
+API key will be loaded using the environment variable `OPENAI_API_KEY`, or you can set manually:
+
+```python
+OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+OpenAIAPI.organization = '......'  # default to None
+```
+
 
 
 ## Prompt
 
-`PromptConverter` can convert this text file into a structured prompt for chat API calls.
+`PromptConverter` can convert this text file `prompt.txt` into a structured prompt for chat API calls:
 
 ```
 $system$
@@ -46,15 +53,29 @@ Sure, please give me the two JSON documents.
 
 $user$
 {
-	"item1": "It is really a good day."
+    "item1": "It is really a good day."
 }
 {
-	"item2": "Indeed."
+    "item2": "Indeed."
 }
 %output_format%
+%misc%
 ```
 
-It can also help substitute placeholder variables (e.g. `%output_format%` in this example) to make multiple prompts modular. A substitute map looks like this:
+```python
+from handyllm import PromptConverter
+converter = PromptConverter()
+
+# chat can be used as the message parameter for OpenAI API
+chat = converter.rawfile2chat('prompt.txt')
+
+# variables wrapped in %s can be replaced at runtime
+new_chat = converter.chat_replace_variables(chat, {r'%misc%': 'Note: do not use any bad word.'})
+```
+
+
+
+`PromptConverter` can also substitute placeholder variables like `%output_format%` stored in text files to make multiple prompts modular. A substitute map `substitute.txt` looks like this:
 
 ```
 %output_format%
@@ -65,8 +86,12 @@ Placeholder text.
 
 %variable2%
 Placeholder text.
+```
 
-%variable3%
-Placeholder text.
+```python
+from handyllm import PromptConverter
+converter = PromptConverter()
+converter.read_substitute_content('substitute.txt')  # read substitute map
+chat = converter.rawfile2chat('prompt.txt')  # variables are substituted already
 ```
 
