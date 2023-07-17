@@ -1,6 +1,6 @@
 # HandyLLM
 
-[![PyPI](https://img.shields.io/pypi/v/HandyLLM)](https://github.com/atomiechen/HandyLLM)![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Handyllm)
+[![PyPI](https://img.shields.io/pypi/v/HandyLLM)](https://github.com/atomiechen/HandyLLM) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Handyllm)
 
 A handy toolkit for using LLM.
 
