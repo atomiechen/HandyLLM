@@ -1,0 +1,18 @@
+$system$
+You are a helpful assistant.
+
+$user$
+Please help me merge the following two JSON documents into one.
+
+$assistant$
+Sure, please give me the two JSON documents.
+
+$user$
+{
+    "item1": "It is really a good day."
+}
+{
+    "item2": "Indeed."
+}
+%output_format%
+%misc%

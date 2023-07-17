@@ -1,0 +1,8 @@
+%output_format%
+Please output a SINGLE JSON object that contains all items from the two input JSON objects.
+
+%variable1%
+Placeholder text.
+
+%variable2%
+Placeholder text.
