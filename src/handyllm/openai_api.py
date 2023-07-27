@@ -58,12 +58,14 @@ class OpenAIAPI:
         if organization is not None:
             headers['OpenAI-Organization'] = organization
         
+        stream = kwargs.get('stream', False)
         response = requests.post(
             url, 
             headers=headers, 
             # data=json.dumps(request_data),
             json=request_data,
-            timeout=timeout
+            stream=stream,
+            timeout=timeout,
             )
         if response.status_code != 200:
             # report both status code and error message
@@ -75,7 +77,6 @@ class OpenAIAPI:
             module_logger.error(err_msg)
             raise Exception(err_msg)
 
-        stream = kwargs.get('stream', False)
         if stream:
             return OpenAIAPI._gen_stream_response(response)
         else:
@@ -83,19 +84,13 @@ class OpenAIAPI:
 
     @staticmethod
     def _gen_stream_response(response):
-        data_buffer = ''
-        for chunk in response.iter_content(decode_unicode=True):
-            data_buffer += chunk
-            while '\n' in data_buffer:  # when '\n' is in the buffer, there is a complete message to process
-                line, data_buffer = data_buffer.split('\n', 1)
-                line = line.strip()
-                if line.startswith('data:'):
-                    line = line[len('data:'):].strip()
-                    if line == '[DONE]':  # end the function when '[DONE]' message is received
-                        return
-                    else:
-                        data = json.loads(line)
-                        yield data
+        for byte_line in response.iter_lines():  # do not auto decode
+            if byte_line:
+                if byte_line.strip() == b"data: [DONE]":
+                    return
+                if byte_line.startswith(b"data: "):
+                    line = byte_line[len(b"data: "):].decode("utf-8")
+                    yield json.loads(line)
 
     @staticmethod
     def stream_chat(response):
