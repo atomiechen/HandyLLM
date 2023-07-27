@@ -6,3 +6,11 @@ dist
 *.env
 
 venv
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
