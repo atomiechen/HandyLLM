@@ -272,6 +272,32 @@ class OpenAIAPI:
         files = { 'file': file }
         return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
+    @staticmethod
+    def files_list(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/files'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def files_upload(file, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/files'
+        files = { 'file': file }
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def files_delete(file_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/files/{file_id}'
+        return OpenAIAPI.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def files_retrieve(file_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/files/{file_id}'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def files_retrieve_content(file_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/files/{file_id}/content'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
 
 if __name__ == '__main__':
     # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
