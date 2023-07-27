@@ -50,13 +50,13 @@ class OpenAIAPI:
         log_strs.append(f"timeout: {timeout}")
         module_logger.info('\n'.join(log_strs))
 
+        files = kwargs.pop('files', None)
         request_data = kwargs if method == 'post' else None
-        headers = {
-            'Authorization': 'Bearer ' + api_key,
-            'Content-Type': 'application/json'
-            }
+        headers = { 'Authorization': 'Bearer ' + api_key }
         if organization is not None:
             headers['OpenAI-Organization'] = organization
+        if files is None:  ## if files is not None, let requests handle the content type
+            headers['Content-Type'] = 'application/json'
         
         stream = kwargs.get('stream', False)
         response = requests.request(
@@ -65,6 +65,7 @@ class OpenAIAPI:
             headers=headers, 
             # data=json.dumps(request_data),
             json=request_data,
+            files=files,
             stream=stream,
             timeout=timeout,
             )
@@ -239,6 +240,25 @@ class OpenAIAPI:
     def moderations(timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/moderations'
         return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def images_generations(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/images/generations'
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def images_edits(image, mask=None, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/images/edits'
+        files = { 'image': image }
+        if mask:
+            files['mask'] = mask
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def images_variations(image, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/images/variations'
+        files = { 'image': image }
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
 
 if __name__ == '__main__':
