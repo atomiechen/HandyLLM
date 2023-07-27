@@ -260,6 +260,18 @@ class OpenAIAPI:
         files = { 'image': image }
         return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
+    @staticmethod
+    def audio_transcriptions(file, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/audio/transcriptions'
+        files = { 'file': file }
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def audio_translations(file, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/audio/translations'
+        files = { 'file': file }
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
 
 if __name__ == '__main__':
     # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
