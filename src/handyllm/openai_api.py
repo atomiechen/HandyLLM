@@ -146,9 +146,22 @@ class OpenAIAPI:
                 log_strs.append(input_str)
 
                 log_strs.append(" OUTPUT START ".center(50, '-'))
-                log_strs.append(response['choices'][0]['message']['content'])
-                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                logger.info('\n'.join(log_strs))
+                stream = kwargs.get('stream', False)
+                if stream:
+                    def wrapper(response):
+                        text = ''
+                        for data in response:
+                            if 'content' in data['choices'][0]['delta']:
+                                text += data['choices'][0]['delta']['content']
+                            yield data
+                        log_strs.append(text)
+                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                        logger.info('\n'.join(log_strs))
+                    response = wrapper(response)
+                else:
+                    log_strs.append(response['choices'][0]['message']['content'])
+                    log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                    logger.info('\n'.join(log_strs))
         except Exception as e:
             if logger is not None:
                 end_time = time.time()
@@ -187,9 +200,21 @@ class OpenAIAPI:
                 log_strs.append(input_str)
 
                 log_strs.append(" OUTPUT START ".center(50, '-'))
-                log_strs.append(response['choices'][0]['text'])
-                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                logger.info('\n'.join(log_strs))
+                stream = kwargs.get('stream', False)
+                if stream:
+                    def wrapper(response):
+                        text = ''
+                        for data in response:
+                            text += data['choices'][0]['text']
+                            yield data
+                        log_strs.append(text)
+                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                        logger.info('\n'.join(log_strs))
+                    response = wrapper(response)
+                else:
+                    log_strs.append(response['choices'][0]['text'])
+                    log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                    logger.info('\n'.join(log_strs))
         except Exception as e:
             if logger is not None:
                 end_time = time.time()
