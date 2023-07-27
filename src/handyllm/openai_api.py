@@ -74,8 +74,40 @@ class OpenAIAPI:
             err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
             module_logger.error(err_msg)
             raise Exception(err_msg)
-        return response.json()
 
+        stream = kwargs.get('stream', False)
+        if stream:
+            return OpenAIAPI._gen_stream_response(response)
+        else:
+            return response.json()
+
+    @staticmethod
+    def _gen_stream_response(response):
+        data_buffer = ''
+        for chunk in response.iter_content(decode_unicode=True):
+            data_buffer += chunk
+            while '\n' in data_buffer:  # when '\n' is in the buffer, there is a complete message to process
+                line, data_buffer = data_buffer.split('\n', 1)
+                line = line.strip()
+                if line.startswith('data:'):
+                    line = line[len('data:'):].strip()
+                    if line == '[DONE]':  # end the function when '[DONE]' message is received
+                        return
+                    else:
+                        data = json.loads(line)
+                        yield data
+
+    @staticmethod
+    def stream_chat(response):
+        for data in response:
+            if 'content' in data['choices'][0]['delta']:
+                yield data['choices'][0]['delta']['content']
+    
+    @staticmethod
+    def stream_completions(response):
+        for data in response:
+            yield data['choices'][0]['text']
+    
     @staticmethod
     def api_request_endpoint(request_url, endpoint_manager=None, **kwargs):
         if endpoint_manager != None:
