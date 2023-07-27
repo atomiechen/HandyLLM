@@ -227,6 +227,11 @@ class OpenAIAPI:
         return response
     
     @staticmethod
+    def edits(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/edits'
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
     def embeddings(timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/embeddings'
         return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
@@ -237,7 +242,7 @@ class OpenAIAPI:
         if model:
             request_url += f'/{model}'
         return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
-    
+
     @staticmethod
     def moderations(timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/moderations'
