@@ -59,6 +59,7 @@ class OpenAIAPI:
             headers['Content-Type'] = 'application/json'
         
         stream = kwargs.get('stream', False)
+        params = { "stream": "true" } if method == 'get' and stream else None
         response = requests.request(
             method,
             url, 
@@ -66,6 +67,7 @@ class OpenAIAPI:
             # data=json.dumps(request_data),
             json=request_data,
             files=files,
+            params=params,
             stream=stream,
             timeout=timeout,
             )
@@ -297,6 +299,36 @@ class OpenAIAPI:
     def files_retrieve_content(file_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/files/{file_id}/content'
         return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/fine-tunes'
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes_list(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/fine-tunes'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes_retrieve(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/fine-tunes/{fine_tune_id}'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes_cancel(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/fine-tunes/{fine_tune_id}/cancel'
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes_events(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/fine-tunes/{fine_tune_id}/events'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def finetunes_delete_model(model, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = f'/models/{model}'
+        return OpenAIAPI.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
 
 if __name__ == '__main__':
