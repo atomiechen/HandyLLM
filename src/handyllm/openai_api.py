@@ -12,13 +12,28 @@ module_logger = logging.getLogger(__name__)
 class OpenAIAPI:
     
     base_url = "https://api.openai.com/v1"
-    api_key = os.environ.get('OPENAI_API_KEY')
+    
+    # set this to your API key; 
+    # or environment variable OPENAI_API_KEY will be used.
+    api_key = None
+    
+    # set this to your organization ID; 
+    # or environment variable OPENAI_ORGANIZATION will be used;
+    # can be None.
     organization = None
     
     converter = PromptConverter()
+    
+    @staticmethod
+    def _get_key_from_env():
+        return os.environ.get('OPENAI_API_KEY')
+    
+    @staticmethod
+    def _get_organization_from_env():
+        return os.environ.get('OPENAI_ORGANIZATION')
 
     @staticmethod
-    def api_request(url, api_key, organization=None, timeout=None, **kwargs):
+    def _api_request(url, api_key, organization=None, timeout=None, **kwargs):
         if api_key is None:
             raise Exception("OpenAI API key is not set")
         if url is None:
@@ -68,10 +83,10 @@ class OpenAIAPI:
             base_url, api_key, organization = endpoint_manager.get_endpoint()
         else:
             base_url = OpenAIAPI.base_url
-            api_key = OpenAIAPI.api_key
-            organization = OpenAIAPI.organization
+            api_key = OpenAIAPI.api_key if OpenAIAPI.api_key is not None else OpenAIAPI._get_key_from_env()
+            organization = OpenAIAPI.organization if OpenAIAPI.organization is not None else OpenAIAPI._get_organization_from_env()
         url = base_url + request_url
-        return OpenAIAPI.api_request(url, api_key, organization=organization, **kwargs)
+        return OpenAIAPI._api_request(url, api_key, organization=organization, **kwargs)
     
     @staticmethod
     def chat(timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
