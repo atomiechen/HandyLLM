@@ -24,9 +24,18 @@ response = OpenAIAPI.chat(
     top_p=1.0,
     frequency_penalty=0.0,
     presence_penalty=0.0,
-    timeout=10
+    timeout=10,
+    stream=True
     )
-print(response['choices'][0]['message']['content'])
+
+# you can use this to stream the response
+for text in OpenAIAPI.stream_chat(response):
+    print(text, end='')
+
+# or you can use this to get the whole response
+# for chunk in response:
+#     if 'content' in chunk['choices'][0]['delta']:
+#         print(chunk['choices'][0]['delta']['content'], end='')
 
 
 print()
@@ -41,5 +50,13 @@ response = OpenAIAPI.completions(
     timeout=10,
     max_tokens=256,
     echo=True,  # Echo back the prompt in addition to the completion
+    stream=True
 )
-print(response['choices'][0]['text'])
+
+# you can use this to stream the response
+for text in OpenAIAPI.stream_completions(response):
+    print(text, end='')
+
+# or you can use this to get the whole response
+# for chunk in response:
+#     print(chunk['choices'][0]['text'], end='')

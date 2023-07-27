@@ -1,6 +1,6 @@
 # HandyLLM
 
-[![PyPI](https://img.shields.io/pypi/v/HandyLLM)](https://github.com/atomiechen/HandyLLM) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/Handyllm)
+[![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)](https://github.com/atomiechen/HandyLLM) [![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white)](https://pypi.org/project/HandyLLM/)
 
 A handy toolkit for using LLM.
 
@@ -12,6 +12,18 @@ A handy toolkit for using LLM.
 pip3 install handyllm
 ```
 
+or, install from the Github repo to get latest updates:
+
+```shell
+pip3 install git+https://github.com/atomiechen/handyllm.git
+```
+
+
+
+## Examples
+
+Example scripts are placed in [tests](./tests) folder.
+
 
 
 ## OpenAI API Request
@@ -20,19 +32,43 @@ This toolkit uses HTTP API request instead of OpenAI's official python package t
 
 ```python
 from handyllm import OpenAIAPI
-OpenAIAPI.api_key = os.environ.get('OPENAI_API_KEY')
+prompt = [{
+    "role": "user",
+    "content": "please tell me a joke"
+    }]
 response = OpenAIAPI.chat(
     model="gpt-3.5-turbo",
     messages=prompt,
     timeout=10
     )
+print(response['choices'][0]['message']['content'])
 ```
 
-API key will be loaded using the environment variable `OPENAI_API_KEY`, or you can set manually:
+API key and organization will be loaded using the environment variable `OPENAI_API_KEY` and `OPENAI_ORGANIZATION`, or you can set manually:
 
 ```python
 OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-OpenAIAPI.organization = '......'  # default to None
+OpenAIAPI.organization = '......'  # default: None
+```
+
+Stream response of `chat`/`completions` can be achieved using `steam` parameter:
+
+```python
+response = OpenAIAPI.chat(
+    model="gpt-3.5-turbo",
+    messages=prompt,
+    timeout=10,
+    stream=True
+    )
+
+# you can use this to stream the response text
+for text in OpenAIAPI.stream_chat(response):
+    print(text, end='')
+
+# or you can use this to get the whole response
+# for chunk in response:
+#     if 'content' in chunk['choices'][0]['delta']:
+#         print(chunk['choices'][0]['delta']['content'], end='')
 ```
 
 

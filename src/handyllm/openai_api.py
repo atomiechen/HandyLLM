@@ -12,13 +12,28 @@ module_logger = logging.getLogger(__name__)
 class OpenAIAPI:
     
     base_url = "https://api.openai.com/v1"
-    api_key = os.environ.get('OPENAI_API_KEY')
+    
+    # set this to your API key; 
+    # or environment variable OPENAI_API_KEY will be used.
+    api_key = None
+    
+    # set this to your organization ID; 
+    # or environment variable OPENAI_ORGANIZATION will be used;
+    # can be None.
     organization = None
     
     converter = PromptConverter()
+    
+    @staticmethod
+    def _get_key_from_env():
+        return os.environ.get('OPENAI_API_KEY')
+    
+    @staticmethod
+    def _get_organization_from_env():
+        return os.environ.get('OPENAI_ORGANIZATION')
 
     @staticmethod
-    def api_request(url, api_key, organization=None, timeout=None, **kwargs):
+    def _api_request(url, api_key, organization=None, timeout=None, **kwargs):
         if api_key is None:
             raise Exception("OpenAI API key is not set")
         if url is None:
@@ -59,8 +74,40 @@ class OpenAIAPI:
             err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
             module_logger.error(err_msg)
             raise Exception(err_msg)
-        return response.json()
 
+        stream = kwargs.get('stream', False)
+        if stream:
+            return OpenAIAPI._gen_stream_response(response)
+        else:
+            return response.json()
+
+    @staticmethod
+    def _gen_stream_response(response):
+        data_buffer = ''
+        for chunk in response.iter_content(decode_unicode=True):
+            data_buffer += chunk
+            while '\n' in data_buffer:  # when '\n' is in the buffer, there is a complete message to process
+                line, data_buffer = data_buffer.split('\n', 1)
+                line = line.strip()
+                if line.startswith('data:'):
+                    line = line[len('data:'):].strip()
+                    if line == '[DONE]':  # end the function when '[DONE]' message is received
+                        return
+                    else:
+                        data = json.loads(line)
+                        yield data
+
+    @staticmethod
+    def stream_chat(response):
+        for data in response:
+            if 'content' in data['choices'][0]['delta']:
+                yield data['choices'][0]['delta']['content']
+    
+    @staticmethod
+    def stream_completions(response):
+        for data in response:
+            yield data['choices'][0]['text']
+    
     @staticmethod
     def api_request_endpoint(request_url, endpoint_manager=None, **kwargs):
         if endpoint_manager != None:
@@ -68,10 +115,10 @@ class OpenAIAPI:
             base_url, api_key, organization = endpoint_manager.get_endpoint()
         else:
             base_url = OpenAIAPI.base_url
-            api_key = OpenAIAPI.api_key
-            organization = OpenAIAPI.organization
+            api_key = OpenAIAPI.api_key if OpenAIAPI.api_key is not None else OpenAIAPI._get_key_from_env()
+            organization = OpenAIAPI.organization if OpenAIAPI.organization is not None else OpenAIAPI._get_organization_from_env()
         url = base_url + request_url
-        return OpenAIAPI.api_request(url, api_key, organization=organization, **kwargs)
+        return OpenAIAPI._api_request(url, api_key, organization=organization, **kwargs)
     
     @staticmethod
     def chat(timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
