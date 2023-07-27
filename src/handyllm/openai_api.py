@@ -234,6 +234,11 @@ class OpenAIAPI:
         if model:
             request_url += f'/{model}'
         return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+    
+    @staticmethod
+    def moderations(timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/moderations'
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
 
 if __name__ == '__main__':
