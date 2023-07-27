@@ -33,7 +33,7 @@ class OpenAIAPI:
         return os.environ.get('OPENAI_ORGANIZATION')
 
     @staticmethod
-    def _api_request(url, api_key, organization=None, timeout=None, **kwargs):
+    def _api_request(url, api_key, organization=None, method='post', timeout=None, **kwargs):
         if api_key is None:
             raise Exception("OpenAI API key is not set")
         if url is None:
@@ -50,7 +50,7 @@ class OpenAIAPI:
         log_strs.append(f"timeout: {timeout}")
         module_logger.info('\n'.join(log_strs))
 
-        request_data = kwargs
+        request_data = kwargs if method == 'post' else None
         headers = {
             'Authorization': 'Bearer ' + api_key,
             'Content-Type': 'application/json'
@@ -59,7 +59,8 @@ class OpenAIAPI:
             headers['OpenAI-Organization'] = organization
         
         stream = kwargs.get('stream', False)
-        response = requests.post(
+        response = requests.request(
+            method,
             url, 
             headers=headers, 
             # data=json.dumps(request_data),
@@ -131,7 +132,7 @@ class OpenAIAPI:
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
             
             if logger is not None:
                 end_time = time.time()
@@ -185,7 +186,7 @@ class OpenAIAPI:
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
             if logger is not None:
                 end_time = time.time()
@@ -225,7 +226,14 @@ class OpenAIAPI:
     @staticmethod
     def embeddings(timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/embeddings'
-        return OpenAIAPI.api_request_endpoint(request_url, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+
+    @staticmethod
+    def models(model=None, timeout=None, endpoint_manager=None, **kwargs):
+        request_url = '/models'
+        if model:
+            request_url += f'/{model}'
+        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
 
 if __name__ == '__main__':
