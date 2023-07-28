@@ -6,3 +6,21 @@ dist
 *.env
 
 venv
+tmp*
+
+# image files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.pdf
+# audio files
+*.m4a
+*.mp3
+*.mp4
+*.wav
+*.flac
+*.aac
+
