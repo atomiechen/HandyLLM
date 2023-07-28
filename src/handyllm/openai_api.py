@@ -51,25 +51,26 @@ class OpenAIAPI:
         module_logger.info('\n'.join(log_strs))
 
         files = kwargs.pop('files', None)
+        stream = kwargs.get('stream', False)
         headers = { 'Authorization': 'Bearer ' + api_key }
+        json_data = None
+        data = None
+        params = None
         if organization is not None:
             headers['OpenAI-Organization'] = organization
         if method == 'post':
             if files is None:
                 headers['Content-Type'] = 'application/json'
                 json_data = kwargs
-                data = None
             else:  ## if files is not None, let requests handle the content type
-                json_data = None
                 data = kwargs
-        
-        stream = kwargs.get('stream', False)
-        params = { "stream": "true" } if method == 'get' and stream else None
+        if method == 'get' and stream:
+            params = { "stream": "true" }
+
         response = requests.request(
             method,
-            url, 
-            headers=headers, 
-            # data=json.dumps(json_data),
+            url,
+            headers=headers,
             data=data,
             json=json_data,
             files=files,
