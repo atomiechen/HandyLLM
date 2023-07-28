@@ -28,7 +28,9 @@ Example scripts are placed in [tests](./tests) folder.
 
 ## OpenAI API Request
 
-This toolkit uses HTTP API request instead of OpenAI's official python package to support client-side `timeout` control:
+### Timeout control
+
+This toolkit supports client-side `timeout` control, which OpenAI's official python package does not support yet:
 
 ```python
 from handyllm import OpenAIAPI
@@ -44,6 +46,8 @@ response = OpenAIAPI.chat(
 print(response['choices'][0]['message']['content'])
 ```
 
+### Authorization
+
 API key and organization will be loaded using the environment variable `OPENAI_API_KEY` and `OPENAI_ORGANIZATION`, or you can set manually:
 
 ```python
@@ -51,7 +55,11 @@ OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 OpenAIAPI.organization = '......'  # default: None
 ```
 
-Stream response of `chat`/`completions` can be achieved using `steam` parameter:
+Or, you can pass `api_key` and `organization` parameters in each API call.
+
+### Stream response
+
+Stream response of `chat`/`completions`/`finetunes_list_events` can be achieved using `steam` parameter:
 
 ```python
 response = OpenAIAPI.chat(
@@ -71,9 +79,39 @@ for text in OpenAIAPI.stream_chat(response):
 #         print(chunk['choices'][0]['delta']['content'], end='')
 ```
 
+### Supported APIs
+
+- chat
+- completions
+- edits
+- embeddings
+- models_list
+- models_retrieve
+- moderations
+- images_generations
+- images_edits
+- images_variations
+- audio_transcriptions
+- audtio_translations
+- files_list
+- files_upload
+- files_delete
+- files_retrieve
+- files_retrieve_content
+- finetunes_create
+- finetunes_list
+- finetunes_retrieve
+- finetunes_cancel
+- finetunes_list_events
+- finetunes_delete_model
+
+Please refer to [OpenAI official API reference](https://platform.openai.com/docs/api-reference) for details.
+
 
 
 ## Prompt
+
+### Prompt Conversion
 
 `PromptConverter` can convert this text file `prompt.txt` into a structured prompt for chat API calls:
 
@@ -109,7 +147,7 @@ chat = converter.rawfile2chat('prompt.txt')
 new_chat = converter.chat_replace_variables(chat, {r'%misc%': 'Note: do not use any bad word.'})
 ```
 
-
+### Substitute
 
 `PromptConverter` can also substitute placeholder variables like `%output_format%` stored in text files to make multiple prompts modular. A substitute map `substitute.txt` looks like this:
 
