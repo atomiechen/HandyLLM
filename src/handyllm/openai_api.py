@@ -116,13 +116,25 @@ class OpenAIAPI:
     
     @staticmethod
     def api_request_endpoint(request_url, endpoint_manager=None, **kwargs):
+        specified_api_key = kwargs.pop('api_key', None)
+        specified_organization = kwargs.pop('organization', None)
         if endpoint_manager != None:
             # 每次换服务器和key要同时换，保证服务器和key是对应的
             base_url, api_key, organization = endpoint_manager.get_endpoint()
         else:
             base_url = OpenAIAPI.base_url
-            api_key = OpenAIAPI.api_key if OpenAIAPI.api_key is not None else OpenAIAPI._get_key_from_env()
-            organization = OpenAIAPI.organization if OpenAIAPI.organization is not None else OpenAIAPI._get_organization_from_env()
+            if specified_api_key is not None:
+                api_key = specified_api_key
+            elif OpenAIAPI.api_key is not None:
+                api_key = OpenAIAPI.api_key
+            else:
+                api_key = OpenAIAPI._get_key_from_env()
+            if specified_organization is not None:
+                organization = specified_organization
+            elif OpenAIAPI.organization is not None:
+                organization = OpenAIAPI.organization 
+            else:
+                organization = OpenAIAPI._get_organization_from_env()
         url = base_url + request_url
         return OpenAIAPI._api_request(url, api_key, organization=organization, **kwargs)
     
