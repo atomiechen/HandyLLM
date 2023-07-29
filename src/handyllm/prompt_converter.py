@@ -62,11 +62,10 @@ class PromptConverter:
         else:
             new_chat = []
             for message in chat:
+                new_message = {"role": message['role'], "content": message['content']}
                 for var, value in variable_map.items():
                     if var in message['content']:
-                        new_message = {"role": message['role'], "content": message['content'].replace(var, value)}
-                    else:
-                        new_message = {"role": message['role'], "content": message['content']}
+                        new_message = {"role": new_message['role'], "content": new_message['content'].replace(var, value)}
                 new_chat.append(new_message)
             return new_chat
 
