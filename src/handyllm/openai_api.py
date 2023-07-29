@@ -140,12 +140,11 @@ class OpenAIAPI:
         return OpenAIAPI._api_request(url, api_key, organization=organization, **kwargs)
     
     @staticmethod
-    def chat(model, messages, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+    def chat(messages, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
         request_url = '/chat/completions'
 
-        if logger is not None and 'messages' in kwargs:
+        if logger is not None:
             arguments = copy.deepcopy(kwargs)
-            arguments.pop('messages', None)
             # check if log_marks is iterable
             if utils.isiterable(log_marks):
                 input_lines = [str(item) for item in log_marks]
@@ -153,13 +152,13 @@ class OpenAIAPI:
                 input_lines = [str(log_marks)]
             input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
             input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(OpenAIAPI.converter.chat2raw(kwargs['messages']))
+            input_lines.append(OpenAIAPI.converter.chat2raw(messages))
             input_lines.append(" INPUT END ".center(50, '-')+"\n")
             input_str = "\n".join(input_lines)
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, model=model, messages=messages, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = OpenAIAPI.api_request_endpoint(request_url, messages=messages, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
             
             if logger is not None:
                 end_time = time.time()
@@ -173,16 +172,19 @@ class OpenAIAPI:
                 if stream:
                     def wrapper(response):
                         text = ''
+                        role = ''
                         for data in response:
+                            if 'role' in data['choices'][0]['delta']:
+                                role = data['choices'][0]['delta']['role']
                             if 'content' in data['choices'][0]['delta']:
                                 text += data['choices'][0]['delta']['content']
                             yield data
-                        log_strs.append(text)
+                        log_strs.append(OpenAIAPI.converter.chat2raw([{'role': role, 'content': text}]))
                         log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                         logger.info('\n'.join(log_strs))
                     response = wrapper(response)
                 else:
-                    log_strs.append(response['choices'][0]['message']['content'])
+                    log_strs.append(OpenAIAPI.converter.chat2raw([response['choices'][0]['message']]))
                     log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                     logger.info('\n'.join(log_strs))
         except Exception as e:
@@ -198,12 +200,11 @@ class OpenAIAPI:
         return response
     
     @staticmethod
-    def completions(model, prompt, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+    def completions(prompt, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
         request_url = '/completions'
 
-        if logger is not None and 'prompt' in kwargs:
+        if logger is not None:
             arguments = copy.deepcopy(kwargs)
-            arguments.pop('prompt', None)
             # check if log_marks is iterable
             if utils.isiterable(log_marks):
                 input_lines = [str(item) for item in log_marks]
@@ -211,13 +212,13 @@ class OpenAIAPI:
                 input_lines = [str(log_marks)]
             input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
             input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(kwargs['prompt'])
+            input_lines.append(prompt)
             input_lines.append(" INPUT END ".center(50, '-')+"\n")
             input_str = "\n".join(input_lines)
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, model=model, prompt=prompt, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = OpenAIAPI.api_request_endpoint(request_url, prompt=prompt, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
             if logger is not None:
                 end_time = time.time()
