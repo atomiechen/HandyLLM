@@ -6,6 +6,7 @@ import json
 import copy
 
 from .prompt_converter import PromptConverter
+from . import utils
 
 module_logger = logging.getLogger(__name__)
 
@@ -145,7 +146,11 @@ class OpenAIAPI:
         if logger is not None and 'messages' in kwargs:
             arguments = copy.deepcopy(kwargs)
             arguments.pop('messages', None)
-            input_lines = [str(item) for item in log_marks]
+            # check if log_marks is iterable
+            if utils.isiterable(log_marks):
+                input_lines = [str(item) for item in log_marks]
+            else:
+                input_lines = [str(log_marks)]
             input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
             input_lines.append(" INPUT START ".center(50, '-'))
             input_lines.append(OpenAIAPI.converter.chat2raw(kwargs['messages']))
@@ -199,7 +204,11 @@ class OpenAIAPI:
         if logger is not None and 'prompt' in kwargs:
             arguments = copy.deepcopy(kwargs)
             arguments.pop('prompt', None)
-            input_lines = [str(item) for item in log_marks]
+            # check if log_marks is iterable
+            if utils.isiterable(log_marks):
+                input_lines = [str(item) for item in log_marks]
+            else:
+                input_lines = [str(log_marks)]
             input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
             input_lines.append(" INPUT START ".center(50, '-'))
             input_lines.append(kwargs['prompt'])

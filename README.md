@@ -28,9 +28,13 @@ Example scripts are placed in [tests](./tests) folder.
 
 ## OpenAI API Request
 
+### Logs
+
+You can pass custom `logger` and `log_marks` (a string or a collection of strings) to `chat`/`completions` to get input and output logging.
+
 ### Timeout control
 
-This toolkit supports client-side `timeout` control, which OpenAI's official python package does not support yet:
+This toolkit supports client-side `timeout` control:
 
 ```python
 from handyllm import OpenAIAPI
