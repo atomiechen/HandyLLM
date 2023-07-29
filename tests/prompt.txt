@@ -15,4 +15,5 @@ $user$
     "item2": "Indeed."
 }
 %output_format%
-%misc%
+%misc1%
+%misc2%

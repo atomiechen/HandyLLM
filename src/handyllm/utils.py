@@ -2,6 +2,7 @@ import requests
 from urllib.parse import urlparse
 import os
 import time
+import collections.abc
 
 
 def get_filename_from_url(download_url):
@@ -23,3 +24,8 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
+def isiterable(arg):
+    return (
+        isinstance(arg, collections.abc.Iterable) 
+        and not isinstance(arg, str)
+    )
