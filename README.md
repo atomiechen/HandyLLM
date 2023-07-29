@@ -133,7 +133,8 @@ $user$
     "item2": "Indeed."
 }
 %output_format%
-%misc%
+%misc1%
+%misc2%
 ```
 
 ```python
@@ -144,7 +145,13 @@ converter = PromptConverter()
 chat = converter.rawfile2chat('prompt.txt')
 
 # variables wrapped in %s can be replaced at runtime
-new_chat = converter.chat_replace_variables(chat, {r'%misc%': 'Note: do not use any bad word.'})
+new_chat = converter.chat_replace_variables(
+    chat, 
+    {
+        r'%misc1%': 'Note1: do not use any bad word.',
+        r'%misc2%': 'Note2: be optimistic.',
+    }
+)
 ```
 
 ### Substitute
