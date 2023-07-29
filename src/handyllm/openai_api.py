@@ -105,10 +105,20 @@ class OpenAIAPI:
                     yield json.loads(line)
 
     @staticmethod
-    def stream_chat(response):
+    def stream_chat_with_role(response):
+        role = ''
         for data in response:
-            if 'content' in data['choices'][0]['delta']:
-                yield data['choices'][0]['delta']['content']
+            message = data['choices'][0]['delta']
+            if 'role' in message:
+                role = message['role']
+            if 'content' in message:
+                text = message['content']
+                yield role, text
+    
+    @staticmethod
+    def stream_chat(response):
+        for _, text in OpenAIAPI.stream_chat_with_role(response):
+            yield text
     
     @staticmethod
     def stream_completions(response):
@@ -174,10 +184,11 @@ class OpenAIAPI:
                         text = ''
                         role = ''
                         for data in response:
-                            if 'role' in data['choices'][0]['delta']:
-                                role = data['choices'][0]['delta']['role']
-                            if 'content' in data['choices'][0]['delta']:
-                                text += data['choices'][0]['delta']['content']
+                            message = data['choices'][0]['delta']
+                            if 'role' in message:
+                                role = message['role']
+                            if 'content' in message:
+                                text += message['content']
                             yield data
                         log_strs.append(OpenAIAPI.converter.chat2raw([{'role': role, 'content': text}]))
                         log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
