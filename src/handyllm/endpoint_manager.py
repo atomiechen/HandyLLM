@@ -38,7 +38,7 @@ class EndpointManager:
 
     def get_base_url(self):
         if len(self._base_urls) == 0:
-            return OpenAIAPI.base_url
+            return OpenAIAPI.get_api_base()
         else:
             base_url = self._base_urls[self._last_idx_url]
             if self._last_idx_url == len(self._base_urls) - 1:
@@ -49,7 +49,7 @@ class EndpointManager:
 
     def get_key(self):
         if len(self._keys) == 0:
-            return OpenAIAPI.api_key
+            return OpenAIAPI.get_api_key()
         else:
             key = self._keys[self._last_idx_key]
             if self._last_idx_key == len(self._keys) - 1:
@@ -60,7 +60,7 @@ class EndpointManager:
     
     def get_organization(self):
         if len(self._organizations) == 0:
-            return OpenAIAPI.organization
+            return OpenAIAPI.get_organization()
         else:
             organization = self._organizations[self._last_idx_organization]
             if self._last_idx_organization == len(self._keys) - 1:

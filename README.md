@@ -28,7 +28,7 @@ Example scripts are placed in [tests](./tests) folder.
 
 ## OpenAI API Request
 
-### Logs
+### Logger
 
 You can pass custom `logger` and `log_marks` (a string or a collection of strings) to `chat`/`completions` to get input and output logging.
 
@@ -110,6 +110,14 @@ for text in OpenAIAPI.stream_chat(response):
 - finetunes_delete_model
 
 Please refer to [OpenAI official API reference](https://platform.openai.com/docs/api-reference) for details.
+
+### Azure
+
+**Azure OpenAI APIs are supported!** 
+
+Refer to [test_azure.py](./tests/test_azure.py) for example usage.
+
+Refer to [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/).
 
 
 

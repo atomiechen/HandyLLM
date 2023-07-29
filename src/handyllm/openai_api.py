@@ -1,5 +1,6 @@
 import os
 import time
+from urllib.parse import quote_plus
 import requests
 import logging
 import json
@@ -8,11 +9,26 @@ import copy
 from .prompt_converter import PromptConverter
 from . import utils
 
+_API_BASE_OPENAI = 'https://api.openai.com/v1'
+_API_TYPE_OPENAI = 'openai'
+_API_TYPES_AZURE = (
+    'azure', 
+    'azure_ad', 
+    'azuread'
+)
+_API_VERSION_AZURE = '2023-05-15'
+
 module_logger = logging.getLogger(__name__)
 
 class OpenAIAPI:
     
-    base_url = "https://api.openai.com/v1"
+    # deprecated
+    base_url = _API_BASE_OPENAI
+    
+    # set this to your API base;
+    # or environment variable OPENAI_API_BASE will be used.
+    # can be None (roll back to default).
+    api_base = None
     
     # set this to your API key; 
     # or environment variable OPENAI_API_KEY will be used.
@@ -23,26 +39,62 @@ class OpenAIAPI:
     # can be None.
     organization = None
     
+    # set this to your API type;
+    # or environment variable OPENAI_API_TYPE will be used;
+    # can be None (roll back to default).
+    api_type = None
+    
+    # set this to your API version;
+    # or environment variable OPENAI_API_VERSION will be used;
+    # can be None.
+    api_version = None
+    
     converter = PromptConverter()
     
-    @staticmethod
-    def _get_key_from_env():
-        return os.environ.get('OPENAI_API_KEY')
+    @classmethod
+    def get_api_key(cls, api_key=None):
+        if not api_key:
+            api_key = cls.api_key if cls.api_key else os.environ.get('OPENAI_API_KEY')
+        return api_key
     
-    @staticmethod
-    def _get_organization_from_env():
-        return os.environ.get('OPENAI_ORGANIZATION')
+    @classmethod
+    def get_organization(cls, organization=None):
+        if not organization:
+            organization = cls.organization if cls.organization else os.environ.get('OPENAI_ORGANIZATION')
+        return organization
+    
+    @classmethod
+    def get_api_base(cls, api_base=None):
+        if not api_base:
+            api_base = cls.api_base if cls.api_base else os.environ.get('OPENAI_API_BASE')
+            if not api_base:
+                api_base = _API_BASE_OPENAI
+        return api_base
+    
+    @classmethod
+    def get_api_type_and_version(cls, api_type=None, api_version=None):
+        if not api_type:
+            api_type = cls.api_type if cls.api_type else os.environ.get('OPENAI_API_TYPE')
+            if not api_type:
+                api_type = _API_TYPE_OPENAI
+        if not api_version:
+            api_version = cls.api_version if cls.api_version else os.environ.get('OPENAI_API_VERSION')
+            if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
+                api_version = _API_VERSION_AZURE
+        return api_type, api_version
 
     @staticmethod
-    def _api_request(url, api_key, organization=None, method='post', timeout=None, **kwargs):
+    def _api_request(url, api_key, organization=None, api_type=api_type, method='post', timeout=None, **kwargs):
         if api_key is None:
             raise Exception("OpenAI API key is not set")
         if url is None:
             raise Exception("OpenAI API url is not set")
+        if api_type is None:
+            raise Exception("OpenAI API type is not set")
 
         ## log request info
         log_strs = []
-        # 避免直接打印api_key
+        # avoid logging the whole api_key
         plaintext_len = 8
         log_strs.append(f"API request {url}")
         log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
@@ -53,10 +105,14 @@ class OpenAIAPI:
 
         files = kwargs.pop('files', None)
         stream = kwargs.get('stream', False)
-        headers = { 'Authorization': 'Bearer ' + api_key }
+        headers = {}
         json_data = None
         data = None
-        params = None
+        params = {}
+        if api_type in _API_TYPES_AZURE:
+            headers['api-key'] = api_key
+        else:
+            headers['Authorization'] = 'Bearer ' + api_key
         if organization is not None:
             headers['OpenAI-Organization'] = organization
         if method == 'post':
@@ -66,7 +122,7 @@ class OpenAIAPI:
             else:  ## if files is not None, let requests handle the content type
                 data = kwargs
         if method == 'get' and stream:
-            params = { "stream": "true" }
+            params['stream'] = 'true'
 
         response = requests.request(
             method,
@@ -125,33 +181,44 @@ class OpenAIAPI:
         for data in response:
             yield data['choices'][0]['text']
     
-    @staticmethod
-    def api_request_endpoint(request_url, endpoint_manager=None, **kwargs):
-        specified_api_key = kwargs.pop('api_key', None)
-        specified_organization = kwargs.pop('organization', None)
+    @classmethod
+    def api_request_endpoint(
+        cls,
+        request_url, 
+        endpoint_manager=None, 
+        **kwargs
+        ):
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         if endpoint_manager != None:
-            # 每次换服务器和key要同时换，保证服务器和key是对应的
-            base_url, api_key, organization = endpoint_manager.get_endpoint()
-        else:
-            base_url = OpenAIAPI.base_url
-            if specified_api_key is not None:
-                api_key = specified_api_key
-            elif OpenAIAPI.api_key is not None:
-                api_key = OpenAIAPI.api_key
-            else:
-                api_key = OpenAIAPI._get_key_from_env()
-            if specified_organization is not None:
-                organization = specified_organization
-            elif OpenAIAPI.organization is not None:
-                organization = OpenAIAPI.organization 
-            else:
-                organization = OpenAIAPI._get_organization_from_env()
-        url = base_url + request_url
-        return OpenAIAPI._api_request(url, api_key, organization=organization, **kwargs)
+            api_base, api_key, organization = endpoint_manager.get_endpoint()
+        url = api_base.rstrip('/') + '/' + request_url.lstrip('/')
+        return cls._api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
     
-    @staticmethod
-    def chat(messages, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
-        request_url = '/chat/completions'
+    @classmethod
+    def consume_kwargs(cls, kwargs):
+        api_key = cls.get_api_key(kwargs.pop('api_key', None))
+        organization = cls.get_organization(kwargs.pop('organization', None))
+        api_base = cls.get_api_base(kwargs.pop('api_base', None))
+        api_type, api_version = cls.get_api_type_and_version(
+            kwargs.pop('api_type', None), 
+            kwargs.pop('api_version', None)
+        )
+        deployment_id = kwargs.pop('deployment_id', None)
+        engine = kwargs.pop('engine', deployment_id)
+        return api_key, organization, api_base, api_type, api_version, engine
+    
+    @classmethod
+    def chat(cls, messages, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            if engine is None:
+                raise Exception("Azure API requires engine to be specified")
+            request_url = f'/openai/deployments/{quote_plus(engine)}/chat/completions?api-version={api_version}'
+        else:
+            if engine is not None:
+                request_url = f'/engines/{quote_plus(engine)}/chat/completions'
+            else:
+                request_url = '/chat/completions'
 
         if logger is not None:
             arguments = copy.deepcopy(kwargs)
@@ -162,13 +229,24 @@ class OpenAIAPI:
                 input_lines = [str(log_marks)]
             input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
             input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(OpenAIAPI.converter.chat2raw(messages))
+            input_lines.append(cls.converter.chat2raw(messages))
             input_lines.append(" INPUT END ".center(50, '-')+"\n")
             input_str = "\n".join(input_lines)
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, messages=messages, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = cls.api_request_endpoint(
+                request_url, 
+                messages=messages, 
+                method='post', 
+                timeout=timeout, 
+                endpoint_manager=endpoint_manager, 
+                api_key=api_key,
+                organization=organization,
+                api_base=api_base,
+                api_type=api_type,
+                **kwargs
+            )
             
             if logger is not None:
                 end_time = time.time()
@@ -190,12 +268,12 @@ class OpenAIAPI:
                             if 'content' in message:
                                 text += message['content']
                             yield data
-                        log_strs.append(OpenAIAPI.converter.chat2raw([{'role': role, 'content': text}]))
+                        log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
                         log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                         logger.info('\n'.join(log_strs))
                     response = wrapper(response)
                 else:
-                    log_strs.append(OpenAIAPI.converter.chat2raw([response['choices'][0]['message']]))
+                    log_strs.append(cls.converter.chat2raw([response['choices'][0]['message']]))
                     log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                     logger.info('\n'.join(log_strs))
         except Exception as e:
@@ -210,9 +288,18 @@ class OpenAIAPI:
 
         return response
     
-    @staticmethod
-    def completions(prompt, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
-        request_url = '/completions'
+    @classmethod
+    def completions(cls, prompt, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            if engine is None:
+                raise Exception("Azure API requires engine to be specified")
+            request_url = f'/openai/deployments/{quote_plus(engine)}/completions?api-version={api_version}'
+        else:
+            if engine is not None:
+                request_url = f'/engines/{quote_plus(engine)}/completions'
+            else:
+                request_url = '/completions'
 
         if logger is not None:
             arguments = copy.deepcopy(kwargs)
@@ -229,7 +316,18 @@ class OpenAIAPI:
         
         start_time = time.time()
         try:
-            response = OpenAIAPI.api_request_endpoint(request_url, prompt=prompt, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+            response = cls.api_request_endpoint(
+                request_url, 
+                prompt=prompt, 
+                method='post', 
+                timeout=timeout, 
+                endpoint_manager=endpoint_manager, 
+                api_key=api_key,
+                organization=organization,
+                api_base=api_base,
+                api_type=api_type,
+                **kwargs
+            )
 
             if logger is not None:
                 end_time = time.time()
@@ -266,117 +364,136 @@ class OpenAIAPI:
 
         return response
     
-    @staticmethod
-    def edits(model, instruction, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def edits(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/edits'
-        return OpenAIAPI.api_request_endpoint(request_url, model=model, instruction=instruction, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def embeddings(model, input, timeout=None, endpoint_manager=None, **kwargs):
-        request_url = '/embeddings'
-        return OpenAIAPI.api_request_endpoint(request_url, model=model, input=input, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+    @classmethod
+    def embeddings(cls, timeout=None, endpoint_manager=None, **kwargs):
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            if engine is None:
+                raise Exception("Azure API requires engine to be specified")
+            request_url = f'/openai/deployments/{quote_plus(engine)}/embeddings?api-version={api_version}'
+        else:
+            if engine is not None:
+                request_url = f'/engines/{quote_plus(engine)}/embeddings'
+            else:
+                request_url = '/embeddings'
+        return cls.api_request_endpoint(
+            request_url, 
+            method='post', 
+            timeout=timeout, 
+            endpoint_manager=endpoint_manager, 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            **kwargs
+            )
 
-    @staticmethod
-    def models_list(timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def models_list(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/models'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def models_retrieve(model, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def models_retrieve(cls, model, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/models/{model}'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def moderations(input, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def moderations(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/moderations'
-        return OpenAIAPI.api_request_endpoint(request_url, input=input, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def images_generations(prompt, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def images_generations(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/images/generations'
-        return OpenAIAPI.api_request_endpoint(request_url, prompt=prompt, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def images_edits(image, prompt, mask=None, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def images_edits(cls, image, mask=None, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/images/edits'
         files = { 'image': image }
         if mask:
             files['mask'] = mask
-        return OpenAIAPI.api_request_endpoint(request_url, prompt=prompt, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def images_variations(image, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def images_variations(cls, image, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/images/variations'
         files = { 'image': image }
-        return OpenAIAPI.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def audio_transcriptions(file, model, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def audio_transcriptions(cls, file, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/audio/transcriptions'
         files = { 'file': file }
-        return OpenAIAPI.api_request_endpoint(request_url, model=model, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def audio_translations(file, model, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def audio_translations(cls, file, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/audio/translations'
         files = { 'file': file }
-        return OpenAIAPI.api_request_endpoint(request_url, model=model, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def files_list(timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def files_list(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/files'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def files_upload(file, purpose, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def files_upload(cls, file, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/files'
         files = { 'file': file }
-        return OpenAIAPI.api_request_endpoint(request_url, purpose=purpose, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def files_delete(file_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def files_delete(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/files/{file_id}'
-        return OpenAIAPI.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def files_retrieve(file_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def files_retrieve(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/files/{file_id}'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def files_retrieve_content(file_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def files_retrieve_content(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/files/{file_id}/content'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_create(training_file, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_create(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/fine-tunes'
-        return OpenAIAPI.api_request_endpoint(request_url, training_file=training_file, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_list(timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_list(cls, timeout=None, endpoint_manager=None, **kwargs):
         request_url = '/fine-tunes'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_retrieve(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_retrieve(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_cancel(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_cancel(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}/cancel'
-        return OpenAIAPI.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_list_events(fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_list_events(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}/events'
-        return OpenAIAPI.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
-    @staticmethod
-    def finetunes_delete_model(model, timeout=None, endpoint_manager=None, **kwargs):
+    @classmethod
+    def finetunes_delete_model(cls, model, timeout=None, endpoint_manager=None, **kwargs):
         request_url = f'/models/{model}'
-        return OpenAIAPI.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
 
 
 if __name__ == '__main__':
