@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import time
 
 from . import _API_TYPES_AZURE
 
@@ -92,3 +93,22 @@ def _gen_stream_response(response):
             if byte_line.startswith(b"data: "):
                 line = byte_line[len(b"data: "):].decode("utf-8")
                 yield json.loads(line)
+
+def poll(
+    url, 
+    method, 
+    until, 
+    failed, 
+    interval=1, 
+    headers=None,
+    params=None,
+    ):
+    response = requests.request(method, url, headers=headers, params=params)
+    if failed(response):
+        return response
+    while not until(response):
+        time.sleep(interval)
+        response = requests.request(method, url, headers=headers, params=params)
+        if failed(response):
+            return response
+    return response

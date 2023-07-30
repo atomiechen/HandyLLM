@@ -4,7 +4,7 @@ from urllib.parse import quote_plus
 import json
 import copy
 
-from .api_request import api_request
+from .api_request import api_request, poll
 from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
 from . import utils
@@ -352,11 +352,28 @@ class OpenAIAPI:
             raw_response=raw_response,
             **kwargs
             )
-        if raw_response:
-            ## TODO: support Azure image generation
-            pass
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            ## TODO: check Azure image generation
+            # use raw response to get poll_url
+            poll_url = response.headers['operation-location']
+            headers= { "api-key": api_key, "Content-Type": "application/json" }
+            response = poll(
+                url=poll_url, 
+                method='get', 
+                until=lambda response: response.json()['status'] == 'succeeded',
+                failed=cls.check_image_failure,
+                headers=headers, 
+                )
+            response_dict = response.json()
+            return response_dict.get('result', response_dict)
         else:
             return response
+
+    @staticmethod
+    def check_image_failure(response):
+        response_dict = response.json()
+        if response_dict['status'] == 'failed':
+            raise Exception(f"Image generation failed: {response_dict['error']['code']} {response_dict['error']['message']}")
 
     @classmethod
     def images_edits(cls, image, mask=None, **kwargs):
