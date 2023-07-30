@@ -31,6 +31,7 @@ def api_request(
     # avoid logging the whole api_key
     plaintext_len = 8
     log_strs.append(f"API request {url}")
+    log_strs.append(f"api_type: {api_type}")
     log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
     if organization is not None:
         log_strs.append(f"organization: {organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
@@ -68,7 +69,7 @@ def api_request(
         stream=stream,
         timeout=timeout,
         )
-    if response.status_code != 200:
+    if not 200 <= response.status_code < 300:
         # report both status code and error message
         try:
             message = response.json()['error']['message']
@@ -99,7 +100,7 @@ def poll(
     method, 
     until, 
     failed, 
-    interval=1, 
+    interval, 
     headers=None,
     params=None,
     ):
@@ -107,7 +108,7 @@ def poll(
     if failed(response):
         return response
     while not until(response):
-        time.sleep(interval)
+        time.sleep(interval(response))
         response = requests.request(method, url, headers=headers, params=params)
         if failed(response):
             return response

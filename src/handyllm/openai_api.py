@@ -353,7 +353,7 @@ class OpenAIAPI:
             **kwargs
             )
         if api_type and api_type.lower() in _API_TYPES_AZURE:
-            ## TODO: check Azure image generation
+            # Azure image generation
             # use raw response to get poll_url
             poll_url = response.headers['operation-location']
             headers= { "api-key": api_key, "Content-Type": "application/json" }
@@ -362,10 +362,10 @@ class OpenAIAPI:
                 method='get', 
                 until=lambda response: response.json()['status'] == 'succeeded',
                 failed=cls.check_image_failure,
+                interval=lambda response: cls.get_retry(response) or 1,
                 headers=headers, 
-                )
-            response_dict = response.json()
-            return response_dict.get('result', response_dict)
+                ).json()
+            return response.get('result', response)
         else:
             return response
 
@@ -374,6 +374,13 @@ class OpenAIAPI:
         response_dict = response.json()
         if response_dict['status'] == 'failed':
             raise Exception(f"Image generation failed: {response_dict['error']['code']} {response_dict['error']['message']}")
+    
+    @staticmethod
+    def get_retry(response):
+        try:
+            return int(response.headers.get('retry-after'))
+        except:
+            return None
 
     @classmethod
     def images_edits(cls, image, mask=None, **kwargs):
