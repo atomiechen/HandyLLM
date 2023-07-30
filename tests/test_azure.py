@@ -11,7 +11,7 @@ import json
 OpenAIAPI.api_type = 'azure'
 OpenAIAPI.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
 OpenAIAPI.api_key = os.getenv("AZURE_OPENAI_KEY")
-OpenAIAPI.api_version = '2023-05-15'
+OpenAIAPI.api_version = '2023-05-15'  # can be None and default value will be used
 
 # ----- EXAMPLE 1 -----
 

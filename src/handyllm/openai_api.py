@@ -6,6 +6,7 @@ import logging
 import json
 import copy
 
+from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
 from . import utils
 
@@ -185,30 +186,46 @@ class OpenAIAPI:
     def api_request_endpoint(
         cls,
         request_url, 
-        endpoint_manager=None, 
         **kwargs
         ):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
-        if endpoint_manager != None:
-            api_base, api_key, organization = endpoint_manager.get_endpoint()
-        url = api_base.rstrip('/') + '/' + request_url.lstrip('/')
+        url = utils.join_url(api_base, request_url)
         return cls._api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
     
     @classmethod
     def consume_kwargs(cls, kwargs):
-        api_key = cls.get_api_key(kwargs.pop('api_key', None))
-        organization = cls.get_organization(kwargs.pop('organization', None))
-        api_base = cls.get_api_base(kwargs.pop('api_base', None))
+        api_key = organization = api_base = api_type = api_version = engine = None
+
+        # read API info from endpoint_manager
+        endpoint_manager = kwargs.pop('endpoint_manager', None)
+        if endpoint_manager is not None:
+            if not isinstance(endpoint_manager, EndpointManager):
+                raise Exception("endpoint_manager must be an instance of EndpointManager")
+            # get_next_endpoint() will be called once for each request
+            api_key, organization, api_base, api_type, api_version = endpoint_manager.get_next_endpoint().get_api_info()
+
+        # read API info from endpoint (override API info from endpoint_manager)
+        endpoint = kwargs.pop('endpoint', None)
+        if endpoint is not None:
+            if not isinstance(endpoint, Endpoint):
+                raise Exception("endpoint must be an instance of Endpoint")
+            api_key, organization, api_base, api_type, api_version = endpoint.get_api_info()
+
+        # read API info from kwargs, class variables, and environment variables
+        api_key = cls.get_api_key(kwargs.pop('api_key', api_key))
+        organization = cls.get_organization(kwargs.pop('organization', organization))
+        api_base = cls.get_api_base(kwargs.pop('api_base', api_base))
         api_type, api_version = cls.get_api_type_and_version(
-            kwargs.pop('api_type', None), 
-            kwargs.pop('api_version', None)
+            kwargs.pop('api_type', api_type), 
+            kwargs.pop('api_version', api_version)
         )
+
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
         return api_key, organization, api_base, api_type, api_version, engine
     
     @classmethod
-    def chat(cls, messages, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+    def chat(cls, messages, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE:
             if engine is None:
@@ -239,8 +256,6 @@ class OpenAIAPI:
                 request_url, 
                 messages=messages, 
                 method='post', 
-                timeout=timeout, 
-                endpoint_manager=endpoint_manager, 
                 api_key=api_key,
                 organization=organization,
                 api_base=api_base,
@@ -289,7 +304,7 @@ class OpenAIAPI:
         return response
     
     @classmethod
-    def completions(cls, prompt, timeout=None, endpoint_manager=None, logger=None, log_marks=[], **kwargs):
+    def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE:
             if engine is None:
@@ -320,8 +335,6 @@ class OpenAIAPI:
                 request_url, 
                 prompt=prompt, 
                 method='post', 
-                timeout=timeout, 
-                endpoint_manager=endpoint_manager, 
                 api_key=api_key,
                 organization=organization,
                 api_base=api_base,
@@ -365,12 +378,12 @@ class OpenAIAPI:
         return response
     
     @classmethod
-    def edits(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def edits(cls, **kwargs):
         request_url = '/edits'
-        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', **kwargs)
 
     @classmethod
-    def embeddings(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def embeddings(cls, **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE:
             if engine is None:
@@ -384,8 +397,6 @@ class OpenAIAPI:
         return cls.api_request_endpoint(
             request_url, 
             method='post', 
-            timeout=timeout, 
-            endpoint_manager=endpoint_manager, 
             api_key=api_key,
             organization=organization,
             api_base=api_base,
@@ -394,106 +405,106 @@ class OpenAIAPI:
             )
 
     @classmethod
-    def models_list(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def models_list(cls, **kwargs):
         request_url = '/models'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def models_retrieve(cls, model, timeout=None, endpoint_manager=None, **kwargs):
+    def models_retrieve(cls, model, **kwargs):
         request_url = f'/models/{model}'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def moderations(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def moderations(cls, **kwargs):
         request_url = '/moderations'
-        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', **kwargs)
 
     @classmethod
-    def images_generations(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def images_generations(cls, **kwargs):
         request_url = '/images/generations'
-        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', **kwargs)
 
     @classmethod
-    def images_edits(cls, image, mask=None, timeout=None, endpoint_manager=None, **kwargs):
+    def images_edits(cls, image, mask=None, **kwargs):
         request_url = '/images/edits'
         files = { 'image': image }
         if mask:
             files['mask'] = mask
-        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, **kwargs)
 
     @classmethod
-    def images_variations(cls, image, timeout=None, endpoint_manager=None, **kwargs):
+    def images_variations(cls, image, **kwargs):
         request_url = '/images/variations'
         files = { 'image': image }
-        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, **kwargs)
 
     @classmethod
-    def audio_transcriptions(cls, file, timeout=None, endpoint_manager=None, **kwargs):
+    def audio_transcriptions(cls, file, **kwargs):
         request_url = '/audio/transcriptions'
         files = { 'file': file }
-        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, **kwargs)
 
     @classmethod
-    def audio_translations(cls, file, timeout=None, endpoint_manager=None, **kwargs):
+    def audio_translations(cls, file, **kwargs):
         request_url = '/audio/translations'
         files = { 'file': file }
-        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, **kwargs)
 
     @classmethod
-    def files_list(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def files_list(cls, **kwargs):
         request_url = '/files'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def files_upload(cls, file, timeout=None, endpoint_manager=None, **kwargs):
+    def files_upload(cls, file, **kwargs):
         request_url = '/files'
         files = { 'file': file }
-        return cls.api_request_endpoint(request_url, method='post', files=files, timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', files=files, **kwargs)
 
     @classmethod
-    def files_delete(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
+    def files_delete(cls, file_id, **kwargs):
         request_url = f'/files/{file_id}'
-        return cls.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='delete', **kwargs)
 
     @classmethod
-    def files_retrieve(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
+    def files_retrieve(cls, file_id, **kwargs):
         request_url = f'/files/{file_id}'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def files_retrieve_content(cls, file_id, timeout=None, endpoint_manager=None, **kwargs):
+    def files_retrieve_content(cls, file_id, **kwargs):
         request_url = f'/files/{file_id}/content'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def finetunes_create(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_create(cls, **kwargs):
         request_url = '/fine-tunes'
-        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', **kwargs)
 
     @classmethod
-    def finetunes_list(cls, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_list(cls, **kwargs):
         request_url = '/fine-tunes'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def finetunes_retrieve(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_retrieve(cls, fine_tune_id, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def finetunes_cancel(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_cancel(cls, fine_tune_id, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}/cancel'
-        return cls.api_request_endpoint(request_url, method='post', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='post', **kwargs)
 
     @classmethod
-    def finetunes_list_events(cls, fine_tune_id, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_list_events(cls, fine_tune_id, **kwargs):
         request_url = f'/fine-tunes/{fine_tune_id}/events'
-        return cls.api_request_endpoint(request_url, method='get', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='get', **kwargs)
 
     @classmethod
-    def finetunes_delete_model(cls, model, timeout=None, endpoint_manager=None, **kwargs):
+    def finetunes_delete_model(cls, model, **kwargs):
         request_url = f'/models/{model}'
-        return cls.api_request_endpoint(request_url, method='delete', timeout=timeout, endpoint_manager=endpoint_manager, **kwargs)
+        return cls.api_request_endpoint(request_url, method='delete', **kwargs)
 
 
 if __name__ == '__main__':

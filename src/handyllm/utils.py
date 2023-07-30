@@ -29,3 +29,10 @@ def isiterable(arg):
         isinstance(arg, collections.abc.Iterable) 
         and not isinstance(arg, str)
     )
+
+def join_url(base_url, *args):
+    url = base_url.rstrip('/')
+    for arg in args:
+        url += '/' + arg.lstrip('/')
+    return url
+
