@@ -1,25 +1,16 @@
 import os
 import time
 from urllib.parse import quote_plus
-import requests
-import logging
 import json
 import copy
 
+from .api_request import api_request, poll
 from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
 from . import utils
 
-_API_BASE_OPENAI = 'https://api.openai.com/v1'
-_API_TYPE_OPENAI = 'openai'
-_API_TYPES_AZURE = (
-    'azure', 
-    'azure_ad', 
-    'azuread'
-)
-_API_VERSION_AZURE = '2023-05-15'
+from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
 
-module_logger = logging.getLogger(__name__)
 
 class OpenAIAPI:
     
@@ -54,112 +45,23 @@ class OpenAIAPI:
     
     @classmethod
     def get_api_key(cls, api_key=None):
-        if not api_key:
-            api_key = cls.api_key if cls.api_key else os.environ.get('OPENAI_API_KEY')
-        return api_key
+        return api_key or cls.api_key or os.environ.get('OPENAI_API_KEY')
     
     @classmethod
     def get_organization(cls, organization=None):
-        if not organization:
-            organization = cls.organization if cls.organization else os.environ.get('OPENAI_ORGANIZATION')
-        return organization
+        return organization or cls.organization or os.environ.get('OPENAI_ORGANIZATION')
     
     @classmethod
     def get_api_base(cls, api_base=None):
-        if not api_base:
-            api_base = cls.api_base if cls.api_base else os.environ.get('OPENAI_API_BASE')
-            if not api_base:
-                api_base = _API_BASE_OPENAI
-        return api_base
+        return api_base or cls.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
     
     @classmethod
     def get_api_type_and_version(cls, api_type=None, api_version=None):
-        if not api_type:
-            api_type = cls.api_type if cls.api_type else os.environ.get('OPENAI_API_TYPE')
-            if not api_type:
-                api_type = _API_TYPE_OPENAI
-        if not api_version:
-            api_version = cls.api_version if cls.api_version else os.environ.get('OPENAI_API_VERSION')
-            if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
-                api_version = _API_VERSION_AZURE
+        api_type = api_type or cls.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
+        api_version = api_version or cls.api_version or os.environ.get('OPENAI_API_VERSION')
+        if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
+            api_version = _API_VERSION_AZURE
         return api_type, api_version
-
-    @staticmethod
-    def _api_request(url, api_key, organization=None, api_type=api_type, method='post', timeout=None, **kwargs):
-        if api_key is None:
-            raise Exception("OpenAI API key is not set")
-        if url is None:
-            raise Exception("OpenAI API url is not set")
-        if api_type is None:
-            raise Exception("OpenAI API type is not set")
-
-        ## log request info
-        log_strs = []
-        # avoid logging the whole api_key
-        plaintext_len = 8
-        log_strs.append(f"API request {url}")
-        log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
-        if organization is not None:
-            log_strs.append(f"organization: {organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
-        log_strs.append(f"timeout: {timeout}")
-        module_logger.info('\n'.join(log_strs))
-
-        files = kwargs.pop('files', None)
-        stream = kwargs.get('stream', False)
-        headers = {}
-        json_data = None
-        data = None
-        params = {}
-        if api_type in _API_TYPES_AZURE:
-            headers['api-key'] = api_key
-        else:
-            headers['Authorization'] = 'Bearer ' + api_key
-        if organization is not None:
-            headers['OpenAI-Organization'] = organization
-        if method == 'post':
-            if files is None:
-                headers['Content-Type'] = 'application/json'
-                json_data = kwargs
-            else:  ## if files is not None, let requests handle the content type
-                data = kwargs
-        if method == 'get' and stream:
-            params['stream'] = 'true'
-
-        response = requests.request(
-            method,
-            url,
-            headers=headers,
-            data=data,
-            json=json_data,
-            files=files,
-            params=params,
-            stream=stream,
-            timeout=timeout,
-            )
-        if response.status_code != 200:
-            # report both status code and error message
-            try:
-                message = response.json()['error']['message']
-            except:
-                message = response.text
-            err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
-            module_logger.error(err_msg)
-            raise Exception(err_msg)
-
-        if stream:
-            return OpenAIAPI._gen_stream_response(response)
-        else:
-            return response.json()
-
-    @staticmethod
-    def _gen_stream_response(response):
-        for byte_line in response.iter_lines():  # do not auto decode
-            if byte_line:
-                if byte_line.strip() == b"data: [DONE]":
-                    return
-                if byte_line.startswith(b"data: "):
-                    line = byte_line[len(b"data: "):].decode("utf-8")
-                    yield json.loads(line)
 
     @staticmethod
     def stream_chat_with_role(response):
@@ -190,7 +92,7 @@ class OpenAIAPI:
         ):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         url = utils.join_url(api_base, request_url)
-        return cls._api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
+        return api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
     
     @classmethod
     def consume_kwargs(cls, kwargs):
@@ -421,8 +323,52 @@ class OpenAIAPI:
 
     @classmethod
     def images_generations(cls, **kwargs):
-        request_url = '/images/generations'
-        return cls.api_request_endpoint(request_url, method='post', **kwargs)
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            request_url = f'/openai/images/generations:submit?api-version={api_version}'
+            raw_response = True
+        else:
+            request_url = '/images/generations'
+            raw_response = False
+        response = cls.api_request_endpoint(
+            request_url, 
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            raw_response=raw_response,
+            **kwargs
+            )
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            # Azure image generation
+            # use raw response to get poll_url
+            poll_url = response.headers['operation-location']
+            headers= { "api-key": api_key, "Content-Type": "application/json" }
+            response = poll(
+                url=poll_url, 
+                method='get', 
+                until=lambda response: response.json()['status'] == 'succeeded',
+                failed=cls.check_image_failure,
+                interval=lambda response: cls.get_retry(response) or 1,
+                headers=headers, 
+                ).json()
+            return response.get('result', response)
+        else:
+            return response
+
+    @staticmethod
+    def check_image_failure(response):
+        response_dict = response.json()
+        if response_dict['status'] == 'failed':
+            raise Exception(f"Image generation failed: {response_dict['error']['code']} {response_dict['error']['message']}")
+    
+    @staticmethod
+    def get_retry(response):
+        try:
+            return int(response.headers.get('retry-after'))
+        except:
+            return None
 
     @classmethod
     def images_edits(cls, image, mask=None, **kwargs):
@@ -505,40 +451,4 @@ class OpenAIAPI:
     def finetunes_delete_model(cls, model, **kwargs):
         request_url = f'/models/{model}'
         return cls.api_request_endpoint(request_url, method='delete', **kwargs)
-
-
-if __name__ == '__main__':
-    # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-    prompt = [{
-        "role": "user",
-        "content": "please tell me a joke"
-        }]
-    response = OpenAIAPI.chat(
-        model="gpt-3.5-turbo-0301",
-        messages=prompt,
-        temperature=0.2,
-        max_tokens=256,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-        timeout=10
-        )
-    print(response)
-    print(response['choices'][0]['message']['content'])
-    
-    ## below for comparison
-    # import openai
-    # response = openai.ChatCompletion.create(
-    #     model="gpt-3.5-turbo-0301",
-    #     messages=prompt,
-    #     temperature=1.2,
-    #     max_tokens=256,
-    #     top_p=1.0,
-    #     frequency_penalty=0.0,
-    #     presence_penalty=0.0,
-    #     api_key=openai_api_key,
-    #     timeout=10  ## this is not working
-    # )
-    # print(response)
-    # print(response['choices'][0]['message']['content'])
 
