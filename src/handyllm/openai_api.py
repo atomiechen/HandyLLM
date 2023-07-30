@@ -1,25 +1,16 @@
 import os
 import time
 from urllib.parse import quote_plus
-import requests
-import logging
 import json
 import copy
 
+from .api_request import api_request
 from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
 from . import utils
 
-_API_BASE_OPENAI = 'https://api.openai.com/v1'
-_API_TYPE_OPENAI = 'openai'
-_API_TYPES_AZURE = (
-    'azure', 
-    'azure_ad', 
-    'azuread'
-)
-_API_VERSION_AZURE = '2023-05-15'
+from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
 
-module_logger = logging.getLogger(__name__)
 
 class OpenAIAPI:
     
@@ -85,83 +76,6 @@ class OpenAIAPI:
         return api_type, api_version
 
     @staticmethod
-    def _api_request(url, api_key, organization=None, api_type=api_type, method='post', timeout=None, **kwargs):
-        if api_key is None:
-            raise Exception("OpenAI API key is not set")
-        if url is None:
-            raise Exception("OpenAI API url is not set")
-        if api_type is None:
-            raise Exception("OpenAI API type is not set")
-
-        ## log request info
-        log_strs = []
-        # avoid logging the whole api_key
-        plaintext_len = 8
-        log_strs.append(f"API request {url}")
-        log_strs.append(f"api_key: {api_key[:plaintext_len]}{'*'*(len(api_key)-plaintext_len)}")
-        if organization is not None:
-            log_strs.append(f"organization: {organization[:plaintext_len]}{'*'*(len(organization)-plaintext_len)}")
-        log_strs.append(f"timeout: {timeout}")
-        module_logger.info('\n'.join(log_strs))
-
-        files = kwargs.pop('files', None)
-        stream = kwargs.get('stream', False)
-        headers = {}
-        json_data = None
-        data = None
-        params = {}
-        if api_type in _API_TYPES_AZURE:
-            headers['api-key'] = api_key
-        else:
-            headers['Authorization'] = 'Bearer ' + api_key
-        if organization is not None:
-            headers['OpenAI-Organization'] = organization
-        if method == 'post':
-            if files is None:
-                headers['Content-Type'] = 'application/json'
-                json_data = kwargs
-            else:  ## if files is not None, let requests handle the content type
-                data = kwargs
-        if method == 'get' and stream:
-            params['stream'] = 'true'
-
-        response = requests.request(
-            method,
-            url,
-            headers=headers,
-            data=data,
-            json=json_data,
-            files=files,
-            params=params,
-            stream=stream,
-            timeout=timeout,
-            )
-        if response.status_code != 200:
-            # report both status code and error message
-            try:
-                message = response.json()['error']['message']
-            except:
-                message = response.text
-            err_msg = f"OpenAI API error ({url} {response.status_code} {response.reason}): {message}"
-            module_logger.error(err_msg)
-            raise Exception(err_msg)
-
-        if stream:
-            return OpenAIAPI._gen_stream_response(response)
-        else:
-            return response.json()
-
-    @staticmethod
-    def _gen_stream_response(response):
-        for byte_line in response.iter_lines():  # do not auto decode
-            if byte_line:
-                if byte_line.strip() == b"data: [DONE]":
-                    return
-                if byte_line.startswith(b"data: "):
-                    line = byte_line[len(b"data: "):].decode("utf-8")
-                    yield json.loads(line)
-
-    @staticmethod
     def stream_chat_with_role(response):
         role = ''
         for data in response:
@@ -190,7 +104,7 @@ class OpenAIAPI:
         ):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
         url = utils.join_url(api_base, request_url)
-        return cls._api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
+        return api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
     
     @classmethod
     def consume_kwargs(cls, kwargs):
@@ -421,8 +335,28 @@ class OpenAIAPI:
 
     @classmethod
     def images_generations(cls, **kwargs):
-        request_url = '/images/generations'
-        return cls.api_request_endpoint(request_url, method='post', **kwargs)
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            request_url = f'/openai/images/generations:submit?api-version={api_version}'
+            raw_response = True
+        else:
+            request_url = '/images/generations'
+            raw_response = False
+        response = cls.api_request_endpoint(
+            request_url, 
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            raw_response=raw_response,
+            **kwargs
+            )
+        if raw_response:
+            ## TODO: support Azure image generation
+            pass
+        else:
+            return response
 
     @classmethod
     def images_edits(cls, image, mask=None, **kwargs):
