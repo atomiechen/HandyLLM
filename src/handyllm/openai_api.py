@@ -211,7 +211,7 @@ class OpenAIAPI:
                 raise Exception("endpoint must be an instance of Endpoint")
             api_key, organization, api_base, api_type, api_version = endpoint.get_api_info()
 
-        # read API info from kwargs
+        # read API info from kwargs, class variables, and environment variables
         api_key = cls.get_api_key(kwargs.pop('api_key', api_key))
         organization = cls.get_organization(kwargs.pop('organization', organization))
         api_base = cls.get_api_base(kwargs.pop('api_base', api_base))
