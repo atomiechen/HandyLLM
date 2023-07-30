@@ -452,39 +452,3 @@ class OpenAIAPI:
         request_url = f'/models/{model}'
         return cls.api_request_endpoint(request_url, method='delete', **kwargs)
 
-
-if __name__ == '__main__':
-    # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
-    prompt = [{
-        "role": "user",
-        "content": "please tell me a joke"
-        }]
-    response = OpenAIAPI.chat(
-        model="gpt-3.5-turbo-0301",
-        messages=prompt,
-        temperature=0.2,
-        max_tokens=256,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-        timeout=10
-        )
-    print(response)
-    print(response['choices'][0]['message']['content'])
-    
-    ## below for comparison
-    # import openai
-    # response = openai.ChatCompletion.create(
-    #     model="gpt-3.5-turbo-0301",
-    #     messages=prompt,
-    #     temperature=1.2,
-    #     max_tokens=256,
-    #     top_p=1.0,
-    #     frequency_penalty=0.0,
-    #     presence_penalty=0.0,
-    #     api_key=openai_api_key,
-    #     timeout=10  ## this is not working
-    # )
-    # print(response)
-    # print(response['choices'][0]['message']['content'])
-
