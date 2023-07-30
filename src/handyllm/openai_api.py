@@ -45,34 +45,22 @@ class OpenAIAPI:
     
     @classmethod
     def get_api_key(cls, api_key=None):
-        if not api_key:
-            api_key = cls.api_key if cls.api_key else os.environ.get('OPENAI_API_KEY')
-        return api_key
+        return api_key or cls.api_key or os.environ.get('OPENAI_API_KEY')
     
     @classmethod
     def get_organization(cls, organization=None):
-        if not organization:
-            organization = cls.organization if cls.organization else os.environ.get('OPENAI_ORGANIZATION')
-        return organization
+        return organization or cls.organization or os.environ.get('OPENAI_ORGANIZATION')
     
     @classmethod
     def get_api_base(cls, api_base=None):
-        if not api_base:
-            api_base = cls.api_base if cls.api_base else os.environ.get('OPENAI_API_BASE')
-            if not api_base:
-                api_base = _API_BASE_OPENAI
-        return api_base
+        return api_base or cls.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
     
     @classmethod
     def get_api_type_and_version(cls, api_type=None, api_version=None):
-        if not api_type:
-            api_type = cls.api_type if cls.api_type else os.environ.get('OPENAI_API_TYPE')
-            if not api_type:
-                api_type = _API_TYPE_OPENAI
-        if not api_version:
-            api_version = cls.api_version if cls.api_version else os.environ.get('OPENAI_API_VERSION')
-            if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
-                api_version = _API_VERSION_AZURE
+        api_type = api_type or cls.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
+        api_version = api_version or cls.api_version or os.environ.get('OPENAI_API_VERSION')
+        if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
+            api_version = _API_VERSION_AZURE
         return api_type, api_version
 
     @staticmethod
