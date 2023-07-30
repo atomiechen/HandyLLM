@@ -3,6 +3,7 @@ from handyllm import OpenAIAPI, EndpointManager, Endpoint
 from dotenv import load_dotenv, find_dotenv
 # load env parameters from file named .env
 load_dotenv(find_dotenv())
+load_dotenv(find_dotenv('azure.env'))
 
 import os
 
@@ -13,8 +14,11 @@ endpoint_manager.add_endpoint_by_info(
     api_key=os.environ.get('OPENAI_API_KEY'),
 )
 endpoint2 = Endpoint(
-    name='endpoint2',  # name is not required
-    api_key=os.environ.get('OPENAI_API_KEY'),
+    name='azure',  # name is not required
+    api_type='azure', 
+    api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
+    api_key=os.getenv("AZURE_OPENAI_KEY"), 
+    api_version='2023-05-15'  # can be None and default value will be used
 )
 endpoint_manager.append(endpoint2)
 
@@ -53,12 +57,11 @@ print("-----")
 
 # ----- EXAMPLE 2 -----
 
-response = OpenAIAPI.completions(
-    model="text-davinci-002",
-    prompt="count to 23 and stop: 1,2,3,",
+response = OpenAIAPI.chat(
+    deployment_id="initial_deployment",
+    messages=prompt,
     timeout=10,
     max_tokens=256,
-    echo=True,  # Echo back the prompt in addition to the completion
     endpoint=endpoint2
 )
-print(response['choices'][0]['text'])
+print(response['choices'][0]['message']['content'])
