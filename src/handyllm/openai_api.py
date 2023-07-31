@@ -125,19 +125,23 @@ class OpenAIAPI:
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
         return api_key, organization, api_base, api_type, api_version, engine
-    
+
+    @staticmethod
+    def get_request_url(request_url, api_type, api_version, engine):
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            if engine is None:
+                return f'/openai/deployments?api-version={api_version}'
+            else:
+                return f'/openai/deployments/{quote_plus(engine)}{request_url}?api-version={api_version}'
+        else:
+            if engine is not None:
+                return f'/engines/{quote_plus(engine)}{request_url}'
+        return request_url
+
     @classmethod
     def chat(cls, messages, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
-            if engine is None:
-                raise Exception("Azure API requires engine to be specified")
-            request_url = f'/openai/deployments/{quote_plus(engine)}/chat/completions?api-version={api_version}'
-        else:
-            if engine is not None:
-                request_url = f'/engines/{quote_plus(engine)}/chat/completions'
-            else:
-                request_url = '/chat/completions'
+        request_url = cls.get_request_url('/chat/completions', api_type, api_version, engine)
 
         if logger is not None:
             arguments = copy.deepcopy(kwargs)
@@ -208,15 +212,7 @@ class OpenAIAPI:
     @classmethod
     def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
-            if engine is None:
-                raise Exception("Azure API requires engine to be specified")
-            request_url = f'/openai/deployments/{quote_plus(engine)}/completions?api-version={api_version}'
-        else:
-            if engine is not None:
-                request_url = f'/engines/{quote_plus(engine)}/completions'
-            else:
-                request_url = '/completions'
+        request_url = cls.get_request_url('/completions', api_type, api_version, engine)
 
         if logger is not None:
             arguments = copy.deepcopy(kwargs)
@@ -287,15 +283,7 @@ class OpenAIAPI:
     @classmethod
     def embeddings(cls, **kwargs):
         api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
-            if engine is None:
-                raise Exception("Azure API requires engine to be specified")
-            request_url = f'/openai/deployments/{quote_plus(engine)}/embeddings?api-version={api_version}'
-        else:
-            if engine is not None:
-                request_url = f'/engines/{quote_plus(engine)}/embeddings'
-            else:
-                request_url = '/embeddings'
+        request_url = cls.get_request_url('/embeddings', api_type, api_version, engine)
         return cls.api_request_endpoint(
             request_url, 
             method='post', 
@@ -308,8 +296,17 @@ class OpenAIAPI:
 
     @classmethod
     def models_list(cls, **kwargs):
-        request_url = '/models'
-        return cls.api_request_endpoint(request_url, method='get', **kwargs)
+        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        request_url = cls.get_request_url('/models', api_type, api_version, engine)
+        return cls.api_request_endpoint(
+            request_url, 
+            method='get', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            **kwargs
+            )
 
     @classmethod
     def models_retrieve(cls, model, **kwargs):
