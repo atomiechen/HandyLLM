@@ -7,6 +7,7 @@ from . import _API_TYPES_AZURE
 
 
 module_logger = logging.getLogger(__name__)
+module_logger.addHandler(logging.NullHandler())
 
 
 def api_request(
