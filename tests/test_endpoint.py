@@ -18,7 +18,10 @@ endpoint2 = Endpoint(
     api_type='azure', 
     api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
     api_key=os.getenv("AZURE_OPENAI_KEY"), 
-    api_version='2023-05-15'  # can be None and default value will be used
+    api_version='2023-05-15',  # can be None and default value will be used
+    model_engine_map={  # needed if you want to use model alias
+        'gpt-3.5-turbo': 'gpt-35-turbo'
+    }
 )
 endpoint_manager.append(endpoint2)
 
@@ -37,18 +40,21 @@ prompt = [{
     "role": "user",
     "content": "please tell me a joke"
     }]
-response = OpenAIAPI.chat(
-    model="gpt-3.5-turbo",
-    messages=prompt,
-    temperature=0.2,
-    max_tokens=256,
-    top_p=1.0,
-    frequency_penalty=0.0,
-    presence_penalty=0.0,
-    timeout=10,
-    endpoint_manager=endpoint_manager
-    )
-print(response['choices'][0]['message']['content'])
+try:
+    response = OpenAIAPI.chat(
+        model="gpt-3.5-turbo",
+        messages=prompt,
+        temperature=0.2,
+        max_tokens=256,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+        timeout=10,
+        endpoint_manager=endpoint_manager
+        )
+    print(response['choices'][0]['message']['content'])
+except Exception as e:
+    print(e)
 
 
 print()
@@ -57,11 +63,16 @@ print("-----")
 
 # ----- EXAMPLE 2 -----
 
-response = OpenAIAPI.chat(
-    deployment_id="initial_deployment",
-    messages=prompt,
-    timeout=10,
-    max_tokens=256,
-    endpoint=endpoint2
-)
-print(response['choices'][0]['message']['content'])
+try:
+    response = OpenAIAPI.chat(
+        # deployment_id="initial_deployment",
+        model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
+        messages=prompt,
+        timeout=10,
+        max_tokens=256,
+        endpoint=endpoint2
+    )
+    print(response['choices'][0]['message']['content'])
+except Exception as e:
+    print(e)
+

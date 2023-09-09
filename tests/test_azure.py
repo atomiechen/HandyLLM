@@ -20,7 +20,14 @@ prompt = [{
     "content": "please tell me a joke"
     }]
 response = OpenAIAPI.chat(
+    # this is the engine (i.e. deployment_id) parameter for Azure OpenAI API
     engine="gpt-35-turbo",
+    
+    # # OR: you can use model parameter and specify the model_engine_map
+    # # this is most useful for EndpointManager to unify API calls
+    # model="gpt-3.5-turbo",
+    # model_engine_map={"gpt-3.5-turbo": "gpt-35-turbo"},
+    
     messages=prompt,
     temperature=0.2,
     max_tokens=256,

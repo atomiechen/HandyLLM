@@ -30,7 +30,7 @@ Example scripts are placed in [tests](./tests) folder.
 
 ### Endpoints
 
-Each API request will connect to an endpoint along with some API configurations, which include: `api_key`, `organization`, `api_base`, `api_type` and `api_version`. 
+Each API request will connect to an endpoint along with some API configurations, which include: `api_key`, `organization`, `api_base`, `api_type`, `api_version` and `model_engine_map`. 
 
 An `Endpoint` object contains these information. An `EndpointManager` acts like a list and can be used to rotate the next endpoint. See [test_endpoint.py](./tests/test_endpoint.py).
 
@@ -39,12 +39,12 @@ There are 5 methods for specifying endpoint info:
 1. (each API call) Pass these fields as keyword parameters.
 2. (each API call) Pass an `endpoint` keyword parameter to specify an `Endpoint`.
 3. (each API call) Pass an `endpoint_manager` keyword parameter to specify an `EndpointManager`.
-4. (global) Set class variables: `OpenAIAPI.api_base`, `OpenAIAPI.api_key`, `OpenAIAPI.organization`, `OpenAIAPI.api_type`, `OpenAIAPI.api_version`.
-5. (global) Set environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`.
+4. (global) Set class variables: `OpenAIAPI.api_base`, `OpenAIAPI.api_key`, `OpenAIAPI.organization`, `OpenAIAPI.api_type`, `OpenAIAPI.api_version`, `OpenAIAPI.model_engine_map`.
+5. (global) Set environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
 
 **Note**: If a field is set to `None` in the previous method, it will be replaced by the non-`None` value in the subsequent method, until a default value is used (OpenAI's endpoint information).
 
-**Azure OpenAI APIs are supported:** Specify `api_type='azure'`, and set `api_base` and `api_key` accordingly. See [test_azure.py](./tests/test_azure.py). Please refer to [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/) for details.
+**Azure OpenAI APIs are supported:** Specify `api_type='azure'`, and set `api_base` and `api_key` accordingly. Set `model_engine_map` if you want to use `model` parameter instead of `engine`/`deployment_id`. See [test_azure.py](./tests/test_azure.py). Please refer to [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/) for details.
 
 ### Logger
 
