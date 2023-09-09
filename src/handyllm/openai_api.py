@@ -41,6 +41,11 @@ class OpenAIAPI:
     # can be None.
     api_version = None
     
+    # set this to your model-engine map;
+    # or environment variable MODEL_ENGINE_MAP will be used;
+    # can be None.
+    model_engine_map = None
+    
     converter = PromptConverter()
     
     @classmethod
@@ -62,6 +67,18 @@ class OpenAIAPI:
         if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
             api_version = _API_VERSION_AZURE
         return api_type, api_version
+
+    @classmethod
+    def get_model_engine_map(cls, model_engine_map=None):
+        if model_engine_map:
+            return model_engine_map
+        if cls.model_engine_map:
+            return cls.model_engine_map
+        try:
+            json_str = os.environ.get('MODEL_ENGINE_MAP')
+            return json.loads(json_str)
+        except:
+            return None
 
     @staticmethod
     def stream_chat_with_role(response):
@@ -121,14 +138,18 @@ class OpenAIAPI:
             kwargs.pop('api_type', api_type), 
             kwargs.pop('api_version', api_version)
         )
+        model_engine_map = cls.get_model_engine_map(kwargs.pop('model_engine_map', model_engine_map))
 
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
         # if using Azure and engine not provided, try to get it from model parameter
         if api_type and api_type.lower() in _API_TYPES_AZURE:
             model = kwargs.pop('model', None)
-            if not engine and model and model_engine_map:
-                engine = model_engine_map.get(model, engine)
+            if not engine and model:
+                if model_engine_map:
+                    engine = model_engine_map.get(model, model)
+                else:
+                    engine = model
         return api_key, organization, api_base, api_type, api_version, engine
 
     @staticmethod
