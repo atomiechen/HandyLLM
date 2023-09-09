@@ -96,7 +96,7 @@ class OpenAIAPI:
     
     @classmethod
     def consume_kwargs(cls, kwargs):
-        api_key = organization = api_base = api_type = api_version = engine = None
+        api_key = organization = api_base = api_type = api_version = engine = model_engine_map = None
 
         # read API info from endpoint_manager
         endpoint_manager = kwargs.pop('endpoint_manager', None)
@@ -104,14 +104,14 @@ class OpenAIAPI:
             if not isinstance(endpoint_manager, EndpointManager):
                 raise Exception("endpoint_manager must be an instance of EndpointManager")
             # get_next_endpoint() will be called once for each request
-            api_key, organization, api_base, api_type, api_version = endpoint_manager.get_next_endpoint().get_api_info()
+            api_key, organization, api_base, api_type, api_version, model_engine_map = endpoint_manager.get_next_endpoint().get_api_info()
 
         # read API info from endpoint (override API info from endpoint_manager)
         endpoint = kwargs.pop('endpoint', None)
         if endpoint is not None:
             if not isinstance(endpoint, Endpoint):
                 raise Exception("endpoint must be an instance of Endpoint")
-            api_key, organization, api_base, api_type, api_version = endpoint.get_api_info()
+            api_key, organization, api_base, api_type, api_version, model_engine_map = endpoint.get_api_info()
 
         # read API info from kwargs, class variables, and environment variables
         api_key = cls.get_api_key(kwargs.pop('api_key', api_key))
@@ -124,6 +124,11 @@ class OpenAIAPI:
 
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
+        # if using Azure and engine not provided, try to get it from model parameter
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            model = kwargs.pop('model', None)
+            if not engine and model and model_engine_map:
+                engine = model_engine_map.get(model, engine)
         return api_key, organization, api_base, api_type, api_version, engine
 
     @staticmethod
