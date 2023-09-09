@@ -30,7 +30,7 @@ Example scripts are placed in [tests](./tests) folder.
 
 ### Endpoints
 
-Each API request will connect to an endpoint along with some API configurations, which include: `api_key`, `organization`, `api_base`, `api_type`, `api_version` and `model_engine_map`. 
+Each API request will connect to an endpoint along with some API configurations, which include: `api_key`, `organization`, `api_base`, `api_type`, `api_version`, `model_engine_map`, `dest_url`. 
 
 An `Endpoint` object contains these information. An `EndpointManager` acts like a list and can be used to rotate the next endpoint. See [test_endpoint.py](./tests/test_endpoint.py).
 
