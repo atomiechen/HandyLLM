@@ -19,6 +19,7 @@ def api_request(
     timeout=None, 
     files=None, 
     raw_response=False, 
+    dest_url=None, 
     **kwargs):
     if api_key is None:
         raise Exception("OpenAI API key is not set")
@@ -50,6 +51,8 @@ def api_request(
         headers['Authorization'] = 'Bearer ' + api_key
     if organization is not None:
         headers['OpenAI-Organization'] = organization
+    if dest_url is not None:
+        headers['Destination-URL'] = dest_url
     if method == 'post':
         if files is None:
             headers['Content-Type'] = 'application/json'

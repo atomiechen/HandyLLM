@@ -12,6 +12,7 @@ class Endpoint:
         api_type=None,
         api_version=None, 
         model_engine_map=None, 
+        dest_url=None, 
         ):
         self.name = name if name else f"ep_{id(self)}"
         self.api_key = api_key
@@ -20,6 +21,7 @@ class Endpoint:
         self.api_type = api_type
         self.api_version = api_version
         self.model_engine_map = model_engine_map if model_engine_map else {}
+        self.dest_url = dest_url
 
     def __str__(self) -> str:
         # do not print api_key
@@ -31,6 +33,7 @@ class Endpoint:
             f'api_type={repr(self.api_type)}' if self.api_type else None,
             f'api_version={repr(self.api_version)}' if self.api_version else None,
             f'model_engine_map={repr(self.model_engine_map)}' if self.model_engine_map else None,
+            f'dest_url={repr(self.dest_url)}' if self.dest_url else None,
         ]
         # remove None in listed_attributes
         listed_attributes = [item for item in listed_attributes if item]
@@ -44,6 +47,7 @@ class Endpoint:
             self.api_type, 
             self.api_version, 
             self.model_engine_map, 
+            self.dest_url, 
         )
 
 

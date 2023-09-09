@@ -107,13 +107,13 @@ class OpenAIAPI:
         request_url, 
         **kwargs
         ):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         url = utils.join_url(api_base, request_url)
-        return api_request(url, api_key, organization=organization, api_type=api_type, **kwargs)
+        return api_request(url, api_key, organization=organization, api_type=api_type, dest_url=dest_url, **kwargs)
     
     @classmethod
     def consume_kwargs(cls, kwargs):
-        api_key = organization = api_base = api_type = api_version = engine = model_engine_map = None
+        api_key = organization = api_base = api_type = api_version = engine = model_engine_map = dest_url = None
 
         # read API info from endpoint_manager
         endpoint_manager = kwargs.pop('endpoint_manager', None)
@@ -121,14 +121,14 @@ class OpenAIAPI:
             if not isinstance(endpoint_manager, EndpointManager):
                 raise Exception("endpoint_manager must be an instance of EndpointManager")
             # get_next_endpoint() will be called once for each request
-            api_key, organization, api_base, api_type, api_version, model_engine_map = endpoint_manager.get_next_endpoint().get_api_info()
+            api_key, organization, api_base, api_type, api_version, model_engine_map, dest_url = endpoint_manager.get_next_endpoint().get_api_info()
 
         # read API info from endpoint (override API info from endpoint_manager)
         endpoint = kwargs.pop('endpoint', None)
         if endpoint is not None:
             if not isinstance(endpoint, Endpoint):
                 raise Exception("endpoint must be an instance of Endpoint")
-            api_key, organization, api_base, api_type, api_version, model_engine_map = endpoint.get_api_info()
+            api_key, organization, api_base, api_type, api_version, model_engine_map, dest_url = endpoint.get_api_info()
 
         # read API info from kwargs, class variables, and environment variables
         api_key = cls.get_api_key(kwargs.pop('api_key', api_key))
@@ -150,7 +150,8 @@ class OpenAIAPI:
                     engine = model_engine_map.get(model, model)
                 else:
                     engine = model
-        return api_key, organization, api_base, api_type, api_version, engine
+        dest_url = kwargs.pop('dest_url', dest_url)
+        return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
     @staticmethod
     def get_request_url(request_url, api_type, api_version, engine):
@@ -166,7 +167,7 @@ class OpenAIAPI:
 
     @classmethod
     def chat(cls, messages, logger=None, log_marks=[], **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/chat/completions', api_type, api_version, engine)
 
         if logger is not None:
@@ -192,6 +193,7 @@ class OpenAIAPI:
                 organization=organization,
                 api_base=api_base,
                 api_type=api_type,
+                dest_url=dest_url,
                 **kwargs
             )
             
@@ -237,7 +239,7 @@ class OpenAIAPI:
     
     @classmethod
     def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/completions', api_type, api_version, engine)
 
         if logger is not None:
@@ -263,6 +265,7 @@ class OpenAIAPI:
                 organization=organization,
                 api_base=api_base,
                 api_type=api_type,
+                dest_url=dest_url,
                 **kwargs
             )
 
@@ -308,7 +311,7 @@ class OpenAIAPI:
 
     @classmethod
     def embeddings(cls, **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/embeddings', api_type, api_version, engine)
         return cls.api_request_endpoint(
             request_url, 
@@ -317,12 +320,13 @@ class OpenAIAPI:
             organization=organization,
             api_base=api_base,
             api_type=api_type,
+            dest_url=dest_url,
             **kwargs
             )
 
     @classmethod
     def models_list(cls, **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/models', api_type, api_version, engine)
         return cls.api_request_endpoint(
             request_url, 
@@ -331,6 +335,7 @@ class OpenAIAPI:
             organization=organization,
             api_base=api_base,
             api_type=api_type,
+            dest_url=dest_url,
             **kwargs
             )
 
@@ -346,7 +351,7 @@ class OpenAIAPI:
 
     @classmethod
     def images_generations(cls, **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine = cls.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE:
             request_url = f'/openai/images/generations:submit?api-version={api_version}'
             raw_response = True
@@ -361,6 +366,7 @@ class OpenAIAPI:
             api_base=api_base,
             api_type=api_type,
             raw_response=raw_response,
+            dest_url=dest_url,
             **kwargs
             )
         if api_type and api_type.lower() in _API_TYPES_AZURE:
