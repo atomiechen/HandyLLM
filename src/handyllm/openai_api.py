@@ -84,6 +84,12 @@ class OpenAIAPI:
     def stream_chat_with_role(response):
         role = ''
         for data in response:
+            if 'choices' not in data:
+                continue
+            if not data['choices']:
+                continue
+            if 'delta' not in data['choices'][0]:
+                continue
             message = data['choices'][0]['delta']
             if 'role' in message:
                 role = message['role']
@@ -99,6 +105,12 @@ class OpenAIAPI:
     @staticmethod
     def stream_completions(response):
         for data in response:
+            if 'choices' not in data:
+                continue
+            if not data['choices']:
+                continue
+            if 'text' not in data['choices'][0]:
+                continue
             yield data['choices'][0]['text']
     
     @classmethod
