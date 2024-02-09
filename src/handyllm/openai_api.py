@@ -84,18 +84,15 @@ class OpenAIAPI:
     def stream_chat_with_role(response):
         role = ''
         for data in response:
-            if 'choices' not in data:
-                continue
-            if not data['choices']:
-                continue
-            if 'delta' not in data['choices'][0]:
-                continue
-            message = data['choices'][0]['delta']
-            if 'role' in message:
-                role = message['role']
-            if 'content' in message:
-                text = message['content']
-                yield role, text
+            try:
+                message = data['choices'][0]['delta']
+                if 'role' in message:
+                    role = message['role']
+                if 'content' in message:
+                    text = message['content']
+                    yield role, text
+            except (KeyError, IndexError):
+                pass
     
     @staticmethod
     def stream_chat(response):
@@ -105,13 +102,10 @@ class OpenAIAPI:
     @staticmethod
     def stream_completions(response):
         for data in response:
-            if 'choices' not in data:
-                continue
-            if not data['choices']:
-                continue
-            if 'text' not in data['choices'][0]:
-                continue
-            yield data['choices'][0]['text']
+            try:
+                yield data['choices'][0]['text']
+            except (KeyError, IndexError):
+                pass
     
     @classmethod
     def api_request_endpoint(
@@ -223,11 +217,14 @@ class OpenAIAPI:
                         text = ''
                         role = ''
                         for data in response:
-                            message = data['choices'][0]['delta']
-                            if 'role' in message:
-                                role = message['role']
-                            if 'content' in message:
-                                text += message['content']
+                            try:
+                                message = data['choices'][0]['delta']
+                                if 'role' in message:
+                                    role = message['role']
+                                if 'content' in message:
+                                    text += message['content']
+                            except (KeyError, IndexError):
+                                pass
                             yield data
                         log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
                         log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
@@ -294,7 +291,10 @@ class OpenAIAPI:
                     def wrapper(response):
                         text = ''
                         for data in response:
-                            text += data['choices'][0]['text']
+                            try:
+                                text += data['choices'][0]['text']
+                            except (KeyError, IndexError):
+                                pass
                             yield data
                         log_strs.append(text)
                         log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
