@@ -231,7 +231,10 @@ class OpenAIAPI:
                         logger.info('\n'.join(log_strs))
                     response = wrapper(response)
                 else:
-                    log_strs.append(cls.converter.chat2raw([response['choices'][0]['message']]))
+                    try:
+                        log_strs.append(cls.converter.chat2raw([response['choices'][0]['message']]))
+                    except (KeyError, IndexError):
+                        log_strs.append("Wrong response format, no message found")
                     log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                     logger.info('\n'.join(log_strs))
         except Exception as e:
@@ -301,7 +304,10 @@ class OpenAIAPI:
                         logger.info('\n'.join(log_strs))
                     response = wrapper(response)
                 else:
-                    log_strs.append(response['choices'][0]['text'])
+                    try:
+                        log_strs.append(response['choices'][0]['text'])
+                    except (KeyError, IndexError):
+                        log_strs.append("Wrong response format, no text found")
                     log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                     logger.info('\n'.join(log_strs))
         except Exception as e:
