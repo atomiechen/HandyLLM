@@ -41,6 +41,9 @@ async def api_request(
     module_logger.info('\n'.join(log_strs))
 
     stream = kwargs.get('stream', False)
+    if stream and raw_response:
+        raise Exception("Cannot use 'raw_response' in stream mode.")
+
     headers = {}
     json_data = None
     data = None
@@ -94,24 +97,27 @@ async def api_request(
     #     module_logger.error(err_msg)
     #     raise Exception(err_msg)
 
-    if raw_response:
-        return response
-    elif stream:
+    if stream:
         return _gen_stream_response(client, response)
     else:
         await client.aclose()
-        return response.json()
+        if raw_response:
+            return response
+        else:
+            return response.json()
 
 async def _gen_stream_response(client: httpx.AsyncClient, response: httpx.Response):
-    async for raw_line in response.aiter_lines():  # do not auto decode
-        if raw_line:
-            if raw_line.strip() == "data: [DONE]":
-                await response.aclose()
-                await client.aclose()
-                return
-            if raw_line.startswith("data: "):
-                line = raw_line[len("data: "):]
-                yield json.loads(line)
+    try:
+        async for raw_line in response.aiter_lines():  # do not auto decode
+            if raw_line:
+                if raw_line.strip() == "data: [DONE]":
+                    return
+                if raw_line.startswith("data: "):
+                    line = raw_line[len("data: "):]
+                    yield json.loads(line)
+    finally:
+        await response.aclose()
+        await client.aclose()
 
 async def poll(
     url, 
