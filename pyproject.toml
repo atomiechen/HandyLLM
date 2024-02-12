@@ -19,6 +19,7 @@ classifiers = [
 keywords = ["LLM", "Large Language Model", "Prompt", "OpenAI", "API"]
 dependencies = [
   "requests",
+  "httpx"
 ]
 
 [project.urls]
