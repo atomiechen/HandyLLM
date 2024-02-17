@@ -154,7 +154,7 @@ class BaseOpenAIAPI:
         return cls.get_request_url('/completions', api_type, api_version, engine)
 
     @classmethod
-    def _chat_log_response_expanded(cls, logger, log_marks, kwargs, messages, start_time, role, content, err_msg=None):
+    def _chat_log_response_final(cls, logger, log_marks, kwargs, messages, start_time, role, content, err_msg=None):
         end_time = time.perf_counter()
         duration = end_time - start_time
         input_content = cls.converter.chat2raw(messages)
@@ -182,7 +182,7 @@ class BaseOpenAIAPI:
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content)
+                        cls._chat_log_response_final(logger, log_marks, kwargs, messages, start_time, role, content)
                 elif inspect.isgenerator(response):
                     def wrapper(response):
                         content = ''
@@ -197,7 +197,7 @@ class BaseOpenAIAPI:
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content)
+                        cls._chat_log_response_final(logger, log_marks, kwargs, messages, start_time, role, content)
                 else:
                     raise Exception("response is not a generator or async generator in stream mode")
                 response = wrapper(response)
@@ -208,7 +208,7 @@ class BaseOpenAIAPI:
                     content = response['choices'][0]['message']['content']
                 except (KeyError, IndexError):
                     err_msg = "Wrong response format, no message found"
-                cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content, err_msg)
+                cls._chat_log_response_final(logger, log_marks, kwargs, messages, start_time, role, content, err_msg)
         return response
     
     @classmethod
