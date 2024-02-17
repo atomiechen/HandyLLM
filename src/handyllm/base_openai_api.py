@@ -154,35 +154,23 @@ class BaseOpenAIAPI:
         return cls.get_request_url('/completions', api_type, api_version, engine)
 
     @classmethod
-    def _chat_log_input(cls, messages, logger, log_marks, kwargs):
-        if logger is not None:
-            arguments = copy.deepcopy(kwargs)
-            # check if log_marks is iterable
-            if utils.isiterable(log_marks):
-                input_lines = [str(item) for item in log_marks]
-            else:
-                input_lines = [str(log_marks)]
-            input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
-            input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(cls.converter.chat2raw(messages))
-            input_lines.append(" INPUT END ".center(50, '-')+"\n")
-            input_str = "\n".join(input_lines)
-            return input_str
-    
-    @classmethod
-    def _chat_log_output(cls, response, input_str, start_time, logger, stream):
-        if logger is not None:
-            end_time = time.time()
-            ## log this on result
-            log_strs = []
-            log_strs.append(f"Chat request result ({end_time-start_time:.2f}s)")
-            log_strs.append(input_str)
+    def _chat_log_response_expanded(cls, logger, log_marks, kwargs, messages, start_time, role, content, err_msg=None):
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        input_content = cls.converter.chat2raw(messages)
+        if not err_msg:
+            output_content = cls.converter.chat2raw([{'role': role, 'content': content}])
+            utils.log_result(logger, "Chat request", duration, log_marks, kwargs, input_content, output_content)
+        else:
+            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
 
-            log_strs.append(" OUTPUT START ".center(50, '-'))
+    @classmethod
+    def _chat_log_response(cls, logger, log_marks, kwargs, messages, start_time, response, stream):
+        if logger is not None:
             if stream:
                 if inspect.isasyncgen(response):
                     async def wrapper(response):
-                        text = ''
+                        content = ''
                         role = ''
                         async for data in response:
                             try:
@@ -190,16 +178,14 @@ class BaseOpenAIAPI:
                                 if 'role' in message:
                                     role = message['role']
                                 if 'content' in message:
-                                    text += message['content']
+                                    content += message['content']
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
-                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                        logger.info('\n'.join(log_strs))
+                        cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content)
                 elif inspect.isgenerator(response):
                     def wrapper(response):
-                        text = ''
+                        content = ''
                         role = ''
                         for data in response:
                             try:
@@ -207,34 +193,31 @@ class BaseOpenAIAPI:
                                 if 'role' in message:
                                     role = message['role']
                                 if 'content' in message:
-                                    text += message['content']
+                                    content += message['content']
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
-                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                        logger.info('\n'.join(log_strs))
+                        cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content)
                 else:
                     raise Exception("response is not a generator or async generator in stream mode")
                 response = wrapper(response)
             else:
+                role = content = err_msg = None
                 try:
-                    log_strs.append(cls.converter.chat2raw([response['choices'][0]['message']]))
+                    role = response['choices'][0]['message']['role']
+                    content = response['choices'][0]['message']['content']
                 except (KeyError, IndexError):
-                    log_strs.append("Wrong response format, no message found")
-                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                logger.info('\n'.join(log_strs))
+                    err_msg = "Wrong response format, no message found"
+                cls._chat_log_response_expanded(logger, log_marks, kwargs, messages, start_time, role, content, err_msg)
         return response
     
     @classmethod
-    def _chat_log_exception(cls, e, input_str, start_time, logger):
+    def _chat_log_exception(cls, logger, log_marks, kwargs, messages, start_time, e: Exception):
         if logger is not None:
-            end_time = time.time()
-            log_strs = []
-            log_strs.append(f"Chat request error ({end_time-start_time:.2f}s)")
-            log_strs.append(input_str)
-            log_strs.append(str(e))
-            logger.error('\n'.join(log_strs))
+            end_time = time.perf_counter()
+            duration = end_time - start_time
+            input_content = cls.converter.chat2raw(messages)
+            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, str(e))
 
     @classmethod
     def _completions_log_input(cls, prompt, logger, log_marks, kwargs):

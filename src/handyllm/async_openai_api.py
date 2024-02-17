@@ -1,6 +1,4 @@
 import time
-import json
-import copy
 
 from .base_openai_api import BaseOpenAIAPI
 from .async_api_request import api_request, poll
@@ -51,8 +49,7 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
     @classmethod
     async def chat(cls, messages, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        input_str = cls._chat_log_input(messages, logger, log_marks, kwargs)
-        start_time = time.time()
+        start_time = time.perf_counter()
         try:
             response = await cls.api_request_endpoint(
                 cls.get_chat_request_url(api_type, api_version, engine), 
@@ -66,10 +63,10 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
                 **kwargs
             )
             stream = kwargs.get('stream', False)
-            response = cls._chat_log_output(response, input_str, start_time, logger, stream)
+            response = cls._chat_log_response(logger, log_marks, kwargs, messages, start_time, response, stream)
             return response
         except Exception as e:
-            cls._chat_log_exception(e, input_str, start_time, logger)
+            cls._chat_log_exception(logger, log_marks, kwargs, messages, start_time, e)
             raise e
 
 
