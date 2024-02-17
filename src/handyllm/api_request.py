@@ -90,14 +90,15 @@ def api_request(
     else:
         return response.json()
 
-def _gen_stream_response(response):
-    for byte_line in response.iter_lines():  # do not auto decode
-        if byte_line:
-            if byte_line.strip() == b"data: [DONE]":
-                return
-            if byte_line.startswith(b"data: "):
-                line = byte_line[len(b"data: "):].decode("utf-8")
-                yield json.loads(line)
+def _gen_stream_response(response: requests.Response):
+    with response:
+        for byte_line in response.iter_lines():  # do not auto decode
+            if byte_line:
+                if byte_line.strip() == b"data: [DONE]":
+                    return
+                if byte_line.startswith(b"data: "):
+                    line = byte_line[len(b"data: "):].decode("utf-8")
+                    yield json.loads(line)
 
 def poll(
     url, 
