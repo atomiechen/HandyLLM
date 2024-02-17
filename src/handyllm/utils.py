@@ -73,3 +73,10 @@ def log_exception(logger, tag: str, duration: float, log_marks, kwargs, input_co
     log_strs.append(err_msg)
     log_strs.append(" EXCEPTION END ".center(50, '-')+"\n")
     logger.error('\n'.join(log_strs))
+
+def exception2err_msg(exception: Exception):
+    err_msg = f"Exception: {type(exception).__module__}.{type(exception).__name__}"
+    err_msg += f"\nDetailed info: {repr(exception)}"
+    if exception.args:
+        print(f"\nException arguments: {exception.args}")
+    return err_msg

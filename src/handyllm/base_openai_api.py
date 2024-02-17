@@ -212,12 +212,13 @@ class BaseOpenAIAPI:
         return response
     
     @classmethod
-    def _chat_log_exception(cls, logger, log_marks, kwargs, messages, start_time, e: Exception):
+    def _chat_log_exception(cls, logger, log_marks, kwargs, messages, start_time, exception: Exception):
         if logger is not None:
             end_time = time.perf_counter()
             duration = end_time - start_time
             input_content = cls.converter.chat2raw(messages)
-            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, str(e))
+            err_msg = utils.exception2err_msg(exception)
+            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
 
     @classmethod
     def _completions_log_response_final(cls, logger, log_marks, kwargs, prompt, start_time, text, err_msg=None):
@@ -267,12 +268,13 @@ class BaseOpenAIAPI:
         return response
 
     @classmethod
-    def _completions_log_exception(cls, logger, log_marks, kwargs, prompt, start_time, e: Exception):
+    def _completions_log_exception(cls, logger, log_marks, kwargs, prompt, start_time, exception: Exception):
         if logger is not None:
             end_time = time.perf_counter()
             duration = end_time - start_time
             input_content = prompt
-            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, str(e))
+            err_msg = utils.exception2err_msg(exception)
+            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
 
     @classmethod
     def edits(cls, **kwargs):
