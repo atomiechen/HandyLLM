@@ -146,6 +146,14 @@ class BaseOpenAIAPI:
         return request_url
 
     @classmethod
+    def get_chat_request_url(cls, api_type, api_version, engine):
+        return cls.get_request_url('/chat/completions', api_type, api_version, engine)
+
+    @classmethod
+    def get_completions_request_url(cls, api_type, api_version, engine):
+        return cls.get_request_url('/completions', api_type, api_version, engine)
+
+    @classmethod
     def _chat_log_input(cls, messages, logger, log_marks, kwargs):
         if logger is not None:
             arguments = copy.deepcopy(kwargs)

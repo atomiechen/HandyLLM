@@ -51,14 +51,11 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
     @classmethod
     async def chat(cls, messages, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        request_url = cls.get_request_url('/chat/completions', api_type, api_version, engine)
-
         input_str = cls._chat_log_input(messages, logger, log_marks, kwargs)
-        
         start_time = time.time()
         try:
             response = await cls.api_request_endpoint(
-                request_url, 
+                cls.get_chat_request_url(api_type, api_version, engine), 
                 messages=messages, 
                 method='post', 
                 api_key=api_key,
@@ -68,26 +65,22 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
                 dest_url=dest_url,
                 **kwargs
             )
-            
             stream = kwargs.get('stream', False)
             response = cls._chat_log_output(response, input_str, start_time, logger, stream)
+            return response
         except Exception as e:
             cls._chat_log_exception(e, input_str, start_time, logger)
             raise e
 
-        return response
 
     @classmethod
     async def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        request_url = cls.get_request_url('/completions', api_type, api_version, engine)
-
         input_str = cls._completions_log_input(prompt, logger, log_marks, kwargs)
-        
         start_time = time.time()
         try:
             response = await cls.api_request_endpoint(
-                request_url, 
+                cls.get_completions_request_url(api_type, api_version, engine), 
                 prompt=prompt, 
                 method='post', 
                 api_key=api_key,
@@ -97,11 +90,10 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
                 dest_url=dest_url,
                 **kwargs
             )
-
             stream = kwargs.get('stream', False)
             response = cls._completions_log_output(response, input_str, start_time, logger, stream)
+            return response
         except Exception as e:
             cls._completions_log_exception(e, input_str, start_time, logger)
             raise e
 
-        return response
