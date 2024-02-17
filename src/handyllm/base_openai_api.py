@@ -3,6 +3,7 @@ import time
 from urllib.parse import quote_plus
 import json
 import copy
+import inspect
 
 from .api_request import api_request, poll
 from .endpoint_manager import Endpoint, EndpointManager
@@ -145,7 +146,7 @@ class BaseOpenAIAPI:
         return request_url
 
     @classmethod
-    def chat_log_prepare(cls, messages, logger, log_marks, kwargs):
+    def _chat_log_input(cls, messages, logger, log_marks, kwargs):
         if logger is not None:
             arguments = copy.deepcopy(kwargs)
             # check if log_marks is iterable
@@ -161,7 +162,7 @@ class BaseOpenAIAPI:
             return input_str
     
     @classmethod
-    def chat_log_response(cls, response, input_str, start_time, logger, stream):
+    def _chat_log_output(cls, response, input_str, start_time, logger, stream):
         if logger is not None:
             end_time = time.time()
             ## log this on result
@@ -171,22 +172,42 @@ class BaseOpenAIAPI:
 
             log_strs.append(" OUTPUT START ".center(50, '-'))
             if stream:
-                def wrapper(response):
-                    text = ''
-                    role = ''
-                    for data in response:
-                        try:
-                            message = data['choices'][0]['delta']
-                            if 'role' in message:
-                                role = message['role']
-                            if 'content' in message:
-                                text += message['content']
-                        except (KeyError, IndexError):
-                            pass
-                        yield data
-                    log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
-                    log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                    logger.info('\n'.join(log_strs))
+                if inspect.isasyncgen(response):
+                    async def wrapper(response):
+                        text = ''
+                        role = ''
+                        async for data in response:
+                            try:
+                                message = data['choices'][0]['delta']
+                                if 'role' in message:
+                                    role = message['role']
+                                if 'content' in message:
+                                    text += message['content']
+                            except (KeyError, IndexError):
+                                pass
+                            yield data
+                        log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
+                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                        logger.info('\n'.join(log_strs))
+                elif inspect.isgenerator(response):
+                    def wrapper(response):
+                        text = ''
+                        role = ''
+                        for data in response:
+                            try:
+                                message = data['choices'][0]['delta']
+                                if 'role' in message:
+                                    role = message['role']
+                                if 'content' in message:
+                                    text += message['content']
+                            except (KeyError, IndexError):
+                                pass
+                            yield data
+                        log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
+                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
+                        logger.info('\n'.join(log_strs))
+                else:
+                    raise Exception("response is not a generator or async generator in stream mode")
                 response = wrapper(response)
             else:
                 try:
@@ -195,9 +216,10 @@ class BaseOpenAIAPI:
                     log_strs.append("Wrong response format, no message found")
                 log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
                 logger.info('\n'.join(log_strs))
+        return response
     
     @classmethod
-    def chat_log_exception(cls, e, input_str, start_time, logger):
+    def _chat_log_exception(cls, e, input_str, start_time, logger):
         if logger is not None:
             end_time = time.time()
             log_strs = []
@@ -206,84 +228,6 @@ class BaseOpenAIAPI:
             log_strs.append(str(e))
             logger.error('\n'.join(log_strs))
 
-    # @classmethod
-    # def chat(cls, messages, logger=None, log_marks=[], **kwargs):
-    #     api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-    #     request_url = cls.get_request_url('/chat/completions', api_type, api_version, engine)
-
-    #     if logger is not None:
-    #         arguments = copy.deepcopy(kwargs)
-    #         # check if log_marks is iterable
-    #         if utils.isiterable(log_marks):
-    #             input_lines = [str(item) for item in log_marks]
-    #         else:
-    #             input_lines = [str(log_marks)]
-    #         input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
-    #         input_lines.append(" INPUT START ".center(50, '-'))
-    #         input_lines.append(cls.converter.chat2raw(messages))
-    #         input_lines.append(" INPUT END ".center(50, '-')+"\n")
-    #         input_str = "\n".join(input_lines)
-        
-    #     start_time = time.time()
-    #     try:
-    #         response = cls.api_request_endpoint(
-    #             request_url, 
-    #             messages=messages, 
-    #             method='post', 
-    #             api_key=api_key,
-    #             organization=organization,
-    #             api_base=api_base,
-    #             api_type=api_type,
-    #             dest_url=dest_url,
-    #             **kwargs
-    #         )
-            
-    #         if logger is not None:
-    #             end_time = time.time()
-    #             ## log this on result
-    #             log_strs = []
-    #             log_strs.append(f"Chat request result ({end_time-start_time:.2f}s)")
-    #             log_strs.append(input_str)
-
-    #             log_strs.append(" OUTPUT START ".center(50, '-'))
-    #             stream = kwargs.get('stream', False)
-    #             if stream:
-    #                 def wrapper(response):
-    #                     text = ''
-    #                     role = ''
-    #                     for data in response:
-    #                         try:
-    #                             message = data['choices'][0]['delta']
-    #                             if 'role' in message:
-    #                                 role = message['role']
-    #                             if 'content' in message:
-    #                                 text += message['content']
-    #                         except (KeyError, IndexError):
-    #                             pass
-    #                         yield data
-    #                     log_strs.append(cls.converter.chat2raw([{'role': role, 'content': text}]))
-    #                     log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-    #                     logger.info('\n'.join(log_strs))
-    #                 response = wrapper(response)
-    #             else:
-    #                 try:
-    #                     log_strs.append(cls.converter.chat2raw([response['choices'][0]['message']]))
-    #                 except (KeyError, IndexError):
-    #                     log_strs.append("Wrong response format, no message found")
-    #                 log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-    #                 logger.info('\n'.join(log_strs))
-    #     except Exception as e:
-    #         if logger is not None:
-    #             end_time = time.time()
-    #             log_strs = []
-    #             log_strs.append(f"Chat request error ({end_time-start_time:.2f}s)")
-    #             log_strs.append(input_str)
-    #             log_strs.append(str(e))
-    #             logger.error('\n'.join(log_strs))
-    #         raise e
-
-    #     return response
-    
     @classmethod
     def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)

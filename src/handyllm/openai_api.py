@@ -53,7 +53,7 @@ class OpenAIAPI(BaseOpenAIAPI):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/chat/completions', api_type, api_version, engine)
 
-        input_str = cls.chat_log_prepare(messages, logger, log_marks, kwargs)
+        input_str = cls._chat_log_input(messages, logger, log_marks, kwargs)
         
         start_time = time.time()
         try:
@@ -70,9 +70,9 @@ class OpenAIAPI(BaseOpenAIAPI):
             )
             
             stream = kwargs.get('stream', False)
-            cls.chat_log_response(response, input_str, start_time, logger, stream)
+            response = cls._chat_log_output(response, input_str, start_time, logger, stream)
         except Exception as e:
-            cls.chat_log_exception(e, input_str, start_time, logger)
+            cls._chat_log_exception(e, input_str, start_time, logger)
             raise e
 
         return response
