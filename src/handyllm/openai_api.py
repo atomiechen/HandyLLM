@@ -82,18 +82,7 @@ class OpenAIAPI(BaseOpenAIAPI):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
         request_url = cls.get_request_url('/completions', api_type, api_version, engine)
 
-        if logger is not None:
-            arguments = copy.deepcopy(kwargs)
-            # check if log_marks is iterable
-            if utils.isiterable(log_marks):
-                input_lines = [str(item) for item in log_marks]
-            else:
-                input_lines = [str(log_marks)]
-            input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
-            input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(prompt)
-            input_lines.append(" INPUT END ".center(50, '-')+"\n")
-            input_str = "\n".join(input_lines)
+        input_str = cls._completions_log_input(prompt, logger, log_marks, kwargs)
         
         start_time = time.time()
         try:
@@ -109,43 +98,10 @@ class OpenAIAPI(BaseOpenAIAPI):
                 **kwargs
             )
 
-            if logger is not None:
-                end_time = time.time()
-                ## log this on result
-                log_strs = []
-                log_strs.append(f"Completions request result ({end_time-start_time:.2f}s)")
-                log_strs.append(input_str)
-
-                log_strs.append(" OUTPUT START ".center(50, '-'))
-                stream = kwargs.get('stream', False)
-                if stream:
-                    def wrapper(response):
-                        text = ''
-                        for data in response:
-                            try:
-                                text += data['choices'][0]['text']
-                            except (KeyError, IndexError):
-                                pass
-                            yield data
-                        log_strs.append(text)
-                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                        logger.info('\n'.join(log_strs))
-                    response = wrapper(response)
-                else:
-                    try:
-                        log_strs.append(response['choices'][0]['text'])
-                    except (KeyError, IndexError):
-                        log_strs.append("Wrong response format, no text found")
-                    log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                    logger.info('\n'.join(log_strs))
+            stream = kwargs.get('stream', False)
+            response = cls._completions_log_output(response, input_str, start_time, logger, stream)
         except Exception as e:
-            if logger is not None:
-                end_time = time.time()
-                log_strs = []
-                log_strs.append(f"Completions request error ({end_time-start_time:.2f}s)")
-                log_strs.append(input_str)
-                log_strs.append(str(e))
-                logger.error('\n'.join(log_strs))
+            cls._completions_log_exception(e, input_str, start_time, logger)
             raise e
 
         return response
