@@ -73,8 +73,7 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
     @classmethod
     async def completions(cls, prompt, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        input_str = cls._completions_log_input(prompt, logger, log_marks, kwargs)
-        start_time = time.time()
+        start_time = time.perf_counter()
         try:
             response = await cls.api_request_endpoint(
                 cls.get_completions_request_url(api_type, api_version, engine), 
@@ -88,9 +87,9 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
                 **kwargs
             )
             stream = kwargs.get('stream', False)
-            response = cls._completions_log_output(response, input_str, start_time, logger, stream)
+            response = cls._completions_log_response(logger, log_marks, kwargs, prompt, start_time, response, stream)
             return response
         except Exception as e:
-            cls._completions_log_exception(e, input_str, start_time, logger)
+            cls._completions_log_exception(logger, log_marks, kwargs, prompt, start_time, e)
             raise e
 

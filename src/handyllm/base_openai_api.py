@@ -220,31 +220,19 @@ class BaseOpenAIAPI:
             utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, str(e))
 
     @classmethod
-    def _completions_log_input(cls, prompt, logger, log_marks, kwargs):
-        if logger is not None:
-            arguments = copy.deepcopy(kwargs)
-            # check if log_marks is iterable
-            if utils.isiterable(log_marks):
-                input_lines = [str(item) for item in log_marks]
-            else:
-                input_lines = [str(log_marks)]
-            input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
-            input_lines.append(" INPUT START ".center(50, '-'))
-            input_lines.append(prompt)
-            input_lines.append(" INPUT END ".center(50, '-')+"\n")
-            input_str = "\n".join(input_lines)
-            return input_str
+    def _completions_log_response_final(cls, logger, log_marks, kwargs, prompt, start_time, text, err_msg=None):
+        end_time = time.perf_counter()
+        duration = end_time - start_time
+        input_content = prompt
+        if not err_msg:
+            output_content = text
+            utils.log_result(logger, "Completions request", duration, log_marks, kwargs, input_content, output_content)
+        else:
+            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
     
     @classmethod
-    def _completions_log_output(cls, response, input_str, start_time, logger, stream):
+    def _completions_log_response(cls, logger, log_marks, kwargs, prompt, start_time, response, stream):
         if logger is not None:
-            end_time = time.time()
-            ## log this on result
-            log_strs = []
-            log_strs.append(f"Completions request result ({end_time-start_time:.2f}s)")
-            log_strs.append(input_str)
-
-            log_strs.append(" OUTPUT START ".center(50, '-'))
             if stream:
                 if inspect.isasyncgen(response):
                     async def wrapper(response):
@@ -255,9 +243,7 @@ class BaseOpenAIAPI:
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        log_strs.append(text)
-                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                        logger.info('\n'.join(log_strs))
+                        cls._completions_log_response_final(logger, log_marks, kwargs, prompt, start_time, text)
                 elif inspect.isgenerator(response):
                     def wrapper(response):
                         text = ''
@@ -267,31 +253,27 @@ class BaseOpenAIAPI:
                             except (KeyError, IndexError):
                                 pass
                             yield data
-                        log_strs.append(text)
-                        log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                        logger.info('\n'.join(log_strs))
+                        cls._completions_log_response_final(logger, log_marks, kwargs, prompt, start_time, text)
                 else:
                     raise Exception("response is not a generator or async generator in stream mode")
                 response = wrapper(response)
             else:
+                text = err_msg = None
                 try:
-                    log_strs.append(response['choices'][0]['text'])
+                    text = response['choices'][0]['text']
                 except (KeyError, IndexError):
-                    log_strs.append("Wrong response format, no text found")
-                log_strs.append(" OUTPUT END ".center(50, '-')+"\n")
-                logger.info('\n'.join(log_strs))
+                    err_msg = "Wrong response format, no text found"
+                cls._completions_log_response_final(logger, log_marks, kwargs, prompt, start_time, text, err_msg)
         return response
-    
+
     @classmethod
-    def _completions_log_exception(cls, e, input_str, start_time, logger):
+    def _completions_log_exception(cls, logger, log_marks, kwargs, prompt, start_time, e: Exception):
         if logger is not None:
-            end_time = time.time()
-            log_strs = []
-            log_strs.append(f"Completions request error ({end_time-start_time:.2f}s)")
-            log_strs.append(input_str)
-            log_strs.append(str(e))
-            logger.error('\n'.join(log_strs))
-    
+            end_time = time.perf_counter()
+            duration = end_time - start_time
+            input_content = prompt
+            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, str(e))
+
     @classmethod
     def edits(cls, **kwargs):
         request_url = '/edits'
