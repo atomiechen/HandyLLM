@@ -206,6 +206,29 @@ class OpenAIClient(BaseOpenAIAPI):
         requestor.set_exception_callback(
             lambda exception, start_time: self._chat_log_exception(logger, log_marks, kwargs, messages, start_time, exception)
         )
-
         return requestor
 
+    def completions(self, prompt, logger=None, log_marks=[], **kwargs):
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        requestor = self.make_requestor(
+            self.get_request_url('/completions', api_type, api_version, engine), 
+            prompt=prompt, 
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            dest_url=dest_url,
+            **kwargs
+        )
+        requestor.set_prepare_callback(
+            lambda *args : time.perf_counter()  # start_time
+        )
+        stream = kwargs.get('stream', False)
+        requestor.set_response_callback(
+            lambda response, start_time: self._completions_log_response(logger, log_marks, kwargs, prompt, start_time, response, stream)
+        )
+        requestor.set_exception_callback(
+            lambda exception, start_time: self._completions_log_exception(logger, log_marks, kwargs, prompt, start_time, exception)
+        )
+        return requestor
