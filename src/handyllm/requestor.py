@@ -1,9 +1,12 @@
+import asyncio
 import logging
 import json
 import requests
 import httpx
+import time
 
 from . import _API_TYPES_AZURE
+from . import utils
 
 
 module_logger = logging.getLogger(__name__)
@@ -21,7 +24,7 @@ class Requestor:
         method='post', 
         timeout=None, 
         files=None, 
-        raw_response=False, 
+        azure_poll=False, 
         dest_url=None, 
         **kwargs) -> None:
         
@@ -47,12 +50,12 @@ class Requestor:
         self.method = method
         self.timeout = timeout
         self.files = files
-        self.raw_response = raw_response
+        self.azure_poll = azure_poll
         self.dest_url = dest_url
 
         self.stream = kwargs.get('stream', False)
-        if self.stream and raw_response:
-            raise Exception("Cannot use 'raw_response' in stream mode.")
+        if self.stream and azure_poll:
+            raise Exception("Cannot use 'azure_poll' in stream mode.")
 
         self.headers = {}
         self.json_data = None
@@ -88,6 +91,22 @@ class Requestor:
         log_strs.append(f"timeout: {self.timeout}")
         module_logger.info('\n'.join(log_strs))
 
+    def _check_image_error(self, response):
+        response_dict = response.json()
+        if response_dict['status'] == 'failed':
+            err_msg = f"Image generation failed: {response_dict['error']['code']} {response_dict['error']['message']}"
+            module_logger.error(err_msg)
+            raise Exception(err_msg)
+    
+    def _check_image_end(self, response):
+        return response.json()['status'] in ['succeeded', 'failed']
+    
+    def _get_image_retry(self, response):
+        try:
+            return int(response.headers.get('retry-after'))
+        except:
+            return 1
+
     def call(self):
         if self._sync_client is None:
             raise Exception("Sync request client is not set")
@@ -104,8 +123,10 @@ class Requestor:
             if self.stream:
                 response = self._gen_stream_response(raw_response, prepare_ret)
             else:
-                if self.raw_response:
-                    response = raw_response
+                if self.azure_poll:
+                    poll_url = raw_response.headers['operation-location']
+                    response = self.poll(poll_url).json()
+                    response = response.get('result', response)
                 else:
                     response = raw_response.json()
             
@@ -117,7 +138,7 @@ class Requestor:
                 self._exception_callback(e, prepare_ret)
             raise e
 
-    def _call_raw(self):
+    def _call_raw(self) -> requests.Response:
         response = self._sync_client.request(
             self.method,
             self.url,
@@ -140,10 +161,10 @@ class Requestor:
             raise Exception(err_msg)
         return response
 
-    def _gen_stream_response(self, response: requests.Response, prepare_ret):
-        with response:
+    def _gen_stream_response(self, raw_response: requests.Response, prepare_ret):
+        with raw_response:
             try:
-                for byte_line in response.iter_lines():  # do not auto decode
+                for byte_line in raw_response.iter_lines():  # do not auto decode
                     if byte_line:
                         if byte_line.strip() == b"data: [DONE]":
                             return
@@ -154,6 +175,16 @@ class Requestor:
                 if self._exception_callback:
                     self._exception_callback(e, prepare_ret)
                 raise e
+
+    def poll(self, url, params=None) -> requests.Response:
+        headers= { "api-key": self.api_key, "Content-Type": "application/json" }
+        response = self._sync_client.request('get', url, headers=headers, params=params)
+        self._check_image_error(response)
+        while not self._check_image_end(response):
+            time.sleep(self._get_image_retry(response))
+            response = self._sync_client.request('get', url, headers=headers, params=params)
+        self._check_image_error(response)
+        return response
 
     async def acall(self):
         if self._async_client is None:
@@ -171,8 +202,10 @@ class Requestor:
             if self.stream:
                 response = self._agen_stream_response(raw_response, prepare_ret)
             else:
-                if self.raw_response:
-                    response = raw_response
+                if self.azure_poll:
+                    poll_url = raw_response.headers['operation-location']
+                    response = await self.apoll(poll_url).json()
+                    response = response.get('result', response)
                 else:
                     response = raw_response.json()
             
@@ -221,6 +254,16 @@ class Requestor:
             raise e
         finally:
             await raw_response.aclose()
+
+    async def apoll(self, url, params=None) -> httpx.Response:
+        headers= { "api-key": self.api_key, "Content-Type": "application/json" }
+        response = await self._async_client.request('get', url, headers=headers, params=params)
+        self._check_image_error(response)
+        while not self._check_image_end(response):
+            await asyncio.sleep(self._get_image_retry(response))
+            response = await self._async_client.request('get', url, headers=headers, params=params)
+        self._check_image_error(response)
+        return response
     
     def set_sync_client(self, client: requests.Session):
         self._sync_client = client

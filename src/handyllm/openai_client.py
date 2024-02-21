@@ -269,41 +269,33 @@ class OpenAIClient(BaseOpenAIAPI):
         return self.make_requestor('/moderations', method='post', **kwargs)
 
     def images_generations(self, **kwargs) -> Requestor:
-        # TODO
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
+        if api_type and api_type.lower() in _API_TYPES_AZURE and api_version in [
+            "2023-06-01-preview",
+            "2023-07-01-preview",
+            "2023-08-01-preview",
+            "2023-09-01-preview",
+            "2023-10-01-preview",
+        ]:
+            # Azure image generation DALL-E 2
+            # use raw response to get poll_url
             request_url = f'/openai/images/generations:submit?api-version={api_version}'
-            raw_response = True
+            azure_poll=True
         else:
-            request_url = '/images/generations'
-            raw_response = False
-        response = self.api_request_endpoint(
+            # OpenAI image generation, or Azure image generation DALL-E 3 and newer
+            request_url = self.get_request_url('/images/generations', api_type, api_version, engine)
+            azure_poll=False
+        return self.make_requestor(
             request_url, 
             method='post', 
             api_key=api_key,
             organization=organization,
             api_base=api_base,
             api_type=api_type,
-            raw_response=raw_response,
             dest_url=dest_url,
+            azure_poll=azure_poll,
             **kwargs
             )
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
-            # Azure image generation
-            # use raw response to get poll_url
-            poll_url = response.headers['operation-location']
-            headers= { "api-key": api_key, "Content-Type": "application/json" }
-            response = poll(
-                url=poll_url, 
-                method='get', 
-                until=lambda response: response.json()['status'] == 'succeeded',
-                failed=utils.check_image_failure,
-                interval=lambda response: utils.get_retry(response) or 1,
-                headers=headers, 
-                ).json()
-            return response.get('result', response)
-        else:
-            return response
 
     def images_edits(self, image, mask=None, **kwargs) -> Requestor:
         files = { 'image': image }
