@@ -1,3 +1,7 @@
+"""
+Deprecated OpenAIAPI code. It is not used in the current version of the 
+library and is kept here for reference.
+"""
 import time
 
 from .base_openai_api import BaseOpenAIAPI
