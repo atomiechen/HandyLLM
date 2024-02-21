@@ -11,9 +11,9 @@ __all__ = [
     'stream_chat_with_role',
     'stream_chat',
     'stream_completions',
-    'async_stream_chat_with_role',
-    'async_stream_chat',
-    'async_stream_completions',
+    'astream_chat_with_role',
+    'astream_chat',
+    'astream_completions',
 ]
 
 
@@ -115,7 +115,7 @@ def stream_completions(response):
         except (KeyError, IndexError):
             pass
 
-async def stream_chat_with_role(response):
+async def astream_chat_with_role(response):
     role = ''
     async for data in response:
         try:
@@ -128,11 +128,11 @@ async def stream_chat_with_role(response):
         except (KeyError, IndexError):
             pass
 
-async def stream_chat(response):
-    async for _, text in stream_chat_with_role(response):
+async def astream_chat(response):
+    async for _, text in astream_chat_with_role(response):
         yield text
 
-async def stream_completions(response):
+async def astream_completions(response):
     async for data in response:
         try:
             yield data['choices'][0]['text']
