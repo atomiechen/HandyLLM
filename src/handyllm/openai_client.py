@@ -177,7 +177,6 @@ class OpenAIClient(BaseOpenAIAPI):
 
     def make_requestor(self, request_url, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
-        print(f"api_key: {api_key}")
         url = utils.join_url(api_base, request_url)
         requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
         requestor.set_sync_client(self.sync_client)
