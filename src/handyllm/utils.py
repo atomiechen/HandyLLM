@@ -7,6 +7,16 @@ import json
 import copy
 
 
+__all__ = [
+    'stream_chat_with_role',
+    'stream_chat',
+    'stream_completions',
+    'async_stream_chat_with_role',
+    'async_stream_chat',
+    'async_stream_completions',
+]
+
+
 def get_filename_from_url(download_url):
     # Parse the URL.
     parsed_url = urlparse(download_url)
@@ -80,3 +90,52 @@ def exception2err_msg(exception: Exception):
     if exception.args:
         print(f"\nException arguments: {exception.args}")
     return err_msg
+
+def stream_chat_with_role(response):
+    role = ''
+    for data in response:
+        try:
+            message = data['choices'][0]['delta']
+            if 'role' in message:
+                role = message['role']
+            if 'content' in message:
+                text = message['content']
+                yield role, text
+        except (KeyError, IndexError):
+            pass
+
+def stream_chat(response):
+    for _, text in stream_chat_with_role(response):
+        yield text
+
+def stream_completions(response):
+    for data in response:
+        try:
+            yield data['choices'][0]['text']
+        except (KeyError, IndexError):
+            pass
+
+async def stream_chat_with_role(response):
+    role = ''
+    async for data in response:
+        try:
+            message = data['choices'][0]['delta']
+            if 'role' in message:
+                role = message['role']
+            if 'content' in message:
+                text = message['content']
+                yield role, text
+        except (KeyError, IndexError):
+            pass
+
+async def stream_chat(response):
+    async for _, text in stream_chat_with_role(response):
+        yield text
+
+async def stream_completions(response):
+    async for data in response:
+        try:
+            yield data['choices'][0]['text']
+        except (KeyError, IndexError):
+            pass
+
