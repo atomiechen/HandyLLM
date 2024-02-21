@@ -208,7 +208,7 @@ class OpenAIClient(BaseOpenAIAPI):
         )
         return requestor
 
-    def completions(self, prompt, logger=None, log_marks=[], **kwargs):
+    def completions(self, prompt, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
         requestor = self.make_requestor(
             self.get_request_url('/completions', api_type, api_version, engine), 
@@ -232,3 +232,128 @@ class OpenAIClient(BaseOpenAIAPI):
             lambda exception, start_time: self._completions_log_exception(logger, log_marks, kwargs, prompt, start_time, exception)
         )
         return requestor
+
+    def edits(self, **kwargs) -> Requestor:
+        return self.make_requestor('/edits', method='post', **kwargs)
+
+    def embeddings(self, **kwargs) -> Requestor:
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        return self.make_requestor(
+            self.get_request_url('/embeddings', api_type, api_version, engine), 
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            dest_url=dest_url,
+            **kwargs
+            )
+
+    def models_list(self, **kwargs) -> Requestor:
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        return self.make_requestor(
+            self.get_request_url('/models', api_type, api_version, engine), 
+            method='get', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            dest_url=dest_url,
+            **kwargs
+            )
+
+    def models_retrieve(self, model, **kwargs) -> Requestor:
+        return self.make_requestor(f'/models/{model}', method='get', **kwargs)
+
+    def moderations(self, **kwargs) -> Requestor:
+        return self.make_requestor('/moderations', method='post', **kwargs)
+
+    def images_generations(self, **kwargs) -> Requestor:
+        # TODO
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            request_url = f'/openai/images/generations:submit?api-version={api_version}'
+            raw_response = True
+        else:
+            request_url = '/images/generations'
+            raw_response = False
+        response = self.api_request_endpoint(
+            request_url, 
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            raw_response=raw_response,
+            dest_url=dest_url,
+            **kwargs
+            )
+        if api_type and api_type.lower() in _API_TYPES_AZURE:
+            # Azure image generation
+            # use raw response to get poll_url
+            poll_url = response.headers['operation-location']
+            headers= { "api-key": api_key, "Content-Type": "application/json" }
+            response = poll(
+                url=poll_url, 
+                method='get', 
+                until=lambda response: response.json()['status'] == 'succeeded',
+                failed=utils.check_image_failure,
+                interval=lambda response: utils.get_retry(response) or 1,
+                headers=headers, 
+                ).json()
+            return response.get('result', response)
+        else:
+            return response
+
+    def images_edits(self, image, mask=None, **kwargs) -> Requestor:
+        files = { 'image': image }
+        if mask:
+            files['mask'] = mask
+        return self.make_requestor('/images/edits', method='post', files=files, **kwargs)
+
+    def images_variations(self, image, **kwargs) -> Requestor:
+        files = { 'image': image }
+        return self.make_requestor('/images/variations', method='post', files=files, **kwargs)
+
+    def audio_transcriptions(self, file, **kwargs) -> Requestor:
+        files = { 'file': file }
+        return self.make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)
+
+    def audio_translations(self, file, **kwargs) -> Requestor:
+        files = { 'file': file }
+        return self.make_requestor('/audio/translations', method='post', files=files, **kwargs)
+
+    def files_list(self, **kwargs) -> Requestor:
+        return self.make_requestor('/files', method='get', **kwargs)
+
+    def files_upload(self, file, **kwargs) -> Requestor:
+        files = { 'file': file }
+        return self.make_requestor('/files', method='post', files=files, **kwargs)
+
+    def files_delete(self, file_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/files/{file_id}', method='delete', **kwargs)
+
+    def files_retrieve(self, file_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/files/{file_id}', method='get', **kwargs)
+
+    def files_retrieve_content(self, file_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/files/{file_id}/content', method='get', **kwargs)
+
+    def finetunes_create(self, **kwargs) -> Requestor:
+        return self.make_requestor('/fine-tunes', method='post', **kwargs)
+
+    def finetunes_list(self, **kwargs) -> Requestor:
+        return self.make_requestor('/fine-tunes', method='get', **kwargs)
+
+    def finetunes_retrieve(self, fine_tune_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
+
+    def finetunes_cancel(self, fine_tune_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
+
+    def finetunes_list_events(self, fine_tune_id, **kwargs) -> Requestor:
+        return self.make_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
+
+    def finetunes_delete_model(self, model, **kwargs) -> Requestor:
+        return self.make_requestor(f'/models/{model}', method='delete', **kwargs)
+
