@@ -11,7 +11,7 @@ from .prompt_converter import PromptConverter
 from .endpoint_manager import Endpoint, EndpointManager
 from .base_openai_api import BaseOpenAIAPI
 from .requestor import Requestor
-from . import utils
+from ._utils import join_url
 from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
 
 
@@ -177,7 +177,7 @@ class OpenAIClient(BaseOpenAIAPI):
 
     def make_requestor(self, request_url, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
-        url = utils.join_url(api_base, request_url)
+        url = join_url(api_base, request_url)
         requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
         requestor.set_sync_client(self.sync_client)
         requestor.set_async_client(self.async_client)

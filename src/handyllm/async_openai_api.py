@@ -2,7 +2,7 @@ import time
 
 from .base_openai_api import BaseOpenAIAPI
 from .async_api_request import api_request, poll
-from . import utils
+from ._utils import join_url
 
 from . import _API_TYPES_AZURE
 
@@ -16,7 +16,7 @@ class AsyncOpenAIAPI(BaseOpenAIAPI):
         **kwargs
         ):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        url = utils.join_url(api_base, request_url)
+        url = join_url(api_base, request_url)
         return await api_request(url, api_key, organization=organization, api_type=api_type, dest_url=dest_url, **kwargs)
 
     @staticmethod

@@ -8,7 +8,7 @@ import inspect
 from .api_request import api_request, poll
 from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
-from . import utils
+from ._utils import join_url, log_result, log_exception, exception2err_msg
 
 from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
 
@@ -88,7 +88,7 @@ class BaseOpenAIAPI:
         **kwargs
         ):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = cls.consume_kwargs(kwargs)
-        url = utils.join_url(api_base, request_url)
+        url = join_url(api_base, request_url)
         return api_request(url, api_key, organization=organization, api_type=api_type, dest_url=dest_url, **kwargs)
     
     @classmethod
@@ -160,9 +160,9 @@ class BaseOpenAIAPI:
         input_content = cls.converter.chat2raw(messages)
         if not err_msg:
             output_content = cls.converter.chat2raw([{'role': role, 'content': content}])
-            utils.log_result(logger, "Chat request", duration, log_marks, kwargs, input_content, output_content)
+            log_result(logger, "Chat request", duration, log_marks, kwargs, input_content, output_content)
         else:
-            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
+            log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
 
     @classmethod
     def _chat_log_response(cls, logger, log_marks, kwargs, messages, start_time, response, stream):
@@ -217,8 +217,8 @@ class BaseOpenAIAPI:
             end_time = time.perf_counter()
             duration = end_time - start_time
             input_content = cls.converter.chat2raw(messages)
-            err_msg = utils.exception2err_msg(exception)
-            utils.log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
+            err_msg = exception2err_msg(exception)
+            log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
 
     @classmethod
     def _completions_log_response_final(cls, logger, log_marks, kwargs, prompt, start_time, text, err_msg=None):
@@ -227,9 +227,9 @@ class BaseOpenAIAPI:
         input_content = prompt
         if not err_msg:
             output_content = text
-            utils.log_result(logger, "Completions request", duration, log_marks, kwargs, input_content, output_content)
+            log_result(logger, "Completions request", duration, log_marks, kwargs, input_content, output_content)
         else:
-            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
+            log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
     
     @classmethod
     def _completions_log_response(cls, logger, log_marks, kwargs, prompt, start_time, response, stream):
@@ -273,8 +273,8 @@ class BaseOpenAIAPI:
             end_time = time.perf_counter()
             duration = end_time - start_time
             input_content = prompt
-            err_msg = utils.exception2err_msg(exception)
-            utils.log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
+            err_msg = exception2err_msg(exception)
+            log_exception(logger, "Completions request", duration, log_marks, kwargs, input_content, err_msg)
 
     @classmethod
     def edits(cls, **kwargs):
