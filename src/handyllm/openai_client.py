@@ -90,6 +90,12 @@ class OpenAIClient(BaseOpenAIAPI):
     def __exit__(self, *args):
         self.close()
     
+    async def __aenter__(self):
+        return self
+    
+    async def __aexit__(self, *args):
+        await self.aclose()
+    
     def __del__(self):
         self.close()
     
@@ -97,6 +103,20 @@ class OpenAIClient(BaseOpenAIAPI):
         if self.async_client is not None:
             try:
                 asyncio.get_running_loop().create_task(self.async_client.aclose())
+                self.async_client = None
+            except Exception:
+                pass
+        if self.sync_client is not None:
+            try:
+                self.sync_client.close()
+                self.sync_client = None
+            except Exception:
+                pass
+    
+    async def aclose(self):
+        if self.async_client is not None:
+            try:
+                await self.async_client.aclose()
                 self.async_client = None
             except Exception:
                 pass
