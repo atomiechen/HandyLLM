@@ -6,7 +6,6 @@ import httpx
 import time
 
 from . import _API_TYPES_AZURE
-from . import utils
 
 
 module_logger = logging.getLogger(__name__)
@@ -106,6 +105,10 @@ class Requestor:
             return int(response.headers.get('retry-after'))
         except:
             return 1
+    
+    def _check_timeout(self, timeout_ddl):
+        if timeout_ddl and time.perf_counter() > timeout_ddl:
+            raise Exception("Timeout")
 
     def call(self):
         if self._sync_client is None:
@@ -115,7 +118,7 @@ class Requestor:
             prepare_ret = self._prepare_callback()
         else:
             prepare_ret = None
-
+        timeout_ddl = time.perf_counter()+self.timeout if self.timeout else None
         self._log_request()
         try:
             raw_response = self._call_raw()
@@ -125,7 +128,7 @@ class Requestor:
             else:
                 if self.azure_poll:
                     poll_url = raw_response.headers['operation-location']
-                    response = self.poll(poll_url).json()
+                    response = self.poll(poll_url, timeout_ddl=timeout_ddl).json()
                     response = response.get('result', response)
                 else:
                     response = raw_response.json()
@@ -176,11 +179,13 @@ class Requestor:
                     self._exception_callback(e, prepare_ret)
                 raise e
 
-    def poll(self, url, params=None) -> requests.Response:
+    def poll(self, url, timeout_ddl=None, params=None) -> requests.Response:
+        self._check_timeout(timeout_ddl)
         headers= { "api-key": self.api_key, "Content-Type": "application/json" }
         response = self._sync_client.request('get', url, headers=headers, params=params)
         self._check_image_error(response)
         while not self._check_image_end(response):
+            self._check_timeout(timeout_ddl)
             time.sleep(self._get_image_retry(response))
             response = self._sync_client.request('get', url, headers=headers, params=params)
         self._check_image_error(response)
@@ -194,7 +199,7 @@ class Requestor:
             prepare_ret = self._prepare_callback()
         else:
             prepare_ret = None
-
+        timeout_ddl = time.perf_counter()+self.timeout if self.timeout else None
         self._log_request()
         try:
             raw_response = await self._acall_raw()
@@ -204,7 +209,7 @@ class Requestor:
             else:
                 if self.azure_poll:
                     poll_url = raw_response.headers['operation-location']
-                    response = await self.apoll(poll_url).json()
+                    response = await self.apoll(poll_url, timeout_ddl=timeout_ddl).json()
                     response = response.get('result', response)
                 else:
                     response = raw_response.json()
@@ -255,11 +260,13 @@ class Requestor:
         finally:
             await raw_response.aclose()
 
-    async def apoll(self, url, params=None) -> httpx.Response:
+    async def apoll(self, url, timeout_ddl=None, params=None) -> httpx.Response:
+        self._check_timeout(timeout_ddl)
         headers= { "api-key": self.api_key, "Content-Type": "application/json" }
         response = await self._async_client.request('get', url, headers=headers, params=params)
         self._check_image_error(response)
         while not self._check_image_end(response):
+            self._check_timeout(timeout_ddl)
             await asyncio.sleep(self._get_image_retry(response))
             response = await self._async_client.request('get', url, headers=headers, params=params)
         self._check_image_error(response)
