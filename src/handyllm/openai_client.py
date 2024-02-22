@@ -13,6 +13,11 @@ from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exc
 from ._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 
+def api(func):
+    func.is_api = True
+    return func
+
+
 class ClientMode(Enum):
     SYNC = auto()
     ASYNC = auto()
@@ -196,6 +201,7 @@ class OpenAIClient:
         requestor.set_async_client(self.async_client)
         return requestor
 
+    @api
     def chat(self, messages, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
@@ -221,6 +227,7 @@ class OpenAIClient:
         )
         return requestor
 
+    @api
     def completions(self, prompt, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
@@ -246,9 +253,11 @@ class OpenAIClient:
         )
         return requestor
 
+    @api
     def edits(self, **kwargs) -> Requestor:
         return self._make_requestor('/edits', method='post', **kwargs)
 
+    @api
     def embeddings(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self._make_requestor(
@@ -262,6 +271,7 @@ class OpenAIClient:
             **kwargs
             )
 
+    @api
     def models_list(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self._make_requestor(
@@ -275,12 +285,15 @@ class OpenAIClient:
             **kwargs
             )
 
+    @api
     def models_retrieve(self, model, **kwargs) -> Requestor:
         return self._make_requestor(f'/models/{model}', method='get', **kwargs)
 
+    @api
     def moderations(self, **kwargs) -> Requestor:
         return self._make_requestor('/moderations', method='post', **kwargs)
 
+    @api
     def images_generations(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE and api_version in [
@@ -310,55 +323,70 @@ class OpenAIClient:
             **kwargs
             )
 
+    @api
     def images_edits(self, image, mask=None, **kwargs) -> Requestor:
         files = { 'image': image }
         if mask:
             files['mask'] = mask
         return self._make_requestor('/images/edits', method='post', files=files, **kwargs)
 
+    @api
     def images_variations(self, image, **kwargs) -> Requestor:
         files = { 'image': image }
         return self._make_requestor('/images/variations', method='post', files=files, **kwargs)
 
+    @api
     def audio_transcriptions(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
         return self._make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)
 
+    @api
     def audio_translations(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
         return self._make_requestor('/audio/translations', method='post', files=files, **kwargs)
 
+    @api
     def files_list(self, **kwargs) -> Requestor:
         return self._make_requestor('/files', method='get', **kwargs)
 
+    @api
     def files_upload(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
         return self._make_requestor('/files', method='post', files=files, **kwargs)
 
+    @api
     def files_delete(self, file_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/files/{file_id}', method='delete', **kwargs)
 
+    @api
     def files_retrieve(self, file_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/files/{file_id}', method='get', **kwargs)
 
+    @api
     def files_retrieve_content(self, file_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/files/{file_id}/content', method='get', **kwargs)
 
+    @api
     def finetunes_create(self, **kwargs) -> Requestor:
         return self._make_requestor('/fine-tunes', method='post', **kwargs)
 
+    @api
     def finetunes_list(self, **kwargs) -> Requestor:
         return self._make_requestor('/fine-tunes', method='get', **kwargs)
 
+    @api
     def finetunes_retrieve(self, fine_tune_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
 
+    @api
     def finetunes_cancel(self, fine_tune_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
 
+    @api
     def finetunes_list_events(self, fine_tune_id, **kwargs) -> Requestor:
         return self._make_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
 
+    @api
     def finetunes_delete_model(self, model, **kwargs) -> Requestor:
         return self._make_requestor(f'/models/{model}', method='delete', **kwargs)
 
