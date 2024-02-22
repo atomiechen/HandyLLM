@@ -1,3 +1,7 @@
+"""
+Deprecated OpenAIAPI code. It is not used in the current version of the 
+library and is kept here for reference.
+"""
 import requests
 import json
 import logging
