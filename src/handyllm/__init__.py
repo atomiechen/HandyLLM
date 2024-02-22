@@ -10,7 +10,6 @@ _API_VERSION_AZURE = '2023-05-15'
 from .openai_client import OpenAIClient, ClientMode
 from .requestor import Requestor
 from .openai_api import OpenAIAPI
-from .async_openai_api import AsyncOpenAIAPI
 from .endpoint_manager import Endpoint, EndpointManager
 from .prompt_converter import PromptConverter
 from .utils import *
