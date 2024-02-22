@@ -136,6 +136,8 @@ class BaseOpenAIAPI:
     @staticmethod
     def get_request_url(request_url, api_type, api_version, engine):
         if api_type and api_type.lower() in _API_TYPES_AZURE:
+            if api_version is None:
+                raise Exception("api_version is required for Azure OpenAI API")
             if engine is None:
                 return f'/openai/deployments?api-version={api_version}'
             else:

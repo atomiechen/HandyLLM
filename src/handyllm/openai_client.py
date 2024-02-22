@@ -12,7 +12,7 @@ from .endpoint_manager import Endpoint, EndpointManager
 from .base_openai_api import BaseOpenAIAPI
 from .requestor import Requestor
 from ._utils import join_url
-from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
+from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 
 class ClientMode(Enum):
@@ -136,12 +136,11 @@ class OpenAIClient(BaseOpenAIAPI):
     def get_api_base(self, api_base=None):
         return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
     
-    def get_api_type_and_version(self, api_type=None, api_version=None):
-        api_type = api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
-        api_version = api_version or self.api_version or os.environ.get('OPENAI_API_VERSION')
-        if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
-            api_version = _API_VERSION_AZURE
-        return api_type, api_version
+    def get_api_type(self, api_type=None):
+        return api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
+
+    def get_api_version(self, api_version=None):
+        return api_version or self.api_version or os.environ.get('OPENAI_API_VERSION')
 
     def get_model_engine_map(self, model_engine_map=None):
         if model_engine_map:
@@ -154,7 +153,7 @@ class OpenAIClient(BaseOpenAIAPI):
         except:
             return None
 
-    def consume_kwargs(self, kwargs):
+    def _consume_kwargs(self, kwargs):
         api_key = organization = api_base = api_type = api_version = engine = model_engine_map = dest_url = None
 
         # read API info from endpoint_manager
@@ -176,10 +175,8 @@ class OpenAIClient(BaseOpenAIAPI):
         api_key = self.get_api_key(kwargs.pop('api_key', api_key))
         organization = self.get_organization(kwargs.pop('organization', organization))
         api_base = self.get_api_base(kwargs.pop('api_base', api_base))
-        api_type, api_version = self.get_api_type_and_version(
-            kwargs.pop('api_type', api_type), 
-            kwargs.pop('api_version', api_version)
-        )
+        api_type = self.get_api_type(kwargs.pop('api_type', api_type))
+        api_version = self.get_api_version(kwargs.pop('api_version', api_version))
         model_engine_map = self.get_model_engine_map(kwargs.pop('model_engine_map', model_engine_map))
 
         deployment_id = kwargs.pop('deployment_id', None)
@@ -196,7 +193,7 @@ class OpenAIClient(BaseOpenAIAPI):
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
     def make_requestor(self, request_url, **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         url = join_url(api_base, request_url)
         requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
         requestor.set_sync_client(self.sync_client)
@@ -204,7 +201,7 @@ class OpenAIClient(BaseOpenAIAPI):
         return requestor
 
     def chat(self, messages, logger=None, log_marks=[], **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self.make_requestor(
             self.get_request_url('/chat/completions', api_type, api_version, engine), 
             messages=messages, 
@@ -229,7 +226,7 @@ class OpenAIClient(BaseOpenAIAPI):
         return requestor
 
     def completions(self, prompt, logger=None, log_marks=[], **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self.make_requestor(
             self.get_request_url('/completions', api_type, api_version, engine), 
             prompt=prompt, 
@@ -257,7 +254,7 @@ class OpenAIClient(BaseOpenAIAPI):
         return self.make_requestor('/edits', method='post', **kwargs)
 
     def embeddings(self, **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self.make_requestor(
             self.get_request_url('/embeddings', api_type, api_version, engine), 
             method='post', 
@@ -270,7 +267,7 @@ class OpenAIClient(BaseOpenAIAPI):
             )
 
     def models_list(self, **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self.make_requestor(
             self.get_request_url('/models', api_type, api_version, engine), 
             method='get', 
@@ -289,7 +286,7 @@ class OpenAIClient(BaseOpenAIAPI):
         return self.make_requestor('/moderations', method='post', **kwargs)
 
     def images_generations(self, **kwargs) -> Requestor:
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self.consume_kwargs(kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         if api_type and api_type.lower() in _API_TYPES_AZURE and api_version in [
             "2023-06-01-preview",
             "2023-07-01-preview",
