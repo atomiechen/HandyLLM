@@ -11,7 +11,7 @@ from .api_request import api_request, poll
 from .._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from .. import utils
 
-from .. import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
+from .._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
 
 
 class OpenAIAPI:

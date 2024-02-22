@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 import time
 import inspect
 
-from . import _API_TYPES_AZURE
+from ._constants import _API_TYPES_AZURE
 from .prompt_converter import PromptConverter
 
 

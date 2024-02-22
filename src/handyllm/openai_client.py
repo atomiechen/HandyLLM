@@ -10,7 +10,7 @@ import httpx
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
-from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
+from ._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 
 class ClientMode(Enum):
