@@ -7,7 +7,7 @@ import json
 import logging
 import time
 
-from . import _API_TYPES_AZURE
+from .. import _API_TYPES_AZURE
 
 
 module_logger = logging.getLogger(__name__)
