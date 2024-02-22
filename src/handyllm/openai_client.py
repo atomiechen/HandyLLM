@@ -127,22 +127,22 @@ class OpenAIClient(BaseOpenAIAPI):
             except Exception:
                 pass
 
-    def get_api_key(self, api_key=None):
+    def _infer_api_key(self, api_key=None):
         return api_key or self.api_key or os.environ.get('OPENAI_API_KEY')
     
-    def get_organization(self, organization=None):
+    def _infer_organization(self, organization=None):
         return organization or self.organization or os.environ.get('OPENAI_ORGANIZATION')
     
-    def get_api_base(self, api_base=None):
+    def _infer_api_base(self, api_base=None):
         return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
     
-    def get_api_type(self, api_type=None):
+    def _infer_api_type(self, api_type=None):
         return api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
 
-    def get_api_version(self, api_version=None):
+    def _infer_api_version(self, api_version=None):
         return api_version or self.api_version or os.environ.get('OPENAI_API_VERSION')
 
-    def get_model_engine_map(self, model_engine_map=None):
+    def _infer_model_engine_map(self, model_engine_map=None):
         if model_engine_map:
             return model_engine_map
         if self.model_engine_map:
@@ -172,12 +172,12 @@ class OpenAIClient(BaseOpenAIAPI):
             api_key, organization, api_base, api_type, api_version, model_engine_map, dest_url = endpoint.get_api_info()
 
         # read API info from kwargs, class variables, and environment variables
-        api_key = self.get_api_key(kwargs.pop('api_key', api_key))
-        organization = self.get_organization(kwargs.pop('organization', organization))
-        api_base = self.get_api_base(kwargs.pop('api_base', api_base))
-        api_type = self.get_api_type(kwargs.pop('api_type', api_type))
-        api_version = self.get_api_version(kwargs.pop('api_version', api_version))
-        model_engine_map = self.get_model_engine_map(kwargs.pop('model_engine_map', model_engine_map))
+        api_key = self._infer_api_key(kwargs.pop('api_key', api_key))
+        organization = self._infer_organization(kwargs.pop('organization', organization))
+        api_base = self._infer_api_base(kwargs.pop('api_base', api_base))
+        api_type = self._infer_api_type(kwargs.pop('api_type', api_type))
+        api_version = self._infer_api_version(kwargs.pop('api_version', api_version))
+        model_engine_map = self._infer_model_engine_map(kwargs.pop('model_engine_map', model_engine_map))
 
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
@@ -192,7 +192,7 @@ class OpenAIClient(BaseOpenAIAPI):
         dest_url = kwargs.pop('dest_url', dest_url)
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
-    def make_requestor(self, request_url, **kwargs) -> Requestor:
+    def _make_requestor(self, request_url, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         url = join_url(api_base, request_url)
         requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
@@ -202,7 +202,7 @@ class OpenAIClient(BaseOpenAIAPI):
 
     def chat(self, messages, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        requestor = self.make_requestor(
+        requestor = self._make_requestor(
             self.get_request_url('/chat/completions', api_type, api_version, engine), 
             messages=messages, 
             method='post', 
@@ -227,7 +227,7 @@ class OpenAIClient(BaseOpenAIAPI):
 
     def completions(self, prompt, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        requestor = self.make_requestor(
+        requestor = self._make_requestor(
             self.get_request_url('/completions', api_type, api_version, engine), 
             prompt=prompt, 
             method='post', 
@@ -251,11 +251,11 @@ class OpenAIClient(BaseOpenAIAPI):
         return requestor
 
     def edits(self, **kwargs) -> Requestor:
-        return self.make_requestor('/edits', method='post', **kwargs)
+        return self._make_requestor('/edits', method='post', **kwargs)
 
     def embeddings(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        return self.make_requestor(
+        return self._make_requestor(
             self.get_request_url('/embeddings', api_type, api_version, engine), 
             method='post', 
             api_key=api_key,
@@ -268,7 +268,7 @@ class OpenAIClient(BaseOpenAIAPI):
 
     def models_list(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        return self.make_requestor(
+        return self._make_requestor(
             self.get_request_url('/models', api_type, api_version, engine), 
             method='get', 
             api_key=api_key,
@@ -280,10 +280,10 @@ class OpenAIClient(BaseOpenAIAPI):
             )
 
     def models_retrieve(self, model, **kwargs) -> Requestor:
-        return self.make_requestor(f'/models/{model}', method='get', **kwargs)
+        return self._make_requestor(f'/models/{model}', method='get', **kwargs)
 
     def moderations(self, **kwargs) -> Requestor:
-        return self.make_requestor('/moderations', method='post', **kwargs)
+        return self._make_requestor('/moderations', method='post', **kwargs)
 
     def images_generations(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
@@ -302,7 +302,7 @@ class OpenAIClient(BaseOpenAIAPI):
             # OpenAI image generation, or Azure image generation DALL-E 3 and newer
             request_url = self.get_request_url('/images/generations', api_type, api_version, engine)
             azure_poll=False
-        return self.make_requestor(
+        return self._make_requestor(
             request_url, 
             method='post', 
             api_key=api_key,
@@ -318,51 +318,51 @@ class OpenAIClient(BaseOpenAIAPI):
         files = { 'image': image }
         if mask:
             files['mask'] = mask
-        return self.make_requestor('/images/edits', method='post', files=files, **kwargs)
+        return self._make_requestor('/images/edits', method='post', files=files, **kwargs)
 
     def images_variations(self, image, **kwargs) -> Requestor:
         files = { 'image': image }
-        return self.make_requestor('/images/variations', method='post', files=files, **kwargs)
+        return self._make_requestor('/images/variations', method='post', files=files, **kwargs)
 
     def audio_transcriptions(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
-        return self.make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)
+        return self._make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)
 
     def audio_translations(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
-        return self.make_requestor('/audio/translations', method='post', files=files, **kwargs)
+        return self._make_requestor('/audio/translations', method='post', files=files, **kwargs)
 
     def files_list(self, **kwargs) -> Requestor:
-        return self.make_requestor('/files', method='get', **kwargs)
+        return self._make_requestor('/files', method='get', **kwargs)
 
     def files_upload(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
-        return self.make_requestor('/files', method='post', files=files, **kwargs)
+        return self._make_requestor('/files', method='post', files=files, **kwargs)
 
     def files_delete(self, file_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/files/{file_id}', method='delete', **kwargs)
+        return self._make_requestor(f'/files/{file_id}', method='delete', **kwargs)
 
     def files_retrieve(self, file_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/files/{file_id}', method='get', **kwargs)
+        return self._make_requestor(f'/files/{file_id}', method='get', **kwargs)
 
     def files_retrieve_content(self, file_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/files/{file_id}/content', method='get', **kwargs)
+        return self._make_requestor(f'/files/{file_id}/content', method='get', **kwargs)
 
     def finetunes_create(self, **kwargs) -> Requestor:
-        return self.make_requestor('/fine-tunes', method='post', **kwargs)
+        return self._make_requestor('/fine-tunes', method='post', **kwargs)
 
     def finetunes_list(self, **kwargs) -> Requestor:
-        return self.make_requestor('/fine-tunes', method='get', **kwargs)
+        return self._make_requestor('/fine-tunes', method='get', **kwargs)
 
     def finetunes_retrieve(self, fine_tune_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
+        return self._make_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
 
     def finetunes_cancel(self, fine_tune_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
+        return self._make_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
 
     def finetunes_list_events(self, fine_tune_id, **kwargs) -> Requestor:
-        return self.make_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
+        return self._make_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
 
     def finetunes_delete_model(self, model, **kwargs) -> Requestor:
-        return self.make_requestor(f'/models/{model}', method='delete', **kwargs)
+        return self._make_requestor(f'/models/{model}', method='delete', **kwargs)
 
