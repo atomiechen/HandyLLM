@@ -81,8 +81,6 @@ class OpenAIClient(BaseOpenAIAPI):
         # or environment variable MODEL_ENGINE_MAP will be used;
         # can be None.
         self.model_engine_map = model_engine_map
-        
-        self.converter = PromptConverter()
     
     def __enter__(self):
         return self

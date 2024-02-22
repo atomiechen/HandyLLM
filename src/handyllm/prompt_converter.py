@@ -38,7 +38,8 @@ class PromptConverter:
         
         return self.raw2chat(raw_prompt)
     
-    def chat2raw(self, chat):
+    @staticmethod
+    def chat2raw(chat):
         # convert chat format to plain text
         messages = []
         for message in chat:
@@ -46,12 +47,14 @@ class PromptConverter:
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
     
-    def chat2rawfile(self, chat, raw_prompt_path: str):
-        raw_prompt = self.chat2raw(chat)
+    @classmethod
+    def chat2rawfile(cls, chat, raw_prompt_path: str):
+        raw_prompt = cls.chat2raw(chat)
         with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
             fout.write(raw_prompt)
     
-    def chat_replace_variables(self, chat, variable_map: dict, inplace=False):
+    @staticmethod
+    def chat_replace_variables(chat, variable_map: dict, inplace=False):
         # replace every variable in chat content
         if inplace:
             for message in chat:
@@ -68,8 +71,9 @@ class PromptConverter:
                         new_message['content'] = new_message['content'].replace(var, value)
                 new_chat.append(new_message)
             return new_chat
-
-    def chat_append_msg(self, chat, content: str, role: str = 'user', inplace=False):
+    
+    @staticmethod
+    def chat_append_msg(chat, content: str, role: str = 'user', inplace=False):
         if inplace:
             chat.append({"role": role, "content": content})
             return chat
