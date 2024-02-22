@@ -61,7 +61,7 @@ class OpenAIAPI(metaclass=_OpenAIAPIMeta):
     # can be None.
     model_engine_map = None
 
-    stream_chat = utils.stream_chat
-    stream_completions = utils.stream_completions
-    stream_chat_with_role = utils.stream_chat_with_role
+    stream_chat = staticmethod(utils.stream_chat)
+    stream_completions = staticmethod(utils.stream_completions)
+    stream_chat_with_role = staticmethod(utils.stream_chat_with_role)
 
