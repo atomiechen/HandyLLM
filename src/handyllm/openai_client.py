@@ -7,11 +7,9 @@ from typing import Union
 import requests
 import httpx
 
-from .prompt_converter import PromptConverter
 from .endpoint_manager import Endpoint, EndpointManager
-from .base_openai_api import BaseOpenAIAPI
 from .requestor import Requestor
-from ._utils import join_url
+from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from . import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 
@@ -21,7 +19,7 @@ class ClientMode(Enum):
     BOTH = auto()
 
 
-class OpenAIClient(BaseOpenAIAPI):
+class OpenAIClient:
     def __init__(
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
@@ -201,7 +199,7 @@ class OpenAIClient(BaseOpenAIAPI):
     def chat(self, messages, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
-            self.get_request_url('/chat/completions', api_type, api_version, engine), 
+            get_request_url('/chat/completions', api_type, api_version, engine), 
             messages=messages, 
             method='post', 
             api_key=api_key,
@@ -216,17 +214,17 @@ class OpenAIClient(BaseOpenAIAPI):
         )
         stream = kwargs.get('stream', False)
         requestor.set_response_callback(
-            lambda response, start_time: self._chat_log_response(logger, log_marks, kwargs, messages, start_time, response, stream)
+            lambda response, start_time: _chat_log_response(logger, log_marks, kwargs, messages, start_time, response, stream)
         )
         requestor.set_exception_callback(
-            lambda exception, start_time: self._chat_log_exception(logger, log_marks, kwargs, messages, start_time, exception)
+            lambda exception, start_time: _chat_log_exception(logger, log_marks, kwargs, messages, start_time, exception)
         )
         return requestor
 
     def completions(self, prompt, logger=None, log_marks=[], **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
-            self.get_request_url('/completions', api_type, api_version, engine), 
+            get_request_url('/completions', api_type, api_version, engine), 
             prompt=prompt, 
             method='post', 
             api_key=api_key,
@@ -241,10 +239,10 @@ class OpenAIClient(BaseOpenAIAPI):
         )
         stream = kwargs.get('stream', False)
         requestor.set_response_callback(
-            lambda response, start_time: self._completions_log_response(logger, log_marks, kwargs, prompt, start_time, response, stream)
+            lambda response, start_time: _completions_log_response(logger, log_marks, kwargs, prompt, start_time, response, stream)
         )
         requestor.set_exception_callback(
-            lambda exception, start_time: self._completions_log_exception(logger, log_marks, kwargs, prompt, start_time, exception)
+            lambda exception, start_time: _completions_log_exception(logger, log_marks, kwargs, prompt, start_time, exception)
         )
         return requestor
 
@@ -254,7 +252,7 @@ class OpenAIClient(BaseOpenAIAPI):
     def embeddings(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self._make_requestor(
-            self.get_request_url('/embeddings', api_type, api_version, engine), 
+            get_request_url('/embeddings', api_type, api_version, engine), 
             method='post', 
             api_key=api_key,
             organization=organization,
@@ -267,7 +265,7 @@ class OpenAIClient(BaseOpenAIAPI):
     def models_list(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self._make_requestor(
-            self.get_request_url('/models', api_type, api_version, engine), 
+            get_request_url('/models', api_type, api_version, engine), 
             method='get', 
             api_key=api_key,
             organization=organization,
@@ -298,7 +296,7 @@ class OpenAIClient(BaseOpenAIAPI):
             azure_poll=True
         else:
             # OpenAI image generation, or Azure image generation DALL-E 3 and newer
-            request_url = self.get_request_url('/images/generations', api_type, api_version, engine)
+            request_url = get_request_url('/images/generations', api_type, api_version, engine)
             azure_poll=False
         return self._make_requestor(
             request_url, 
