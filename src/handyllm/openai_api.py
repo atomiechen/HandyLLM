@@ -102,7 +102,7 @@ class _OpenAIClientProxy:
     
     # set this to your API version;
     # or environment variable OPENAI_API_VERSION will be used;
-    # can be None.
+    # cannot be None if using Azure API.
     api_version = None
     
     # set this to your model-engine map;

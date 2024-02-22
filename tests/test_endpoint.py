@@ -18,7 +18,7 @@ endpoint2 = Endpoint(
     api_type='azure', 
     api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
     api_key=os.getenv("AZURE_OPENAI_KEY"), 
-    api_version='2023-05-15',  # can be None and default value will be used
+    api_version='2023-05-15',  # cannot be None if using Azure API.
     model_engine_map={  # needed if you want to use model alias
         'gpt-3.5-turbo': 'gpt-35-turbo'
     }

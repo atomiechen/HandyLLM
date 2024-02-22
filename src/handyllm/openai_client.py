@@ -77,7 +77,7 @@ class OpenAIClient:
         
         # set this to your API version;
         # or environment variable OPENAI_API_VERSION will be used;
-        # can be None.
+        # cannot be None if using Azure API.
         self.api_version = api_version
         
         # set this to your model-engine map;
