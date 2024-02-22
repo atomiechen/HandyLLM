@@ -11,7 +11,7 @@ from .api_request import api_request, poll
 from .._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from .. import utils
 
-from .._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, _API_VERSION_AZURE
+from .._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 
 class OpenAIAPI:
@@ -65,12 +65,12 @@ class OpenAIAPI:
         return api_base or cls.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
     
     @classmethod
-    def get_api_type_and_version(cls, api_type=None, api_version=None):
-        api_type = api_type or cls.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
-        api_version = api_version or cls.api_version or os.environ.get('OPENAI_API_VERSION')
-        if not api_version and api_type and api_type.lower() in _API_TYPES_AZURE:
-            api_version = _API_VERSION_AZURE
-        return api_type, api_version
+    def get_api_type(cls, api_type=None):
+        return api_type or cls.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
+    
+    @classmethod
+    def get_api_version(cls, api_version=None):
+        return api_version or cls.api_version or os.environ.get('OPENAI_API_VERSION')
 
     @classmethod
     def get_model_engine_map(cls, model_engine_map=None):
@@ -107,10 +107,8 @@ class OpenAIAPI:
         api_key = cls.get_api_key(kwargs.pop('api_key', api_key))
         organization = cls.get_organization(kwargs.pop('organization', organization))
         api_base = cls.get_api_base(kwargs.pop('api_base', api_base))
-        api_type, api_version = cls.get_api_type_and_version(
-            kwargs.pop('api_type', api_type), 
-            kwargs.pop('api_version', api_version)
-        )
+        api_type = cls.get_api_type(kwargs.pop('api_type', api_type))
+        api_version = cls.get_api_version(kwargs.pop('api_version', api_version))
         model_engine_map = cls.get_model_engine_map(kwargs.pop('model_engine_map', model_engine_map))
 
         deployment_id = kwargs.pop('deployment_id', None)

@@ -5,4 +5,3 @@ _API_TYPES_AZURE = (
     'azure_ad', 
     'azuread'
 )
-_API_VERSION_AZURE = '2023-05-15'
