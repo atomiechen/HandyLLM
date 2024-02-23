@@ -6,6 +6,15 @@ A handy toolkit for using LLM.
 
 
 
+## Why HandyLLM?
+
+- Both sync and async APIs supported with straightforward unified design
+- OpenAI and Azure APIs all in one!
+- Easy life with API endpoint management
+- Writing chat prompt in a human-friendly mark-up text format
+
+
+
 ## Install
 
 ```shell
@@ -20,9 +29,60 @@ pip3 install git+https://github.com/atomiechen/handyllm.git
 
 
 
-## Examples
+## Usage
 
-Example scripts are placed in [tests](./tests) folder.
+More example scripts are placed in [tests](./tests) folder.
+
+### Using OpenAIClient
+
+Each API function of `OpenAIClient` returns a `Requestor`, and you can execute its `call()` or `acall()` to get synchronous or asynchronous API calls.
+
+Synchronous API usage:
+
+```python
+from handyllm import OpenAIClient
+with OpenAIClient(api_key='<your-key>') as client:
+    response = client.chat(
+      	model="gpt-4-turbo",
+      	messages=[{"role": "user", "content": "please tell me a joke"}]
+    ).call()  ## note .call() here
+    print(response['choices'][0]['message']['content'])
+```
+
+Asynchronous API usage:
+
+```python
+async with OpenAIClient('async', api_key='<your-key>') as client_async:
+    response = await client_async.chat(
+      	model="gpt-4-turbo",
+      	messages=[{"role": "user", "content": "please tell me a joke"}]
+    ).acall()  ## note .acall() here
+    print(response['choices'][0]['message']['content'])
+```
+
+You can instantiate a client that supports both modes:
+
+```python
+client = OpenAIClient('sync')  ## only supports sync APIs
+client = OpenAIClient('async')  ## only supports async APIs
+client = OpenAIClient('both')  ## supports both versions
+```
+
+
+
+### Legacy: Using OpenAIAPI proxy
+
+Under the hood it connects to a module client and only provides **synchronous** APIs, **without** `call()`.
+
+```python
+from handyllm import OpenAIAPI
+OpenAIAPI.api_key = '<your-key>'
+response = OpenAIAPI.chat(
+    model="gpt-4-turbo",
+    messages=[{"role": "user", "content": "please tell me a joke"}]
+)  ## no .call() here
+print(response['choices'][0]['message']['content'])
+```
 
 
 
@@ -39,7 +99,7 @@ There are 5 methods for specifying endpoint info:
 1. (each API call) Pass these fields as keyword parameters.
 2. (each API call) Pass an `endpoint` keyword parameter to specify an `Endpoint`.
 3. (each API call) Pass an `endpoint_manager` keyword parameter to specify an `EndpointManager`.
-4. (global) Set class variables: `OpenAIAPI.api_base`, `OpenAIAPI.api_key`, `OpenAIAPI.organization`, `OpenAIAPI.api_type`, `OpenAIAPI.api_version`, `OpenAIAPI.model_engine_map`.
+4. (global) Set `OpenAIClient` instance (or `OpenAIAPI`) variables: `client.api_base`, `client.api_key`, `client.organization`, `client.api_type`, `client.api_version`, `client.model_engine_map`. They can be passed to `OpenAIClient()` constructor as well.
 5. (global) Set environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
 
 **Note**: If a field is set to `None` in the previous method, it will be replaced by the non-`None` value in the subsequent method, until a default value is used (OpenAI's endpoint information).
