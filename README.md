@@ -38,7 +38,7 @@ More example scripts are placed in [tests](./tests) folder.
 
 ### Using OpenAIClient
 
-Each API function of `OpenAIClient` returns a `Requestor`, and you can execute its `call()` or `acall()` to get synchronous or asynchronous API calls.
+Each API method of `OpenAIClient` returns a `Requestor`, and you can execute its `call()` or `acall()` to get synchronous or asynchronous API calls.
 
 Synchronous API usage:
 
@@ -96,20 +96,28 @@ print(response['choices'][0]['message']['content'])
 
 ### Endpoints
 
-Each API request will connect to an endpoint along with some API configurations, which include: `api_key`, `organization`, `api_base`, `api_type`, `api_version`, `model_engine_map`, `dest_url`. 
+Each API request will connect to an endpoint along with some API configurations, which include:
+
+|                  | Description                                                  | Value                   |
+| ---------------- | ------------------------------------------------------------ | ----------------------- |
+| api_type         | API type. Defaults to `openai`.                              | str: `openai` / `azure` |
+| api_base         | API base url. Defaults to OpenAI base url.                   | str                     |
+| api_key          | API key.                                                     | str                     |
+| organization     | Organization.                                                | str                     |
+| api_version      | API version. **Must be provided for Azure end-points.**      | str                     |
+| model_engine_map | Map model name to engine name. Useful for Azure end-points if you have custom model names. | dict                    |
 
 An `Endpoint` object contains these information. An `EndpointManager` acts like a list and can be used to rotate the next endpoint. See [test_endpoint.py](./tests/test_endpoint.py).
 
-Methods for specifying endpoint info (with the former taking precedence over the latter):
+Methods for configuring endpoint info (values will be inferred in **top-town** order):
 
-1. API method keyword parameters.
-2. API method `endpoint` keyword parameter to specify an `Endpoint`.
-3. API method `endpoint_manager` keyword parameter to specify an `EndpointManager`.
-4. `OpenAIClient` instance (or `OpenAIAPI`) variables: `client.api_base`, `client.api_key`, `client.organization`, `client.api_type`, `client.api_version`, `client.model_engine_map`. They can be passed to `OpenAIClient()` constructor as well.
-5. Environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`/`OPENAI_ORG_ID`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
-
-> [!NOTE]
-> Fallback: `api_type` → `'openai'`;  `api_base` → OpenAI base url.
+| Configuration method                               | Description                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| API keyword parameters                             | e.g.: `chat(api_key='xxx', ...)`                             |
+| API `endpoint` keyword parameter                   | Providing an `Endpoint`, e.g.: `chat(endpoint=MyEndpoint)`   |
+| API `endpoint_manager` keyword parameter           | Providing an `EndpointManager`, e.g.: `chat(endpoint_manager=MyEndpointManager)` |
+| `OpenAIClient` instance (or `OpenAIAPI`) variables | e.g.: `client.api_key = 'xxx'` / `OpenAIAPI.api_key = 'xxx'` |
+| Environment variables                              | `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`/`OPENAI_ORG_ID`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`. |
 
 > [!TIP]
 >
