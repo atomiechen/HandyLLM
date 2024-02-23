@@ -1,4 +1,4 @@
-from handyllm import OpenAIAPI, EndpointManager, Endpoint
+from handyllm import OpenAIClient, EndpointManager, Endpoint
 
 from dotenv import load_dotenv, find_dotenv
 # load env parameters from file named .env
@@ -39,11 +39,11 @@ prompt = [{
     }]
 
 
-def example1():
+def example1(client: OpenAIClient):
     # ----- EXAMPLE 1 -----
 
     try:
-        response = OpenAIAPI.chat(
+        response = client.chat(
             model="gpt-3.5-turbo",
             messages=prompt,
             temperature=0.2,
@@ -53,34 +53,35 @@ def example1():
             presence_penalty=0.0,
             timeout=10,
             endpoint_manager=endpoint_manager
-            )
+            ).call()
         print(response['choices'][0]['message']['content'])
     except Exception as e:
         print(e)
 
 
-def example2():
+def example2(client: OpenAIClient):
     # ----- EXAMPLE 2 -----
 
     try:
-        response = OpenAIAPI.chat(
+        response = client.chat(
             # deployment_id="initial_deployment",
             model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
             messages=prompt,
             timeout=10,
             max_tokens=256,
             endpoint=endpoint2
-        )
+        ).call()
         print(response['choices'][0]['message']['content'])
     except Exception as e:
         print(e)
 
 
 if __name__ == "__main__":
-    example1()
-    
-    print()
-    print("-----")
-    
-    example2()
+    with OpenAIClient() as client:
+        example1(client)
+        
+        print()
+        print("-----")
+        
+        example2(client)
 
