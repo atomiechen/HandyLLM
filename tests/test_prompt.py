@@ -2,10 +2,10 @@ import json
 from handyllm import PromptConverter
 converter = PromptConverter()
 
-converter.read_substitute_content('substitute.txt')  # read substitute map
+converter.read_substitute_content('../assets/substitute.txt')  # read substitute map
 
 # chat can be used as the message parameter for OpenAI API
-chat = converter.rawfile2chat('prompt.txt')  # variables are substituted according to map
+chat = converter.rawfile2chat('../assets/prompt.txt')  # variables are substituted according to map
 # print(json.dumps(chat, indent=2))
 print(converter.chat2raw(chat))
 print('-----')

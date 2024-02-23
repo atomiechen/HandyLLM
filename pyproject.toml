@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HandyLLM"
-version = "0.5.5"
+version = "0.6.0"
 authors = [
   { name="Atomie CHEN", email="atomic_cwh@163.com" },
 ]
@@ -19,8 +19,12 @@ classifiers = [
 keywords = ["LLM", "Large Language Model", "Prompt", "OpenAI", "API"]
 dependencies = [
   "requests",
+  "httpx"
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/atomiechen/HandyLLM"
 "Bug Tracker" = "https://github.com/atomiechen/HandyLLM/issues"
+
+[project.optional-dependencies]
+test = ["python-dotenv"]

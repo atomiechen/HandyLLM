@@ -2,7 +2,6 @@ import requests
 from urllib.parse import urlparse
 import os
 import time
-import collections.abc
 
 
 def get_filename_from_url(download_url):
@@ -24,15 +23,51 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def isiterable(arg):
-    return (
-        isinstance(arg, collections.abc.Iterable) 
-        and not isinstance(arg, str)
-    )
+def stream_chat_with_role(response):
+    role = ''
+    for data in response:
+        try:
+            message = data['choices'][0]['delta']
+            if 'role' in message:
+                role = message['role']
+            if 'content' in message:
+                text = message['content']
+                yield role, text
+        except (KeyError, IndexError):
+            pass
 
-def join_url(base_url, *args):
-    url = base_url.rstrip('/')
-    for arg in args:
-        url += '/' + arg.lstrip('/')
-    return url
+def stream_chat(response):
+    for _, text in stream_chat_with_role(response):
+        yield text
+
+def stream_completions(response):
+    for data in response:
+        try:
+            yield data['choices'][0]['text']
+        except (KeyError, IndexError):
+            pass
+
+async def astream_chat_with_role(response):
+    role = ''
+    async for data in response:
+        try:
+            message = data['choices'][0]['delta']
+            if 'role' in message:
+                role = message['role']
+            if 'content' in message:
+                text = message['content']
+                yield role, text
+        except (KeyError, IndexError):
+            pass
+
+async def astream_chat(response):
+    async for _, text in astream_chat_with_role(response):
+        yield text
+
+async def astream_completions(response):
+    async for data in response:
+        try:
+            yield data['choices'][0]['text']
+        except (KeyError, IndexError):
+            pass
 

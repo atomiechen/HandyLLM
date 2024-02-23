@@ -1,9 +1,8 @@
-from handyllm import OpenAIAPI, EndpointManager, Endpoint
+from handyllm import OpenAIClient, EndpointManager, Endpoint
 
 from dotenv import load_dotenv, find_dotenv
 # load env parameters from file named .env
 load_dotenv(find_dotenv())
-load_dotenv(find_dotenv('azure.env'))
 
 import os
 
@@ -18,7 +17,7 @@ endpoint2 = Endpoint(
     api_type='azure', 
     api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
     api_key=os.getenv("AZURE_OPENAI_KEY"), 
-    api_version='2023-05-15',  # can be None and default value will be used
+    api_version='2023-05-15',  # cannot be None if using Azure API.
     model_engine_map={  # needed if you want to use model alias
         'gpt-3.5-turbo': 'gpt-35-turbo'
     }
@@ -34,45 +33,55 @@ for endpoint in endpoint_manager:
     # print(endpoint.get_api_info())  # WARNING: print endpoint info including api_key
 
 
-# ----- EXAMPLE 1 -----
-
 prompt = [{
     "role": "user",
     "content": "please tell me a joke"
     }]
-try:
-    response = OpenAIAPI.chat(
-        model="gpt-3.5-turbo",
-        messages=prompt,
-        temperature=0.2,
-        max_tokens=256,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-        timeout=10,
-        endpoint_manager=endpoint_manager
-        )
-    print(response['choices'][0]['message']['content'])
-except Exception as e:
-    print(e)
 
 
-print()
-print("-----")
+def example1(client: OpenAIClient):
+    # ----- EXAMPLE 1 -----
+
+    try:
+        response = client.chat(
+            model="gpt-3.5-turbo",
+            messages=prompt,
+            temperature=0.2,
+            max_tokens=256,
+            top_p=1.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            timeout=10,
+            endpoint_manager=endpoint_manager
+            ).call()
+        print(response['choices'][0]['message']['content'])
+    except Exception as e:
+        print(e)
 
 
-# ----- EXAMPLE 2 -----
+def example2(client: OpenAIClient):
+    # ----- EXAMPLE 2 -----
 
-try:
-    response = OpenAIAPI.chat(
-        # deployment_id="initial_deployment",
-        model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
-        messages=prompt,
-        timeout=10,
-        max_tokens=256,
-        endpoint=endpoint2
-    )
-    print(response['choices'][0]['message']['content'])
-except Exception as e:
-    print(e)
+    try:
+        response = client.chat(
+            # deployment_id="initial_deployment",
+            model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
+            messages=prompt,
+            timeout=10,
+            max_tokens=256,
+            endpoint=endpoint2
+        ).call()
+        print(response['choices'][0]['message']['content'])
+    except Exception as e:
+        print(e)
+
+
+if __name__ == "__main__":
+    with OpenAIClient() as client:
+        example1(client)
+        
+        print()
+        print("-----")
+        
+        example2(client)
 
