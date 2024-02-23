@@ -25,6 +25,35 @@ class ClientMode(Enum):
 
 
 class OpenAIClient:
+    # set this to your API type;
+    # or environment variable OPENAI_API_TYPE will be used;
+    # can be None (roll back to default).
+    api_type: Union[str, None]
+
+    # set this to your API base;
+    # or environment variable OPENAI_API_BASE will be used.
+    # can be None (roll back to default).
+    api_base: Union[str, None]
+    
+    # set this to your API key; 
+    # or environment variable OPENAI_API_KEY will be used.
+    api_key: Union[str, None]
+    
+    # set this to your organization ID; 
+    # or environment variable OPENAI_ORGANIZATION / OPENAI_ORG_ID will be used;
+    # can be None.
+    organization: Union[str, None]
+    
+    # set this to your API version;
+    # or environment variable OPENAI_API_VERSION will be used;
+    # cannot be None if using Azure API.
+    api_version: Union[str, None]
+    
+    # set this to your model-engine map;
+    # or environment variable MODEL_ENGINE_MAP will be used;
+    # can be None.
+    model_engine_map: Union[dict, None]
+    
     def __init__(
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
@@ -55,33 +84,11 @@ class OpenAIClient:
         else:
             self.async_client = None
         
-        # set this to your API base;
-        # or environment variable OPENAI_API_BASE will be used.
-        # can be None (roll back to default).
         self.api_base = api_base
-        
-        # set this to your API key; 
-        # or environment variable OPENAI_API_KEY will be used.
         self.api_key = api_key
-        
-        # set this to your organization ID; 
-        # or environment variable OPENAI_ORGANIZATION / OPENAI_ORG_ID will be used;
-        # can be None.
         self.organization = organization
-        
-        # set this to your API type;
-        # or environment variable OPENAI_API_TYPE will be used;
-        # can be None (roll back to default).
         self.api_type = api_type
-        
-        # set this to your API version;
-        # or environment variable OPENAI_API_VERSION will be used;
-        # cannot be None if using Azure API.
         self.api_version = api_version
-        
-        # set this to your model-engine map;
-        # or environment variable MODEL_ENGINE_MAP will be used;
-        # can be None.
         self.model_engine_map = model_engine_map
     
     def __enter__(self):
