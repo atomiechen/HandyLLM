@@ -106,7 +106,7 @@ Methods for specifying endpoint info (with the former taking precedence over the
 2. API method `endpoint` keyword parameter to specify an `Endpoint`.
 3. API method `endpoint_manager` keyword parameter to specify an `EndpointManager`.
 4. `OpenAIClient` instance (or `OpenAIAPI`) variables: `client.api_base`, `client.api_key`, `client.organization`, `client.api_type`, `client.api_version`, `client.model_engine_map`. They can be passed to `OpenAIClient()` constructor as well.
-5. Environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
+5. Environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`/`OPENAI_ORG_ID`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
 
 > [!NOTE]
 > Fallback: `api_type` → `'openai'`;  `api_base` → OpenAI base url.
