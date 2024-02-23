@@ -15,40 +15,47 @@ logging.basicConfig(level=logging.DEBUG)
 my_logger = logging.getLogger(__file__)
 
 
-# ----- EXAMPLE 1 -----
+def example_chat():
+    # ----- EXAMPLE 1 -----
 
-prompt = [{
-    "role": "user",
-    "content": "please tell me a joke"
-    }]
-response = OpenAIAPI.chat(
-    model="gpt-3.5-turbo",
-    messages=prompt,
-    temperature=0.2,
-    max_tokens=256,
-    top_p=1.0,
-    frequency_penalty=0.0,
-    presence_penalty=0.0,
-    timeout=10,
-    logger=my_logger,
-    log_marks=['mark: line 1', 'mark: line 2'],
+    prompt = [{
+        "role": "user",
+        "content": "please tell me a joke"
+        }]
+    response = OpenAIAPI.chat(
+        model="gpt-3.5-turbo",
+        messages=prompt,
+        temperature=0.2,
+        max_tokens=256,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+        timeout=10,
+        logger=my_logger,
+        log_marks=['mark: line 1', 'mark: line 2'],
+        )
+
+
+def example_completions():
+    # ----- EXAMPLE 2 -----
+
+    response = OpenAIAPI.completions(
+        model="text-davinci-002",
+        prompt="count to 23 and stop: 1,2,3,",
+        timeout=10,
+        max_tokens=256,
+        # echo=True,  # Echo back the prompt in addition to the completion
+        stream=True,
+        logger=my_logger,
+        log_marks='you can also pass a string here',
     )
+    # If set stream to True, the response should be explicitly iterated to 
+    # make the logger work
+    for _ in OpenAIAPI.stream_completions(response):
+        pass
 
 
+if __name__ == "__main__":
+    example_chat()
+    example_completions()
 
-# ----- EXAMPLE 2 -----
-
-response = OpenAIAPI.completions(
-    model="text-davinci-002",
-    prompt="count to 23 and stop: 1,2,3,",
-    timeout=10,
-    max_tokens=256,
-    # echo=True,  # Echo back the prompt in addition to the completion
-    stream=True,
-    logger=my_logger,
-    log_marks='you can also pass a string here',
-)
-# If set stream to True, the response should be explicitly iterated to 
-# make the logger work
-for _ in OpenAIAPI.stream_completions(response):
-    pass

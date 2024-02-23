@@ -10,36 +10,49 @@ load_dotenv(find_dotenv())
 # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 # OpenAIAPI.organization = None
 
-# ----- EXAMPLE 1 -----
 
-prompt = [{
-    "role": "user",
-    "content": "please tell me a joke"
-    }]
-response = OpenAIAPI.chat(
-    model="gpt-3.5-turbo",
-    messages=prompt,
-    temperature=0.2,
-    max_tokens=256,
-    top_p=1.0,
-    frequency_penalty=0.0,
-    presence_penalty=0.0,
-    timeout=10
-    )
-print(response['choices'][0]['message']['content'])
+def example_chat():
+    # ----- EXAMPLE 1 -----
+
+    prompt = [{
+        "role": "user",
+        "content": "please tell me a joke"
+        }]
+    response = OpenAIAPI.chat(
+        model="gpt-3.5-turbo",
+        messages=prompt,
+        temperature=0.2,
+        max_tokens=256,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+        timeout=10
+        )
+    print(response['choices'][0]['message']['content'])
 
 
 print()
 print("-----")
 
 
-# ----- EXAMPLE 2 -----
+def example_completions():
+    # ----- EXAMPLE 2 -----
 
-response = OpenAIAPI.completions(
-    model="text-davinci-002",
-    prompt="count to 23 and stop: 1,2,3,",
-    timeout=10,
-    max_tokens=256,
-    echo=True,  # Echo back the prompt in addition to the completion
-)
-print(response['choices'][0]['text'])
+    response = OpenAIAPI.completions(
+        model="text-davinci-002",
+        prompt="count to 23 and stop: 1,2,3,",
+        timeout=10,
+        max_tokens=256,
+        echo=True,  # Echo back the prompt in addition to the completion
+    )
+    print(response['choices'][0]['text'])
+
+
+if __name__ == "__main__":
+    example_chat()
+    
+    print()
+    print("-----")
+    
+    example_completions()
+

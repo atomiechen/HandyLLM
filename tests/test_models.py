@@ -11,15 +11,23 @@ load_dotenv(find_dotenv())
 # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 # OpenAIAPI.organization = None
 
-## get all models
-response = OpenAIAPI.models_list(
-    timeout=10,
-)
-print(json.dumps(response, indent=2))
+def example_list():
+    ## get all models
+    response = OpenAIAPI.models_list(
+        timeout=10,
+    )
+    print(json.dumps(response, indent=2))
 
-## retrieve a specific model
-response = OpenAIAPI.models_retrieve(
-    timeout=10,
-    model="text-embedding-ada-002",
-)
-print(json.dumps(response, indent=2))
+def example_retrieve():
+    ## retrieve a specific model
+    response = OpenAIAPI.models_retrieve(
+        timeout=10,
+        model="text-embedding-ada-002",
+    )
+    print(json.dumps(response, indent=2))
+
+
+if __name__ == "__main__":
+    example_list()
+    example_retrieve()
+

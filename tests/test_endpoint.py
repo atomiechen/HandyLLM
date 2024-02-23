@@ -3,7 +3,6 @@ from handyllm import OpenAIAPI, EndpointManager, Endpoint
 from dotenv import load_dotenv, find_dotenv
 # load env parameters from file named .env
 load_dotenv(find_dotenv())
-load_dotenv(find_dotenv('azure.env'))
 
 import os
 
@@ -34,45 +33,54 @@ for endpoint in endpoint_manager:
     # print(endpoint.get_api_info())  # WARNING: print endpoint info including api_key
 
 
-# ----- EXAMPLE 1 -----
-
 prompt = [{
     "role": "user",
     "content": "please tell me a joke"
     }]
-try:
-    response = OpenAIAPI.chat(
-        model="gpt-3.5-turbo",
-        messages=prompt,
-        temperature=0.2,
-        max_tokens=256,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=0.0,
-        timeout=10,
-        endpoint_manager=endpoint_manager
+
+
+def example1():
+    # ----- EXAMPLE 1 -----
+
+    try:
+        response = OpenAIAPI.chat(
+            model="gpt-3.5-turbo",
+            messages=prompt,
+            temperature=0.2,
+            max_tokens=256,
+            top_p=1.0,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            timeout=10,
+            endpoint_manager=endpoint_manager
+            )
+        print(response['choices'][0]['message']['content'])
+    except Exception as e:
+        print(e)
+
+
+def example2():
+    # ----- EXAMPLE 2 -----
+
+    try:
+        response = OpenAIAPI.chat(
+            # deployment_id="initial_deployment",
+            model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
+            messages=prompt,
+            timeout=10,
+            max_tokens=256,
+            endpoint=endpoint2
         )
-    print(response['choices'][0]['message']['content'])
-except Exception as e:
-    print(e)
+        print(response['choices'][0]['message']['content'])
+    except Exception as e:
+        print(e)
 
 
-print()
-print("-----")
-
-
-# ----- EXAMPLE 2 -----
-
-try:
-    response = OpenAIAPI.chat(
-        # deployment_id="initial_deployment",
-        model="gpt-3.5-turbo",  # you can use model alias for Azure because model_engine_map is provided
-        messages=prompt,
-        timeout=10,
-        max_tokens=256,
-        endpoint=endpoint2
-    )
-    print(response['choices'][0]['message']['content'])
-except Exception as e:
-    print(e)
+if __name__ == "__main__":
+    example1()
+    
+    print()
+    print("-----")
+    
+    example2()
 
