@@ -75,14 +75,14 @@ class OpenAIClient:
             raise TypeError("Invalid client mode specified")
 
         if mode == ClientMode.SYNC or mode == ClientMode.BOTH:
-            self.sync_client = requests.Session()
+            self._sync_client = requests.Session()
         else:
-            self.sync_client = None
+            self._sync_client = None
         
         if mode == ClientMode.ASYNC or mode == ClientMode.BOTH:
-            self.async_client = httpx.AsyncClient()
+            self._async_client = httpx.AsyncClient()
         else:
-            self.async_client = None
+            self._async_client = None
         
         self.api_base = api_base
         self.api_key = api_key
@@ -107,30 +107,30 @@ class OpenAIClient:
         self.close()
     
     def close(self):
-        if self.async_client is not None:
+        if self._async_client is not None:
             try:
-                asyncio.get_running_loop().create_task(self.async_client.aclose())
-                self.async_client = None
+                asyncio.get_running_loop().create_task(self._async_client.aclose())
+                self._async_client = None
             except Exception:
                 pass
-        if self.sync_client is not None:
+        if self._sync_client is not None:
             try:
-                self.sync_client.close()
-                self.sync_client = None
+                self._sync_client.close()
+                self._sync_client = None
             except Exception:
                 pass
     
     async def aclose(self):
-        if self.async_client is not None:
+        if self._async_client is not None:
             try:
-                await self.async_client.aclose()
-                self.async_client = None
+                await self._async_client.aclose()
+                self._async_client = None
             except Exception:
                 pass
-        if self.sync_client is not None:
+        if self._sync_client is not None:
             try:
-                self.sync_client.close()
-                self.sync_client = None
+                self._sync_client.close()
+                self._sync_client = None
             except Exception:
                 pass
 
@@ -203,8 +203,8 @@ class OpenAIClient:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         url = join_url(api_base, request_url)
         requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
-        requestor.set_sync_client(self.sync_client)
-        requestor.set_async_client(self.async_client)
+        requestor.set_sync_client(self._sync_client)
+        requestor.set_async_client(self._async_client)
         return requestor
 
     @api
