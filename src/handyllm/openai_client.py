@@ -132,7 +132,7 @@ class OpenAIClient:
         return api_key or self.api_key or os.environ.get('OPENAI_API_KEY')
     
     def _infer_organization(self, organization=None):
-        return organization or self.organization or os.environ.get('OPENAI_ORGANIZATION')
+        return organization or self.organization or os.environ.get('OPENAI_ORGANIZATION') or os.environ.get('OPENAI_ORG_ID')
     
     def _infer_api_base(self, api_base=None):
         return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
