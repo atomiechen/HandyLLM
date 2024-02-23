@@ -6,7 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 # organization is read from environment variable OPENAI_ORGANIZATION
 load_dotenv(find_dotenv())
 
-file_path = 'hello.m4a'
+file_path = '../assets/hello.m4a'  # replace with your file path
 
 with open(file_path, "rb") as file_bin:
     response = OpenAIAPI.audio_transcriptions(
