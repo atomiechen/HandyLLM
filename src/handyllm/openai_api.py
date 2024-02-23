@@ -81,34 +81,34 @@ def _load_client() -> _ModuleClient:
 class _OpenAIClientProxy:
     """A proxy for all OpenAIClient API methods."""
 
-    # set this to your API base;
-    # or environment variable OPENAI_API_BASE will be used.
-    # can be None (roll back to default).
-    api_base = None
-    
-    # set this to your API key; 
-    # or environment variable OPENAI_API_KEY will be used.
-    api_key = None
-    
-    # set this to your organization ID; 
-    # or environment variable OPENAI_ORGANIZATION will be used;
-    # can be None.
-    organization = None
-    
     # set this to your API type;
     # or environment variable OPENAI_API_TYPE will be used;
     # can be None (roll back to default).
-    api_type = None
+    api_type: Union[str, None] = None
+
+    # set this to your API base;
+    # or environment variable OPENAI_API_BASE will be used.
+    # can be None (roll back to default).
+    api_base: Union[str, None] = None
+    
+    # set this to your API key; 
+    # or environment variable OPENAI_API_KEY will be used.
+    api_key: Union[str, None] = None
+    
+    # set this to your organization ID; 
+    # or environment variable OPENAI_ORGANIZATION / OPENAI_ORG_ID will be used;
+    # can be None.
+    organization: Union[str, None] = None
     
     # set this to your API version;
     # or environment variable OPENAI_API_VERSION will be used;
     # cannot be None if using Azure API.
-    api_version = None
+    api_version: Union[str, None] = None
     
     # set this to your model-engine map;
     # or environment variable MODEL_ENGINE_MAP will be used;
     # can be None.
-    model_engine_map = None
+    model_engine_map: Union[dict, None] = None
 
     stream_chat = staticmethod(utils.stream_chat)
     stream_completions = staticmethod(utils.stream_completions)
