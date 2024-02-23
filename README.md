@@ -6,16 +6,19 @@ A handy toolkit for using LLM.
 
 
 
-## Why HandyLLM?
+## 🌟 Why HandyLLM?
 
-- Both sync and async APIs supported with straightforward unified design
-- OpenAI and Azure APIs all in one!
-- Easy life with API endpoint management
-- Writing chat prompt in a human-friendly mark-up text format
+☯️ Both sync and async APIs supported with unified design
+
+🍡 OpenAI and Azure APIs all in one
+
+☕️ Easy life with API endpoint management
+
+📃 Writing chat prompt in a human-friendly mark-up format
 
 
 
-## Install
+## Installation
 
 ```shell
 pip3 install handyllm
@@ -72,7 +75,8 @@ client = OpenAIClient('both')  ## supports both versions
 
 ### Legacy: Using OpenAIAPI proxy
 
-*This is not recommended anymore.*
+> [!IMPORTANT]
+> This is not recommended anymore. Use `OpenAIClient` instead.
 
 Under the hood it connects to a module client and only provides **synchronous** APIs, **without** `call()`.
 
@@ -96,17 +100,20 @@ Each API request will connect to an endpoint along with some API configurations,
 
 An `Endpoint` object contains these information. An `EndpointManager` acts like a list and can be used to rotate the next endpoint. See [test_endpoint.py](./tests/test_endpoint.py).
 
-There are 5 methods for specifying endpoint info:
+Methods for specifying endpoint info (with the former taking precedence over the latter):
 
-1. (each API call) Pass these fields as keyword parameters.
-2. (each API call) Pass an `endpoint` keyword parameter to specify an `Endpoint`.
-3. (each API call) Pass an `endpoint_manager` keyword parameter to specify an `EndpointManager`.
-4. (global) Set `OpenAIClient` instance (or `OpenAIAPI`) variables: `client.api_base`, `client.api_key`, `client.organization`, `client.api_type`, `client.api_version`, `client.model_engine_map`. They can be passed to `OpenAIClient()` constructor as well.
-5. (global) Set environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
+1. API method keyword parameters.
+2. API method `endpoint` keyword parameter to specify an `Endpoint`.
+3. API method `endpoint_manager` keyword parameter to specify an `EndpointManager`.
+4. `OpenAIClient` instance (or `OpenAIAPI`) variables: `client.api_base`, `client.api_key`, `client.organization`, `client.api_type`, `client.api_version`, `client.model_engine_map`. They can be passed to `OpenAIClient()` constructor as well.
+5. Environment variables: `OPENAI_API_KEY`, `OPENAI_ORGANIZATION`, `OPENAI_API_BASE`, `OPENAI_API_TYPE`, `OPENAI_API_VERSION`, `MODEL_ENGINE_MAP`.
 
-**Note**: If a field is set to `None` in the previous method, it will be replaced by the non-`None` value in the subsequent method, until a default value is used (OpenAI's endpoint information).
+> [!NOTE]
+> Fallback: `api_type` → `'openai'`;  `api_base` → OpenAI base url.
 
-**Azure OpenAI APIs are supported:** Specify `api_type='azure'`, and set `api_base` and `api_key` accordingly. Set `model_engine_map` if you want to use `model` parameter instead of `engine`/`deployment_id`. See [test_azure.py](./tests/test_azure.py). Please refer to [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/) for details.
+> [!TIP]
+>
+> **Azure OpenAI APIs are supported:** Specify `api_type='azure'`, and set `api_base` and `api_key` accordingly. Set `model_engine_map` if you want to use `model` parameter instead of `engine`/`deployment_id`. See [test_azure.py](./tests/test_azure.py). Please refer to [Azure OpenAI Service Documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/) for details.
 
 ### Logger
 
@@ -186,7 +193,7 @@ Please refer to [OpenAI official API reference](https://platform.openai.com/docs
 
 
 
-## Prompt
+## Chat Prompt
 
 ### Prompt Conversion
 
