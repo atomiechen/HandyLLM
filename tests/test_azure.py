@@ -1,4 +1,4 @@
-from handyllm import OpenAIAPI, utils
+from handyllm import OpenAIClient, utils
 
 from dotenv import load_dotenv, find_dotenv
 # load env parameters from file
@@ -8,20 +8,14 @@ import os
 import json
 
 
-OpenAIAPI.api_type = 'azure'
-OpenAIAPI.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
-OpenAIAPI.api_key = os.getenv("AZURE_OPENAI_KEY")
-OpenAIAPI.api_version = os.getenv("AZURE_OPENAI_API_VERSION")  # cannot be None if using Azure API.
-
-
-def example_chat():
+def example_chat(client: OpenAIClient):
     # ----- EXAMPLE 1 -----
 
     prompt = [{
         "role": "user",
         "content": "please tell me a joke"
         }]
-    response = OpenAIAPI.chat(
+    response = client.chat(
         # this is the engine (i.e. deployment_id) parameter for Azure OpenAI API
         engine="gpt-35-turbo",
         
@@ -37,31 +31,31 @@ def example_chat():
         frequency_penalty=0.0,
         presence_penalty=0.0,
         timeout=10,
-        )
+        ).call()
     print(response['choices'][0]['message']['content'])
 
 
 
-def example_embeddings():
+def example_embeddings(client: OpenAIClient):
     # ----- EXAMPLE 2 -----
 
-    response = OpenAIAPI.embeddings(
+    response = client.embeddings(
         engine="text-embedding-ada-002",
         input="I enjoy walking with my cute dog",
         timeout=10,
-    )
+    ).call()
     print(json.dumps(response, indent=2))
 
 
-def example_images_generations():
+def example_images_generations(client: OpenAIClient):
     # ----- EXAMPLE 3 -----
 
-    response = OpenAIAPI.images_generations(
+    response = client.images_generations(
         api_version='2023-06-01-preview',
         prompt="A panda, synthwave style, digital painting",
         n=1,
         size="256x256",
-    )
+    ).call()
     print(json.dumps(response, indent=2))
     download_url = response['data'][0]['url']
     file_path = utils.download_binary(download_url)
@@ -69,14 +63,21 @@ def example_images_generations():
 
 
 if __name__ == "__main__":
-    example_chat()
-    
-    print()
-    print("-----")
-    
-    example_embeddings()
-    
-    print()
-    print("-----")
-    
-    example_images_generations()
+    with OpenAIClient(
+        api_type='azure', 
+        api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
+        api_key=os.getenv("AZURE_OPENAI_KEY"), 
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION")  # cannot be None if using Azure API.
+        ) as client:
+        example_chat(client)
+        
+        print()
+        print("-----")
+        
+        example_embeddings(client)
+        
+        print()
+        print("-----")
+        
+        example_images_generations(client)
+
