@@ -25,3 +25,6 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/atomiechen/HandyLLM"
 "Bug Tracker" = "https://github.com/atomiechen/HandyLLM/issues"
+
+[project.optional-dependencies]
+test = ["python-dotenv"]
