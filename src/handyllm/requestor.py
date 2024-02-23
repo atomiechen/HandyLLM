@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import json
+from typing import Union
 import requests
 import httpx
 import time
@@ -109,6 +110,16 @@ class Requestor:
     def _check_timeout(self, timeout_ddl):
         if timeout_ddl and time.perf_counter() > timeout_ddl:
             raise Exception("Timeout")
+    
+    def _make_wrapped_exception(self, response: Union[requests.Response, httpx.Response]):
+        # report both status code and error message
+        try:
+            # message = response.json()['error']['message']
+            message = response.json()
+        except:
+            message = response.text
+        err_msg = f"API error ({self.url} {response.status_code} {response.reason}) - {message}"
+        return Exception(err_msg)
 
     def call(self):
         if self._sync_client is None:
@@ -153,15 +164,11 @@ class Requestor:
             stream=self.stream,
             timeout=self.timeout,
             )
-        if not 200 <= response.status_code < 300:
-            # report both status code and error message
-            try:
-                message = response.json()['error']['message']
-            except:
-                message = response.text
-            err_msg = f"OpenAI API error ({self.url} {response.status_code} {response.reason}): {message}"
-            module_logger.error(err_msg)
-            raise Exception(err_msg)
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as e:
+            module_logger.error(e, exc_info=True)
+            raise self._make_wrapped_exception(response)
         return response
 
     def _gen_stream_response(self, raw_response: requests.Response, prepare_ret):
@@ -240,8 +247,8 @@ class Requestor:
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
-            module_logger.error("Encountered httpx.HTTPStatusError", exc_info=True)
-            raise e
+            module_logger.error(e, exc_info=True)
+            raise self._make_wrapped_exception(response)
         return response
 
     async def _agen_stream_response(self, raw_response: httpx.Response, prepare_ret):
