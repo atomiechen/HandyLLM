@@ -66,7 +66,7 @@ class OpenAIClient:
         self.api_key = api_key
         
         # set this to your organization ID; 
-        # or environment variable OPENAI_ORGANIZATION will be used;
+        # or environment variable OPENAI_ORGANIZATION / OPENAI_ORG_ID will be used;
         # can be None.
         self.organization = organization
         
