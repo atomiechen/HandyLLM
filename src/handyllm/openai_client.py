@@ -29,7 +29,6 @@ class OpenAIClient:
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
         *,
-        base_url=None,
         api_base=None,
         api_key=None,
         organization=None,
@@ -59,7 +58,7 @@ class OpenAIClient:
         # set this to your API base;
         # or environment variable OPENAI_API_BASE will be used.
         # can be None (roll back to default).
-        self.api_base = base_url or api_base
+        self.api_base = api_base
         
         # set this to your API key; 
         # or environment variable OPENAI_API_KEY will be used.
