@@ -16,9 +16,6 @@ from .._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
 
 class OpenAIAPI:
     
-    # deprecated
-    base_url = _API_BASE_OPENAI
-    
     # set this to your API base;
     # or environment variable OPENAI_API_BASE will be used.
     # can be None (roll back to default).
