@@ -72,6 +72,8 @@ client = OpenAIClient('both')  ## supports both versions
 
 ### Legacy: Using OpenAIAPI proxy
 
+*This is not recommended anymore.*
+
 Under the hood it connects to a module client and only provides **synchronous** APIs, **without** `call()`.
 
 ```python
@@ -115,16 +117,17 @@ You can pass custom `logger` and `log_marks` (a string or a collection of string
 This toolkit supports client-side `timeout` control:
 
 ```python
-from handyllm import OpenAIAPI
+from handyllm import OpenAIClient
+client = OpenAIClient()
 prompt = [{
     "role": "user",
     "content": "please tell me a joke"
     }]
-response = OpenAIAPI.chat(
+response = client.chat(
     model="gpt-3.5-turbo",
     messages=prompt,
     timeout=10
-    )
+    ).call()
 print(response['choices'][0]['message']['content'])
 ```
 
@@ -133,15 +136,18 @@ print(response['choices'][0]['message']['content'])
 Stream response of `chat`/`completions`/`finetunes_list_events` can be achieved using `steam` parameter:
 
 ```python
-response = OpenAIAPI.chat(
+from handyllm import OpenAIClient, stream_chat
+
+client = OpenAIClient()
+response = client.chat(
     model="gpt-3.5-turbo",
     messages=prompt,
     timeout=10,
     stream=True
-    )
+    ).call()
 
 # you can use this to stream the response text
-for text in OpenAIAPI.stream_chat(response):
+for text in stream_chat(response):
     print(text, end='')
 
 # or you can use this to get the whole response
