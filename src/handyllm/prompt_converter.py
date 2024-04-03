@@ -2,8 +2,15 @@ import re
 
 class PromptConverter:
     
+    role_keys = ['system', 'user', 'assistant']
+
     def __init__(self):
         self.substitute_map = {}
+
+    @property
+    def split_pattern(self):
+        # build a regex pattern to split the prompt by role keys
+        return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
 
     def read_substitute_content(self, path: str):
         # 从文本文件读取所有prompt中需要替换的内容
@@ -24,11 +31,11 @@ class PromptConverter:
 
         # convert plain text to chat format
         chat = []
-        blocks = re.split(r'(\$\w+\$)', raw_prompt)
+        blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
         for idx in range(1, len(blocks), 2):
             key = blocks[idx]
             value = blocks[idx+1]
-            chat.append({"role": key[1:-1], "content": value.strip()})
+            chat.append({"role": key, "content": value.strip()})
         
         return chat
     

@@ -246,6 +246,10 @@ new_chat = converter.chat_replace_variables(
 )
 ```
 
+> [!IMPORTANT]
+>
+> About the prompt format, each role key (e.g. `$system$` / `$user$` / `$assistant`) should be placed in a separate line.
+
 ### Substitute
 
 `PromptConverter` can also substitute placeholder variables like `%output_format%` stored in text files to make multiple prompts modular. A substitute map `substitute.txt` looks like this:
