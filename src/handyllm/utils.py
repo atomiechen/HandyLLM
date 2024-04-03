@@ -1,4 +1,3 @@
-import requests
 from urllib.parse import urlparse
 import os
 import time
@@ -12,6 +11,7 @@ def get_filename_from_url(download_url):
     return filename
 
 def download_binary(download_url, file_path=None, dir='.'):
+    import requests
     response = requests.get(download_url, allow_redirects=True)
     if file_path == None:
         filename = get_filename_from_url(download_url)
