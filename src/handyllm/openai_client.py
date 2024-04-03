@@ -1,11 +1,10 @@
+from __future__ import annotations
+from typing import Union, TYPE_CHECKING
 import os
 import json
 import time
 from enum import Enum, auto
 import asyncio
-from typing import Union
-import requests
-import httpx
 
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
@@ -75,11 +74,15 @@ class OpenAIClient:
             raise TypeError("Invalid client mode specified")
 
         if mode == ClientMode.SYNC or mode == ClientMode.BOTH:
+            # lazy import
+            import requests
             self._sync_client = requests.Session()
         else:
             self._sync_client = None
         
         if mode == ClientMode.ASYNC or mode == ClientMode.BOTH:
+            # lazy import
+            import httpx
             self._async_client = httpx.AsyncClient()
         else:
             self._async_client = None

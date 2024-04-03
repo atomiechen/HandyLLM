@@ -1,10 +1,12 @@
+from __future__ import annotations
+from typing import Union, TYPE_CHECKING
 import asyncio
 import logging
 import json
-from typing import Union
-import requests
-import httpx
 import time
+if TYPE_CHECKING:
+    import requests
+    import httpx
 
 from ._constants import _API_TYPES_AZURE
 
