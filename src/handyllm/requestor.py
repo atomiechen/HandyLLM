@@ -155,6 +155,7 @@ class Requestor:
             raise e
 
     def _call_raw(self) -> requests.Response:
+        import requests
         response = self._sync_client.request(
             self.method,
             self.url,
@@ -232,6 +233,7 @@ class Requestor:
             raise e
 
     async def _acall_raw(self):
+        import httpx
         request = self._async_client.build_request(
             self.method,
             self.url,
