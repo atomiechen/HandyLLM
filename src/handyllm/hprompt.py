@@ -12,10 +12,13 @@ __all__ = [
 from abc import abstractmethod, ABC
 import io
 from typing import Union
+import copy
 
 import frontmatter
 
 from .prompt_converter import PromptConverter
+from .openai_client import OpenAIClient
+from .utils import stream_chat_with_role, stream_completions
 
 
 converter = PromptConverter()
@@ -81,6 +84,17 @@ class HandyPrompt(ABC):
     def dump(self, fd: io.IOBase) -> None:
         text = self.dumps()
         fd.write(text)
+    
+    @abstractmethod
+    def _run_with_client(self, client: OpenAIClient) -> HandyPrompt:
+        ...
+    
+    def run(self, client: OpenAIClient = None) -> HandyPrompt:
+        if client:
+            return self._run_with_client(client)
+        else:
+            with OpenAIClient() as client:
+                return self._run_with_client(client)
 
 
 class ChatPrompt(HandyPrompt):
@@ -94,6 +108,27 @@ class ChatPrompt(HandyPrompt):
     
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
+    
+    def _run_with_client(self, client: OpenAIClient) -> ChatPrompt:
+        arguments = copy.deepcopy(self.meta)
+        stream = arguments.get("stream", False)
+        response = client.chat(
+            messages=self.chat,
+            **arguments
+            ).call()
+        if stream:
+            role = ""
+            content = ""
+            for r, text in stream_chat_with_role(response):
+                role = r
+                content += text
+        else:
+            role = response['choices'][0]['message']['role']
+            content = response['choices'][0]['message']['content']
+        return ChatPrompt(
+            [{"role": role, "content": content}],
+            arguments
+        )
 
 
 class CompletionsPrompt(HandyPrompt):
@@ -107,4 +142,22 @@ class CompletionsPrompt(HandyPrompt):
     
     def _serialize_data(self) -> str:
         return self.prompt
+
+    def _run_with_client(self, client: OpenAIClient) -> CompletionsPrompt:
+        arguments = copy.deepcopy(self.meta)
+        stream = arguments.get("stream", False)
+        response = client.completions(
+            prompt=self.prompt,
+            **arguments
+            ).call()
+        if stream:
+            content = ""
+            for text in stream_completions(response):
+                content += text
+        else:
+            content = response['choices'][0]['text']
+        return CompletionsPrompt(
+            content,
+            arguments
+        )
 
