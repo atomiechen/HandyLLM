@@ -9,6 +9,9 @@ __all__ = [
     "dumps",
     "dump",
     "dump_to",
+    "load_var_map",
+    "RunConfig",
+    "RequestRecordMode",
 ]
 
 from enum import Enum, auto
@@ -33,6 +36,7 @@ from .utils import (
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
+p_var_map = re.compile(r'(%\w+%)')
 
 DEFAULT_BLACKLIST = (
     "api_key", "organization", "api_base", "api_type", "api_version", 
@@ -97,7 +101,7 @@ def load_var_map(path: str) -> dict[str, str]:
     with open(path, 'r', encoding='utf-8') as fin:
         content = fin.read()
     substitute_map = {}
-    blocks = re.split(r'(%\w+%)', content)
+    blocks = p_var_map.split(content)
     for idx in range(1, len(blocks), 2):
         key = blocks[idx]
         value = blocks[idx+1]
