@@ -31,7 +31,7 @@ def loads(
 ) -> HandyPrompt:
     if handler.detect(text):
         metadata, content = frontmatter.parse(text, encoding, handler)
-        meta = metadata.pop("meta", {})
+        meta = metadata.pop("meta", None) or {}
         request = metadata
     else:
         content = text
