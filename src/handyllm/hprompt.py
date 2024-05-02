@@ -20,8 +20,11 @@ import frontmatter
 from mergedeep import merge, Strategy
 
 from .prompt_converter import PromptConverter
-from .openai_client import OpenAIClient
-from .utils import stream_chat_with_role, stream_completions
+from .openai_client import ClientMode, OpenAIClient
+from .utils import (
+    astream_chat_with_role, astream_completions, 
+    stream_chat_with_role, stream_completions, 
+)
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -122,8 +125,19 @@ class HandyPrompt(ABC):
         if client:
             return self._run_with_client(client)
         else:
-            with OpenAIClient() as client:
+            with OpenAIClient(ClientMode.SYNC) as client:
                 return self._run_with_client(client)
+    
+    @abstractmethod
+    async def _arun_with_client(self: PromptType, client: OpenAIClient) -> PromptType:
+        ...
+    
+    async def arun(self: PromptType, client: OpenAIClient = None) -> PromptType:
+        if client:
+            return await self._arun_with_client(client)
+        else:
+            async with OpenAIClient(ClientMode.ASYNC) as client:
+                return await self._arun_with_client(client)
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
@@ -162,6 +176,28 @@ class ChatPrompt(HandyPrompt):
             role = ""
             content = ""
             for r, text in stream_chat_with_role(response):
+                role = r
+                content += text
+        else:
+            role = response['choices'][0]['message']['role']
+            content = response['choices'][0]['message']['content']
+        return ChatPrompt(
+            [{"role": role, "content": content}],
+            arguments,
+            copy.deepcopy(self.meta)
+        )
+    
+    async def _arun_with_client(self, client: OpenAIClient) -> ChatPrompt:
+        arguments = copy.deepcopy(self.request)
+        stream = arguments.get("stream", False)
+        response = await client.chat(
+            messages=self.chat,
+            **arguments
+            ).acall()
+        if stream:
+            role = ""
+            content = ""
+            async for r, text in astream_chat_with_role(response):
                 role = r
                 content += text
         else:
@@ -237,6 +273,25 @@ class CompletionsPrompt(HandyPrompt):
         if stream:
             content = ""
             for text in stream_completions(response):
+                content += text
+        else:
+            content = response['choices'][0]['text']
+        return CompletionsPrompt(
+            content,
+            arguments,
+            copy.deepcopy(self.meta)
+        )
+    
+    async def _arun_with_client(self, client: OpenAIClient) -> CompletionsPrompt:
+        arguments = copy.deepcopy(self.request)
+        stream = arguments.get("stream", False)
+        response = await client.completions(
+            prompt=self.prompt,
+            **arguments
+            ).acall()
+        if stream:
+            content = ""
+            async for text in astream_completions(response):
                 content += text
         else:
             content = response['choices'][0]['text']
