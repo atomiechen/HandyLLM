@@ -30,16 +30,19 @@ def loads(
     encoding: str = "utf-8"
 ) -> HandyPrompt:
     if handler.detect(text):
-        meta, content = frontmatter.parse(text, encoding, handler)
+        metadata, content = frontmatter.parse(text, encoding, handler)
+        meta = metadata.pop("meta", {})
+        request = metadata
     else:
-        meta = {}
         content = text
+        request = {}
+        meta = {}
     api: str = meta.get("api", "")
     if api.startswith("completion"):
-        return CompletionsPrompt(content, meta)
+        return CompletionsPrompt(content, request, meta)
     else:
         chat = converter.raw2chat(content)
-        return ChatPrompt(chat, meta)
+        return ChatPrompt(chat, request, meta)
 
 def load(
     fd: io.IOBase, 
@@ -62,8 +65,9 @@ def dump(
 
 class HandyPrompt(ABC):
     
-    def __init__(self, data: Union[str, list], meta: dict = None):
+    def __init__(self, data: Union[str, list], request: dict = None, meta: dict = None):
         self.data = data
+        self.request = request or {}
         self.meta = meta or {}
     
     @abstractmethod
@@ -75,10 +79,12 @@ class HandyPrompt(ABC):
     
     def dumps(self) -> str:
         serialized_data = self._serialize_data()
-        if not self.meta:
+        if not self.meta and not self.request:
             return serialized_data
         else:
-            post = frontmatter.Post(serialized_data, None, **self.meta)
+            front_data = copy.deepcopy(self.request)
+            front_data['meta'] = copy.deepcopy(self.meta)
+            post = frontmatter.Post(serialized_data, None, **front_data)
             return frontmatter.dumps(post, handler)
     
     def dump(self, fd: io.IOBase) -> None:
@@ -99,8 +105,8 @@ class HandyPrompt(ABC):
 
 class ChatPrompt(HandyPrompt):
         
-    def __init__(self, chat: list, meta: dict):
-        super().__init__(chat, meta)
+    def __init__(self, chat: list, request: dict, meta: dict):
+        super().__init__(chat, request, meta)
     
     @property
     def chat(self) -> list:
@@ -110,7 +116,7 @@ class ChatPrompt(HandyPrompt):
         return converter.chat2raw(self.chat)
     
     def _run_with_client(self, client: OpenAIClient) -> ChatPrompt:
-        arguments = copy.deepcopy(self.meta)
+        arguments = copy.deepcopy(self.request)
         stream = arguments.get("stream", False)
         response = client.chat(
             messages=self.chat,
@@ -127,14 +133,15 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            arguments
+            arguments,
+            copy.deepcopy(self.meta)
         )
 
 
 class CompletionsPrompt(HandyPrompt):
     
-    def __init__(self, prompt: str, meta: dict):
-        super().__init__(prompt, meta)
+    def __init__(self, prompt: str, request: dict, meta: dict):
+        super().__init__(prompt, request, meta)
     
     @property
     def prompt(self) -> str:
@@ -144,7 +151,7 @@ class CompletionsPrompt(HandyPrompt):
         return self.prompt
 
     def _run_with_client(self, client: OpenAIClient) -> CompletionsPrompt:
-        arguments = copy.deepcopy(self.meta)
+        arguments = copy.deepcopy(self.request)
         stream = arguments.get("stream", False)
         response = client.completions(
             prompt=self.prompt,
@@ -158,6 +165,7 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            arguments
+            arguments,
+            copy.deepcopy(self.meta)
         )
 
