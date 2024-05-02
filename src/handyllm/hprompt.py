@@ -148,21 +148,15 @@ class HandyPrompt(ABC):
         blacklist: list[str] = DEFAULT_BLACKLIST,
         whitelist: list[str] = None,
         **kwargs) -> PromptType:
+        # update kwargs
+        kwargs['record'] = record
+        kwargs['blacklist'] = blacklist
+        kwargs['whitelist'] = whitelist
         if client:
-            return self._run_with_client(
-                client=client,
-                record=record,
-                blacklist=blacklist,
-                whitelist=whitelist,
-                **kwargs)
+            return self._run_with_client(client, **kwargs)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                return self._run_with_client(
-                    client=client,
-                    record=record,
-                    blacklist=blacklist,
-                    whitelist=whitelist,
-                    **kwargs)
+                return self._run_with_client(client, **kwargs)
     
     @abstractmethod
     async def _arun_with_client(
@@ -181,21 +175,15 @@ class HandyPrompt(ABC):
         blacklist: list[str] = DEFAULT_BLACKLIST,
         whitelist: list[str] = None,
         **kwargs) -> PromptType:
+        # update kwargs
+        kwargs['record'] = record
+        kwargs['blacklist'] = blacklist
+        kwargs['whitelist'] = whitelist
         if client:
-            return await self._arun_with_client(
-                client=client,
-                record=record,
-                blacklist=blacklist,
-                whitelist=whitelist,
-                **kwargs)
+            return await self._arun_with_client(client, **kwargs)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                return await self._arun_with_client(
-                    client=client,
-                    record=record,
-                    blacklist=blacklist,
-                    whitelist=whitelist,
-                    **kwargs)
+                return await self._arun_with_client(client, **kwargs)
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
