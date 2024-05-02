@@ -15,6 +15,7 @@ from enum import Enum, auto
 from abc import abstractmethod, ABC
 import io
 from typing import Optional, Union, TypeVar
+import re
 import copy
 from dataclasses import dataclass
 
@@ -91,6 +92,18 @@ def dump_to(
 ) -> None:
     return prompt.dump_to(path)
 
+def load_var_map(path: str) -> dict[str, str]:
+    # read all content that needs to be replaced in the prompt from a text file
+    with open(path, 'r', encoding='utf-8') as fin:
+        content = fin.read()
+    substitute_map = {}
+    blocks = re.split(r'(%\w+%)', content)
+    for idx in range(1, len(blocks), 2):
+        key = blocks[idx]
+        value = blocks[idx+1]
+        substitute_map[key] = value.strip()
+    return substitute_map
+
 
 class RequestRecordMode(Enum):
     BLACKLIST = auto()  # record all request arguments except specified ones
@@ -104,12 +117,16 @@ class RunConfig:
     record: RequestRecordMode = RequestRecordMode.NONE
     blacklist: Optional[list[str]] = None
     whitelist: Optional[list[str]] = None
+    var_map: Optional[dict[str, str]] = None
+    var_map_path: Optional[str] = None
 
 
 DEFAULT_CONFIG = RunConfig(
     record=RequestRecordMode.BLACKLIST,
     blacklist=DEFAULT_BLACKLIST,
     whitelist=None,
+    var_map=None,
+    var_map_path=None,
 )
 
 
@@ -209,6 +226,22 @@ class HandyPrompt(ABC):
         elif record == RequestRecordMode.NONE:
             arguments = {}
         return arguments
+    
+    def _parse_var_map(self, run_config: RunConfig):
+        var_map = {}
+        if run_config.var_map_path:
+            var_map = merge(
+                var_map, 
+                load_var_map(run_config.var_map_path), 
+                strategy=Strategy.REPLACE
+            )
+        if run_config.var_map:
+            var_map = merge(
+                var_map, 
+                run_config.var_map, 
+                strategy=Strategy.REPLACE
+            )
+        return var_map
 
 
 class ChatPrompt(HandyPrompt):
@@ -233,6 +266,14 @@ class ChatPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
     
+    def _parse_chat(self, run_config: RunConfig) -> list:
+        var_map = self._parse_var_map(run_config)
+        if var_map:
+            return converter.chat_replace_variables(
+                self.chat, var_map, inplace=False)
+        else:
+            return self.chat
+    
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
@@ -241,7 +282,7 @@ class ChatPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.chat(
-            messages=self.chat,
+            messages=self._parse_chat(run_config),
             **arguments
             ).call()
         if stream:
@@ -267,7 +308,7 @@ class ChatPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.chat(
-            messages=self.chat,
+            messages=self._parse_chat(run_config),
             **arguments
             ).acall()
         if stream:
@@ -335,6 +376,15 @@ class CompletionsPrompt(HandyPrompt):
     @prompt.setter
     def prompt(self, value: str):
         self.data = value
+    
+    def _parse_prompt(self, run_config: RunConfig) -> str:
+        var_map = self._parse_var_map(run_config)
+        if var_map:
+            new_prompt = self.prompt
+            for key, value in var_map.items():
+                new_prompt = new_prompt.replace(key, value)
+        else:
+            return self.prompt
 
     def _run_with_client(
         self, client: OpenAIClient, 
@@ -344,7 +394,7 @@ class CompletionsPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.completions(
-            prompt=self.prompt,
+            prompt=self._parse_prompt(run_config),
             **arguments
             ).call()
         if stream:
@@ -367,7 +417,7 @@ class CompletionsPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.completions(
-            prompt=self.prompt,
+            prompt=self._parse_prompt(run_config),
             **arguments
             ).acall()
         if stream:
