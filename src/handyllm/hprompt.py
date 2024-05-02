@@ -17,6 +17,7 @@ from typing import Union
 import copy
 
 import frontmatter
+from mergedeep import merge, Strategy
 
 from .prompt_converter import PromptConverter
 from .openai_client import OpenAIClient
@@ -133,6 +134,10 @@ class ChatPrompt(HandyPrompt):
     def chat(self) -> list:
         return self.data
     
+    @chat.setter
+    def chat(self, value: list):
+        self.data = value
+    
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
     
@@ -157,6 +162,45 @@ class ChatPrompt(HandyPrompt):
             arguments,
             copy.deepcopy(self.meta)
         )
+
+    def __add__(self, other: Union[str, list, ChatPrompt]):
+        # support concatenation with string, list or another ChatPrompt
+        if isinstance(other, str):
+            return ChatPrompt(
+                self.chat + [{"role": "user", "content": other}],
+                copy.deepcopy(self.request),
+                copy.deepcopy(self.meta)
+            )
+        elif isinstance(other, list):
+            return ChatPrompt(
+                self.chat + [{"role": msg['role'], "content": msg['content']} for msg in other],
+                copy.deepcopy(self.request),
+                copy.deepcopy(self.meta)
+            )
+        elif isinstance(other, ChatPrompt):
+            # merge two ChatPrompt objects
+            return ChatPrompt(
+                self.chat + other.chat,
+                merge({}, self.request, other.request, strategy=Strategy.ADDITIVE),
+                merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
+            )
+        else:
+            raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
+    
+    def __iadd__(self, other: Union[str, list, ChatPrompt]):
+        # support concatenation with string, list or another ChatPrompt
+        if isinstance(other, str):
+            self.chat.append({"role": "user", "content": other})
+        elif isinstance(other, list):
+            self.chat += [{"role": msg['role'], "content": msg['content']} for msg in other]
+        elif isinstance(other, ChatPrompt):
+            # merge two ChatPrompt objects
+            self.chat += other.chat
+            merge(self.request, other.request, strategy=Strategy.ADDITIVE)
+            merge(self.meta, other.meta, strategy=Strategy.ADDITIVE)
+        else:
+            raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
+        return self
 
 
 class CompletionsPrompt(HandyPrompt):
