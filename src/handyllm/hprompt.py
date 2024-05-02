@@ -124,12 +124,12 @@ class HandyPrompt(ABC):
     def result_str(self) -> str:
         return str(self.data)
     
-    @abstractmethod
     def _serialize_data(self) -> str:
         '''
         Serialize the data to a string. 
-        This method should be implemented by subclasses.
+        This method can be overridden by subclasses.
         '''
+        return str(self.data)
     
     def dumps(self) -> str:
         serialized_data = self._serialize_data()
@@ -335,9 +335,6 @@ class CompletionsPrompt(HandyPrompt):
     @prompt.setter
     def prompt(self, value: str):
         self.data = value
-    
-    def _serialize_data(self) -> str:
-        return self.prompt
 
     def _run_with_client(
         self, client: OpenAIClient, 
