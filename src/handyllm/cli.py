@@ -22,7 +22,7 @@ def hprompt_command(args):
     if args.output:
         result.dump_to(args.output)
     else:
-        print(result.data)
+        print(result.result_str)
 
 def main():
     """Main entry point for the handyllm CLI."""

@@ -120,6 +120,10 @@ class HandyPrompt(ABC):
         self.request = request or {}
         self.meta = meta or {}
     
+    @property
+    def result_str(self) -> str:
+        return str(self.data)
+    
     @abstractmethod
     def _serialize_data(self) -> str:
         '''
@@ -219,6 +223,12 @@ class ChatPrompt(HandyPrompt):
     @chat.setter
     def chat(self, value: list):
         self.data = value
+    
+    @property
+    def result_str(self) -> str:
+        if len(self.chat) == 0:
+            return ""
+        return self.chat[-1]['content']
     
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
