@@ -2,8 +2,13 @@ import argparse
 from handyllm import hprompt
 
 
-def register_hprompt_command(subparsers):
-    parser_hprompt = subparsers.add_parser('hprompt', help="Run hprompt files")
+def register_hprompt_command(subparsers: argparse._SubParsersAction):
+    parser_hprompt = subparsers.add_parser(
+        'hprompt', 
+        help="Run hprompt files",
+        description="Run hprompt files",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser_hprompt.add_argument("path", help="Path to hprompt file")
     parser_hprompt.add_argument("-o", "--output", help="Output path")
     parser_hprompt.add_argument("-v", "--verbose", action="store_true", default=False, help="Verbose output")
@@ -21,7 +26,10 @@ def hprompt_command(args):
 
 def main():
     """Main entry point for the handyllm CLI."""
-    parser = argparse.ArgumentParser(description="HandyLLM CLI")
+    parser = argparse.ArgumentParser(
+        description="HandyLLM CLI",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="command")
     register_hprompt_command(subparsers)
     args = parser.parse_args()
