@@ -30,3 +30,6 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["python-dotenv"]
+
+[project.scripts]
+handyllm = "handyllm.cli:main"
