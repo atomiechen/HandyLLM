@@ -22,7 +22,11 @@ def hprompt_command(args):
     prompt = hprompt.load_from(args.path)
     run_config = hprompt.RunConfig()
     if args.var_map:
-        run_config.var_map = dict([pair.split("=") for pair in args.var_map.split("|")])
+        var_map = {}
+        for pair in args.var_map.split("|"):
+            key, value = pair.split("=", maxsplit=1)
+            var_map[key.strip()] = value.strip()
+        run_config.var_map = var_map
     if args.var_map_path:
         run_config.var_map_path = args.var_map_path
     result = prompt.run(run_config=run_config)
