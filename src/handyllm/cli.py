@@ -12,13 +12,20 @@ def register_hprompt_command(subparsers: argparse._SubParsersAction):
     parser_hprompt.add_argument("path", help="Path to hprompt file")
     parser_hprompt.add_argument("-o", "--output", help="Output path")
     parser_hprompt.add_argument("-v", "--verbose", action="store_true", default=False, help="Verbose output")
+    parser_hprompt.add_argument("-vm", "--var-map", help="Variable map in the format key1=value1|key2=value2")
+    parser_hprompt.add_argument("-vmp", "--var-map-path", help="Variable map file path")
 
 def hprompt_command(args):
     if args.verbose:
         print(f"Input path: {args.path}")
         print(f"Output path: {args.output}")
     prompt = hprompt.load_from(args.path)
-    result = prompt.run()
+    run_config = hprompt.RunConfig()
+    if args.var_map:
+        run_config.var_map = dict([pair.split("=") for pair in args.var_map.split("|")])
+    if args.var_map_path:
+        run_config.var_map_path = args.var_map_path
+    result = prompt.run(run_config=run_config)
     if args.output:
         result.dump_to(args.output)
     else:
