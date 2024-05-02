@@ -13,7 +13,7 @@ __all__ = [
 
 from abc import abstractmethod, ABC
 import io
-from typing import Union
+from typing import Union, TypeVar
 import copy
 
 import frontmatter
@@ -24,6 +24,7 @@ from .openai_client import OpenAIClient
 from .utils import stream_chat_with_role, stream_completions
 
 
+PromptType = TypeVar('PromptType', bound='HandyPrompt')
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 
@@ -114,17 +115,17 @@ class HandyPrompt(ABC):
             self.dump(fd)
     
     @abstractmethod
-    def _run_with_client(self, client: OpenAIClient) -> HandyPrompt:
+    def _run_with_client(self: PromptType, client: OpenAIClient) -> PromptType:
         ...
     
-    def run(self, client: OpenAIClient = None) -> HandyPrompt:
+    def run(self: PromptType, client: OpenAIClient = None) -> PromptType:
         if client:
             return self._run_with_client(client)
         else:
             with OpenAIClient() as client:
                 return self._run_with_client(client)
 
-    def _merge_non_data(self, other: HandyPrompt, inplace=False) -> Union[None, tuple[dict, dict]]:
+    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
             merge(self.request, other.request, strategy=Strategy.ADDITIVE)
             merge(self.meta, other.meta, strategy=Strategy.ADDITIVE)
