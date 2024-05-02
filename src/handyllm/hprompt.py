@@ -172,6 +172,20 @@ class HandyPrompt(ABC):
             self.dump(fd)
     
     @abstractmethod
+    def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
+        ...
+    
+    def eval(self: PromptType, run_config: RunConfig) -> PromptType:
+        new_data = self._eval_data(run_config)
+        if new_data != self.data:
+            return self.__class__(
+                new_data,
+                copy.deepcopy(self.request),
+                copy.deepcopy(self.meta)
+            )
+        return self
+    
+    @abstractmethod
     def _run_with_client(
         self: PromptType, 
         client: OpenAIClient, 
@@ -270,7 +284,7 @@ class ChatPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
     
-    def _parse_chat(self, run_config: RunConfig) -> list:
+    def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
         if var_map:
             return converter.chat_replace_variables(
@@ -286,7 +300,7 @@ class ChatPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.chat(
-            messages=self._parse_chat(run_config),
+            messages=self._eval_data(run_config),
             **arguments
             ).call()
         if stream:
@@ -312,7 +326,7 @@ class ChatPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.chat(
-            messages=self._parse_chat(run_config),
+            messages=self._eval_data(run_config),
             **arguments
             ).acall()
         if stream:
@@ -381,7 +395,7 @@ class CompletionsPrompt(HandyPrompt):
     def prompt(self, value: str):
         self.data = value
     
-    def _parse_prompt(self, run_config: RunConfig) -> str:
+    def _eval_data(self, run_config: RunConfig) -> str:
         var_map = self._parse_var_map(run_config)
         if var_map:
             new_prompt = self.prompt
@@ -398,7 +412,7 @@ class CompletionsPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.completions(
-            prompt=self._parse_prompt(run_config),
+            prompt=self._eval_data(run_config),
             **arguments
             ).call()
         if stream:
@@ -421,7 +435,7 @@ class CompletionsPrompt(HandyPrompt):
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.completions(
-            prompt=self._parse_prompt(run_config),
+            prompt=self._eval_data(run_config),
             **arguments
             ).acall()
         if stream:
