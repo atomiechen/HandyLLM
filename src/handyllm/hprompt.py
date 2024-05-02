@@ -124,6 +124,15 @@ class HandyPrompt(ABC):
             with OpenAIClient() as client:
                 return self._run_with_client(client)
 
+    def _merge_non_data(self, other: HandyPrompt, inplace=False) -> Union[None, tuple[dict, dict]]:
+        if inplace:
+            merge(self.request, other.request, strategy=Strategy.ADDITIVE)
+            merge(self.meta, other.meta, strategy=Strategy.ADDITIVE)
+        else:
+            merged_request = merge({}, self.request, other.request, strategy=Strategy.ADDITIVE)
+            merged_meta = merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
+            return merged_request, merged_meta
+
 
 class ChatPrompt(HandyPrompt):
         
@@ -179,10 +188,9 @@ class ChatPrompt(HandyPrompt):
             )
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
+            merged_request, merged_meta = self._merge_non_data(other)
             return ChatPrompt(
-                self.chat + other.chat,
-                merge({}, self.request, other.request, strategy=Strategy.ADDITIVE),
-                merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
+                self.chat + other.chat, merged_request, merged_meta
             )
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
@@ -196,8 +204,7 @@ class ChatPrompt(HandyPrompt):
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
             self.chat += other.chat
-            merge(self.request, other.request, strategy=Strategy.ADDITIVE)
-            merge(self.meta, other.meta, strategy=Strategy.ADDITIVE)
+            self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
         return self
@@ -211,6 +218,10 @@ class CompletionsPrompt(HandyPrompt):
     @property
     def prompt(self) -> str:
         return self.data
+    
+    @prompt.setter
+    def prompt(self, value: str):
+        self.data = value
     
     def _serialize_data(self) -> str:
         return self.prompt
@@ -233,4 +244,33 @@ class CompletionsPrompt(HandyPrompt):
             arguments,
             copy.deepcopy(self.meta)
         )
+    
+    def __add__(self, other: Union[str, CompletionsPrompt]):
+        # support concatenation with string or another CompletionsPrompt
+        if isinstance(other, str):
+            return CompletionsPrompt(
+                self.prompt + other,
+                copy.deepcopy(self.request),
+                copy.deepcopy(self.meta)
+            )
+        elif isinstance(other, CompletionsPrompt):
+            # merge two CompletionsPrompt objects
+            merged_request, merged_meta = self._merge_non_data(other)
+            return CompletionsPrompt(
+                self.prompt + other.prompt, merged_request, merged_meta
+            )
+        else:
+            raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
+    
+    def __iadd__(self, other: Union[str, CompletionsPrompt]):
+        # support concatenation with string or another CompletionsPrompt
+        if isinstance(other, str):
+            self.prompt += other
+        elif isinstance(other, CompletionsPrompt):
+            # merge two CompletionsPrompt objects
+            self.prompt += other.prompt
+            self._merge_non_data(other, inplace=True)
+        else:
+            raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
+        return self
 
