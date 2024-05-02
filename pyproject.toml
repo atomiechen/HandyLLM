@@ -20,7 +20,8 @@ keywords = ["LLM", "Large Language Model", "Prompt", "OpenAI", "API"]
 dependencies = [
   "requests",
   "httpx",
-  "python-frontmatter"
+  "python-frontmatter",
+  "mergedeep"
 ]
 
 [project.urls]
