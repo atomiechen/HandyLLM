@@ -5,8 +5,10 @@ __all__ = [
     "CompletionsPrompt",
     "loads",
     "load",
+    "load_from",
     "dumps",
     "dump",
+    "dump_to",
 ]
 
 from abc import abstractmethod, ABC
@@ -52,6 +54,13 @@ def load(
     text = fd.read()
     return loads(text, encoding)
 
+def load_from(
+    path: str,
+    encoding: str = "utf-8"
+) -> HandyPrompt:
+    with open(path, "r", encoding=encoding) as fd:
+        return load(fd, encoding)
+
 def dumps(
     prompt: HandyPrompt, 
 ) -> str:
@@ -62,6 +71,12 @@ def dump(
     fd: io.IOBase, 
 ) -> None:
     return prompt.dump(fd)
+
+def dump_to(
+    prompt: HandyPrompt, 
+    path: str
+) -> None:
+    return prompt.dump_to(path)
 
 
 class HandyPrompt(ABC):
@@ -92,6 +107,10 @@ class HandyPrompt(ABC):
     def dump(self, fd: io.IOBase) -> None:
         text = self.dumps()
         fd.write(text)
+    
+    def dump_to(self, path: str) -> None:
+        with open(path, "w", encoding="utf-8") as fd:
+            self.dump(fd)
     
     @abstractmethod
     def _run_with_client(self, client: OpenAIClient) -> HandyPrompt:
