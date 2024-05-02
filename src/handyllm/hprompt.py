@@ -16,6 +16,7 @@ from abc import abstractmethod, ABC
 import io
 from typing import Union, TypeVar
 import copy
+from dataclasses import dataclass
 
 import frontmatter
 from mergedeep import merge, Strategy
@@ -32,11 +33,11 @@ PromptType = TypeVar('PromptType', bound='HandyPrompt')
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 
-DEFAULT_BLACKLIST = [
+DEFAULT_BLACKLIST = (
     "api_key", "organization", "api_base", "api_type", "api_version", 
     "endpoint_manager", "endpoint", "engine", "deployment_id", 
     "model_engine_map", "dest_url", 
-]
+)
 
 
 def loads(
@@ -98,6 +99,20 @@ class RequestRecordMode(Enum):
     ALL = auto()  # record all request arguments
 
 
+@dataclass
+class RunConfig:
+    record: RequestRecordMode
+    blacklist: list[str]
+    whitelist: list[str]
+
+
+DEFAULT_CONFIG = RunConfig(
+    record=RequestRecordMode.BLACKLIST,
+    blacklist=DEFAULT_BLACKLIST,
+    whitelist=None,
+)
+
+
 class HandyPrompt(ABC):
     
     def __init__(self, data: Union[str, list], request: dict = None, meta: dict = None):
@@ -135,55 +150,39 @@ class HandyPrompt(ABC):
     def _run_with_client(
         self: PromptType, 
         client: OpenAIClient, 
-        record: RequestRecordMode,
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> PromptType:
         ...
     
     def run(
         self: PromptType, 
         client: OpenAIClient = None, 
-        record: RequestRecordMode = RequestRecordMode.BLACKLIST,
-        blacklist: list[str] = DEFAULT_BLACKLIST,
-        whitelist: list[str] = None,
+        run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
-        # update kwargs
-        kwargs['record'] = record
-        kwargs['blacklist'] = blacklist
-        kwargs['whitelist'] = whitelist
         if client:
-            return self._run_with_client(client, **kwargs)
+            return self._run_with_client(client, run_config, **kwargs)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                return self._run_with_client(client, **kwargs)
+                return self._run_with_client(client, run_config, **kwargs)
     
     @abstractmethod
     async def _arun_with_client(
         self: PromptType, 
         client: OpenAIClient, 
-        record: RequestRecordMode,
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> PromptType:
         ...
     
     async def arun(
         self: PromptType, 
         client: OpenAIClient = None, 
-        record: RequestRecordMode = RequestRecordMode.BLACKLIST,
-        blacklist: list[str] = DEFAULT_BLACKLIST,
-        whitelist: list[str] = None,
+        run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
-        # update kwargs
-        kwargs['record'] = record
-        kwargs['blacklist'] = blacklist
-        kwargs['whitelist'] = whitelist
         if client:
-            return await self._arun_with_client(client, **kwargs)
+            return await self._arun_with_client(client, run_config, **kwargs)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                return await self._arun_with_client(client, **kwargs)
+                return await self._arun_with_client(client, run_config, **kwargs)
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
@@ -226,9 +225,7 @@ class ChatPrompt(HandyPrompt):
     
     def _run_with_client(
         self, client: OpenAIClient, 
-        record: RequestRecordMode, 
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
@@ -248,15 +245,13 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, record, blacklist, whitelist),
+            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
             copy.deepcopy(self.meta)
         )
     
     async def _arun_with_client(
         self, client: OpenAIClient, 
-        record: RequestRecordMode,
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
@@ -276,7 +271,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, record, blacklist, whitelist),
+            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
             copy.deepcopy(self.meta)
         )
 
@@ -336,9 +331,7 @@ class CompletionsPrompt(HandyPrompt):
 
     def _run_with_client(
         self, client: OpenAIClient, 
-        record: RequestRecordMode, 
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
@@ -355,15 +348,13 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            self._new_arguments(arguments, record, blacklist, whitelist),
+            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
             copy.deepcopy(self.meta)
         )
     
     async def _arun_with_client(
         self, client: OpenAIClient, 
-        record: RequestRecordMode,
-        blacklist: list[str],
-        whitelist: list[str],
+        run_config: RunConfig,
         **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
@@ -380,7 +371,7 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            self._new_arguments(arguments, record, blacklist, whitelist),
+            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
             copy.deepcopy(self.meta)
         )
     
