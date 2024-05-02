@@ -83,7 +83,8 @@ class HandyPrompt(ABC):
             return serialized_data
         else:
             front_data = copy.deepcopy(self.request)
-            front_data['meta'] = copy.deepcopy(self.meta)
+            if self.meta:
+                front_data['meta'] = copy.deepcopy(self.meta)
             post = frontmatter.Post(serialized_data, None, **front_data)
             return frontmatter.dumps(post, handler)
     
