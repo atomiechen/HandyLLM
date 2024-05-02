@@ -11,6 +11,7 @@ __all__ = [
     "dump_to",
 ]
 
+from enum import Enum, auto
 from abc import abstractmethod, ABC
 import io
 from typing import Union, TypeVar
@@ -30,6 +31,12 @@ from .utils import (
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
+
+DEFAULT_BLACKLIST = [
+    "api_key", "organization", "api_base", "api_type", "api_version", 
+    "endpoint_manager", "endpoint", "engine", "deployment_id", 
+    "model_engine_map", "dest_url", 
+]
 
 
 def loads(
@@ -84,6 +91,13 @@ def dump_to(
     return prompt.dump_to(path)
 
 
+class RequestRecordMode(Enum):
+    BLACKLIST = auto()  # record all request arguments except specified ones
+    WHITELIST = auto()  # record only specified request arguments
+    NONE = auto()  # record no request arguments
+    ALL = auto()  # record all request arguments
+
+
 class HandyPrompt(ABC):
     
     def __init__(self, data: Union[str, list], request: dict = None, meta: dict = None):
@@ -118,26 +132,70 @@ class HandyPrompt(ABC):
             self.dump(fd)
     
     @abstractmethod
-    def _run_with_client(self: PromptType, client: OpenAIClient, **kwargs) -> PromptType:
+    def _run_with_client(
+        self: PromptType, 
+        client: OpenAIClient, 
+        record: RequestRecordMode,
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> PromptType:
         ...
     
-    def run(self: PromptType, client: OpenAIClient = None, **kwargs) -> PromptType:
+    def run(
+        self: PromptType, 
+        client: OpenAIClient = None, 
+        record: RequestRecordMode = RequestRecordMode.BLACKLIST,
+        blacklist: list[str] = DEFAULT_BLACKLIST,
+        whitelist: list[str] = None,
+        **kwargs) -> PromptType:
         if client:
-            return self._run_with_client(client, **kwargs)
+            return self._run_with_client(
+                client=client,
+                record=record,
+                blacklist=blacklist,
+                whitelist=whitelist,
+                **kwargs)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                return self._run_with_client(client, **kwargs)
+                return self._run_with_client(
+                    client=client,
+                    record=record,
+                    blacklist=blacklist,
+                    whitelist=whitelist,
+                    **kwargs)
     
     @abstractmethod
-    async def _arun_with_client(self: PromptType, client: OpenAIClient, **kwargs) -> PromptType:
+    async def _arun_with_client(
+        self: PromptType, 
+        client: OpenAIClient, 
+        record: RequestRecordMode,
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> PromptType:
         ...
     
-    async def arun(self: PromptType, client: OpenAIClient = None, **kwargs) -> PromptType:
+    async def arun(
+        self: PromptType, 
+        client: OpenAIClient = None, 
+        record: RequestRecordMode = RequestRecordMode.BLACKLIST,
+        blacklist: list[str] = DEFAULT_BLACKLIST,
+        whitelist: list[str] = None,
+        **kwargs) -> PromptType:
         if client:
-            return await self._arun_with_client(client, **kwargs)
+            return await self._arun_with_client(
+                client=client,
+                record=record,
+                blacklist=blacklist,
+                whitelist=whitelist,
+                **kwargs)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                return await self._arun_with_client(client, **kwargs)
+                return await self._arun_with_client(
+                    client=client,
+                    record=record,
+                    blacklist=blacklist,
+                    whitelist=whitelist,
+                    **kwargs)
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
@@ -147,6 +205,19 @@ class HandyPrompt(ABC):
             merged_request = merge({}, self.request, other.request, strategy=Strategy.ADDITIVE)
             merged_meta = merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
             return merged_request, merged_meta
+    
+    def _new_arguments(
+        self, arguments: dict, record: RequestRecordMode, 
+        blacklist: list[str], whitelist: list[str]) -> dict:
+        if record == RequestRecordMode.BLACKLIST:
+            # will modify the original arguments
+            for key in blacklist:
+                arguments.pop(key, None)
+        elif record == RequestRecordMode.WHITELIST:
+            arguments = {key: value for key, value in arguments.items() if key in whitelist}
+        elif record == RequestRecordMode.NONE:
+            arguments = {}
+        return arguments
 
 
 class ChatPrompt(HandyPrompt):
@@ -165,7 +236,12 @@ class ChatPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
     
-    def _run_with_client(self, client: OpenAIClient, **kwargs) -> ChatPrompt:
+    def _run_with_client(
+        self, client: OpenAIClient, 
+        record: RequestRecordMode, 
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
@@ -184,11 +260,16 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            arguments,
+            self._new_arguments(arguments, record, blacklist, whitelist),
             copy.deepcopy(self.meta)
         )
     
-    async def _arun_with_client(self, client: OpenAIClient, **kwargs) -> ChatPrompt:
+    async def _arun_with_client(
+        self, client: OpenAIClient, 
+        record: RequestRecordMode,
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
@@ -207,7 +288,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            arguments,
+            self._new_arguments(arguments, record, blacklist, whitelist),
             copy.deepcopy(self.meta)
         )
 
@@ -265,7 +346,12 @@ class CompletionsPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return self.prompt
 
-    def _run_with_client(self, client: OpenAIClient, **kwargs) -> CompletionsPrompt:
+    def _run_with_client(
+        self, client: OpenAIClient, 
+        record: RequestRecordMode, 
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
@@ -281,11 +367,16 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            arguments,
+            self._new_arguments(arguments, record, blacklist, whitelist),
             copy.deepcopy(self.meta)
         )
     
-    async def _arun_with_client(self, client: OpenAIClient, **kwargs) -> CompletionsPrompt:
+    async def _arun_with_client(
+        self, client: OpenAIClient, 
+        record: RequestRecordMode,
+        blacklist: list[str],
+        whitelist: list[str],
+        **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
         arguments.update(kwargs)
         stream = arguments.get("stream", False)
@@ -301,7 +392,7 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            arguments,
+            self._new_arguments(arguments, record, blacklist, whitelist),
             copy.deepcopy(self.meta)
         )
     
