@@ -38,7 +38,8 @@ def loads(
         request = {}
         meta = {}
     api: str = meta.get("api", "")
-    if api.startswith("completion"):
+    is_chat = converter.detect(content)
+    if api.startswith("completion") or not is_chat:
         return CompletionsPrompt(content, request, meta)
     else:
         chat = converter.raw2chat(content)
