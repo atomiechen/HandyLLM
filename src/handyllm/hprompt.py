@@ -14,7 +14,7 @@ __all__ = [
 from enum import Enum, auto
 from abc import abstractmethod, ABC
 import io
-from typing import Union, TypeVar
+from typing import Optional, Union, TypeVar
 import copy
 from dataclasses import dataclass
 
@@ -101,9 +101,9 @@ class RequestRecordMode(Enum):
 
 @dataclass
 class RunConfig:
-    record: RequestRecordMode
-    blacklist: list[str]
-    whitelist: list[str]
+    record: RequestRecordMode = RequestRecordMode.NONE
+    blacklist: Optional[list[str]] = None
+    whitelist: Optional[list[str]] = None
 
 
 DEFAULT_CONFIG = RunConfig(
