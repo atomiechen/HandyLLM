@@ -118,26 +118,26 @@ class HandyPrompt(ABC):
             self.dump(fd)
     
     @abstractmethod
-    def _run_with_client(self: PromptType, client: OpenAIClient) -> PromptType:
+    def _run_with_client(self: PromptType, client: OpenAIClient, **kwargs) -> PromptType:
         ...
     
-    def run(self: PromptType, client: OpenAIClient = None) -> PromptType:
+    def run(self: PromptType, client: OpenAIClient = None, **kwargs) -> PromptType:
         if client:
-            return self._run_with_client(client)
+            return self._run_with_client(client, **kwargs)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                return self._run_with_client(client)
+                return self._run_with_client(client, **kwargs)
     
     @abstractmethod
-    async def _arun_with_client(self: PromptType, client: OpenAIClient) -> PromptType:
+    async def _arun_with_client(self: PromptType, client: OpenAIClient, **kwargs) -> PromptType:
         ...
     
-    async def arun(self: PromptType, client: OpenAIClient = None) -> PromptType:
+    async def arun(self: PromptType, client: OpenAIClient = None, **kwargs) -> PromptType:
         if client:
-            return await self._arun_with_client(client)
+            return await self._arun_with_client(client, **kwargs)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                return await self._arun_with_client(client)
+                return await self._arun_with_client(client, **kwargs)
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
@@ -165,8 +165,9 @@ class ChatPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return converter.chat2raw(self.chat)
     
-    def _run_with_client(self, client: OpenAIClient) -> ChatPrompt:
+    def _run_with_client(self, client: OpenAIClient, **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
+        arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.chat(
             messages=self.chat,
@@ -187,8 +188,9 @@ class ChatPrompt(HandyPrompt):
             copy.deepcopy(self.meta)
         )
     
-    async def _arun_with_client(self, client: OpenAIClient) -> ChatPrompt:
+    async def _arun_with_client(self, client: OpenAIClient, **kwargs) -> ChatPrompt:
         arguments = copy.deepcopy(self.request)
+        arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.chat(
             messages=self.chat,
@@ -263,8 +265,9 @@ class CompletionsPrompt(HandyPrompt):
     def _serialize_data(self) -> str:
         return self.prompt
 
-    def _run_with_client(self, client: OpenAIClient) -> CompletionsPrompt:
+    def _run_with_client(self, client: OpenAIClient, **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
+        arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = client.completions(
             prompt=self.prompt,
@@ -282,8 +285,9 @@ class CompletionsPrompt(HandyPrompt):
             copy.deepcopy(self.meta)
         )
     
-    async def _arun_with_client(self, client: OpenAIClient) -> CompletionsPrompt:
+    async def _arun_with_client(self, client: OpenAIClient, **kwargs) -> CompletionsPrompt:
         arguments = copy.deepcopy(self.request)
+        arguments.update(kwargs)
         stream = arguments.get("stream", False)
         response = await client.completions(
             prompt=self.prompt,
