@@ -18,7 +18,7 @@ import re
 import copy
 import io
 import os
-from typing import Optional, TypeAlias, Union, TypeVar
+from typing import Optional, Union, TypeVar
 from enum import Enum, auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
@@ -35,7 +35,7 @@ from .utils import (
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
-PathType: TypeAlias = Union[str, os.PathLike[str]]
+PathType = Union[str, os.PathLike[str]]
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
