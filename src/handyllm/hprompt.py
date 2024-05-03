@@ -126,6 +126,8 @@ class RunConfig:
     whitelist: Optional[list[str]] = None
     var_map: Optional[dict[str, str]] = None
     var_map_path: Optional[str] = None
+    output_path: Optional[str] = None
+    output_fd: Optional[io.IOBase] = None
 
 
 DEFAULT_CONFIG = RunConfig(
@@ -134,6 +136,8 @@ DEFAULT_CONFIG = RunConfig(
     whitelist=None,
     var_map=None,
     var_map_path=None,
+    output_path=None,
+    output_fd=None,
 )
 
 
@@ -155,10 +159,11 @@ class HandyPrompt(ABC):
         '''
         return str(self.data)
     
-    def _dumps(self, content: str = "") -> str:
-        front_data = copy.deepcopy(self.request)
-        if self.meta:
-            front_data['meta'] = copy.deepcopy(self.meta)
+    @staticmethod
+    def _dumps(request, meta, content: str) -> str:
+        front_data = copy.deepcopy(request)
+        if meta:
+            front_data['meta'] = copy.deepcopy(meta)
         post = frontmatter.Post(content, None, **front_data)
         return frontmatter.dumps(post, handler)
     
@@ -167,7 +172,7 @@ class HandyPrompt(ABC):
         if not self.meta and not self.request:
             return serialized_data
         else:
-            return self._dumps(serialized_data)
+            return self._dumps(self.request, self.meta, serialized_data)
     
     def dump(self, fd: io.IOBase) -> None:
         text = self.dumps()
@@ -238,19 +243,19 @@ class HandyPrompt(ABC):
             merged_meta = merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
             return merged_request, merged_meta
     
-    def _new_arguments(
-        self, arguments: dict, 
+    def _filter_arguments(
+        self, request: dict, 
         run_config: RunConfig,
         ) -> dict:
         if run_config.record == RequestRecordMode.BLACKLIST:
-            # will modify the original arguments
+            # will modify the original request
             for key in run_config.blacklist:
-                arguments.pop(key, None)
+                request.pop(key, None)
         elif run_config.record == RequestRecordMode.WHITELIST:
-            arguments = {key: value for key, value in arguments.items() if key in run_config.whitelist}
+            request = {key: value for key, value in request.items() if key in run_config.whitelist}
         elif run_config.record == RequestRecordMode.NONE:
-            arguments = {}
-        return arguments
+            request = {}
+        return request
     
     def _parse_var_map(self, run_config: RunConfig):
         var_map = {}
@@ -299,57 +304,111 @@ class ChatPrompt(HandyPrompt):
         else:
             return self.chat
     
+    def _stream_chat_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        if fd:
+            # dump frontmatter
+            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+        # stream response to fd
+        role = ""
+        content = ""
+        for r, text in stream_chat_with_role(response):
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$\n")
+            elif fd:
+                fd.write(text)
+            content += text
+        return role, content
+    
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
         **kwargs) -> ChatPrompt:
-        arguments = copy.deepcopy(self.request)
-        arguments.update(kwargs)
-        stream = arguments.get("stream", False)
+        new_request = copy.deepcopy(self.request)
+        new_request.update(kwargs)
+        stream = new_request.get("stream", False)
         response = client.chat(
             messages=self._eval_data(run_config),
-            **arguments
+            **new_request
             ).call()
+        new_request = self._filter_arguments(new_request, run_config)
+        new_meta = copy.deepcopy(self.meta)
         if stream:
-            role = ""
-            content = ""
-            for r, text in stream_chat_with_role(response):
-                role = r
-                content += text
+            if run_config.output_path:
+                # stream response to a file
+                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                    role, content = self._stream_chat_proc(new_request, new_meta, response, fout)
+            elif run_config.output_fd:
+                role, content = self._stream_chat_proc(new_request, new_meta, response, run_config.output_fd)
+            else:
+                role, content = self._stream_chat_proc(new_request, new_meta, response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
-        return ChatPrompt(
+        new_prompt = ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, run_config),
-            copy.deepcopy(self.meta)
+            new_request, new_meta
         )
+        if not stream:
+            if run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
+            elif run_config.output_fd:
+                new_prompt.dump(run_config.output_fd)
+        return new_prompt
+    
+    async def _astream_chat_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        if fd:
+            # dump frontmatter
+            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+        # stream response to fd
+        role = ""
+        content = ""
+        async for r, text in astream_chat_with_role(response):
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$\n")
+            elif fd:
+                fd.write(text)
+            content += text
+        return role, content
     
     async def _arun_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
         **kwargs) -> ChatPrompt:
-        arguments = copy.deepcopy(self.request)
-        arguments.update(kwargs)
-        stream = arguments.get("stream", False)
+        new_request = copy.deepcopy(self.request)
+        new_request.update(kwargs)
+        stream = new_request.get("stream", False)
         response = await client.chat(
             messages=self._eval_data(run_config),
-            **arguments
+            **new_request
             ).acall()
+        new_request = self._filter_arguments(new_request, run_config)
+        new_meta = copy.deepcopy(self.meta)
         if stream:
-            role = ""
-            content = ""
-            async for r, text in astream_chat_with_role(response):
-                role = r
-                content += text
+            if run_config.output_path:
+                # stream response to a file
+                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                    role, content = await self._astream_chat_proc(new_request, new_meta, response, fout)
+            elif run_config.output_fd:
+                role, content = await self._astream_chat_proc(new_request, new_meta, response, run_config.output_fd)
+            else:
+                role, content = await self._astream_chat_proc(new_request, new_meta, response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
-        return ChatPrompt(
+        new_prompt = ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, run_config),
-            copy.deepcopy(self.meta)
+            new_request, new_meta
         )
+        if not stream:
+            if run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
+            elif run_config.output_fd:
+                new_prompt.dump(run_config.output_fd)
+        return new_prompt
 
     def __add__(self, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
@@ -410,52 +469,94 @@ class CompletionsPrompt(HandyPrompt):
                 new_prompt = new_prompt.replace(key, value)
         else:
             return self.prompt
+    
+    def _stream_completions_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> str:
+        if fd:
+            # dump frontmatter
+            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+        # stream response to fd
+        content = ""
+        for text in stream_completions(response):
+            if fd:
+                fd.write(text)
+            content += text
+        return content
 
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
         **kwargs) -> CompletionsPrompt:
-        arguments = copy.deepcopy(self.request)
-        arguments.update(kwargs)
-        stream = arguments.get("stream", False)
+        new_request = copy.deepcopy(self.request)
+        new_request.update(kwargs)
+        stream = new_request.get("stream", False)
         response = client.completions(
             prompt=self._eval_data(run_config),
-            **arguments
+            **new_request
             ).call()
+        new_request = self._filter_arguments(new_request, run_config)
+        new_meta = copy.deepcopy(self.meta)
         if stream:
-            content = ""
-            for text in stream_completions(response):
-                content += text
+            if run_config.output_path:
+                # stream response to a file
+                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                    content = self._stream_completions_proc(new_request, new_meta, response, fout)
+            elif run_config.output_fd:
+                content = self._stream_completions_proc(new_request, new_meta, response, run_config.output_fd)
+            else:
+                content = self._stream_completions_proc(new_request, new_meta, response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(
-            content,
-            self._new_arguments(arguments, run_config),
-            copy.deepcopy(self.meta)
-        )
+        new_prompt = CompletionsPrompt(content, new_request, new_meta)
+        if not stream:
+            if run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
+            elif run_config.output_fd:
+                new_prompt.dump(run_config.output_fd)
+        return new_prompt
+
+    async def _astream_completions_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> str:
+        if fd:
+            # dump frontmatter
+            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+        # stream response to fd
+        content = ""
+        async for text in astream_completions(response):
+            if fd:
+                fd.write(text)
+            content += text
+        return content
     
     async def _arun_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
         **kwargs) -> CompletionsPrompt:
-        arguments = copy.deepcopy(self.request)
-        arguments.update(kwargs)
-        stream = arguments.get("stream", False)
+        new_request = copy.deepcopy(self.request)
+        new_request.update(kwargs)
+        stream = new_request.get("stream", False)
         response = await client.completions(
             prompt=self._eval_data(run_config),
-            **arguments
+            **new_request
             ).acall()
+        new_request = self._filter_arguments(new_request, run_config)
+        new_meta = copy.deepcopy(self.meta)
         if stream:
-            content = ""
-            async for text in astream_completions(response):
-                content += text
+            if run_config.output_path:
+                # stream response to a file
+                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                    content = await self._astream_completions_proc(new_request, new_meta, response, fout)
+            elif run_config.output_fd:
+                content = await self._astream_completions_proc(new_request, new_meta, response, run_config.output_fd)
+            else:
+                content = await self._astream_completions_proc(new_request, new_meta, response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(
-            content,
-            self._new_arguments(arguments, run_config),
-            copy.deepcopy(self.meta)
-        )
+        new_prompt = CompletionsPrompt(content, new_request, new_meta)
+        if not stream:
+            if run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
+            elif run_config.output_fd:
+                new_prompt.dump(run_config.output_fd)
+        return new_prompt
     
     def __add__(self, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
