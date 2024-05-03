@@ -155,16 +155,19 @@ class HandyPrompt(ABC):
         '''
         return str(self.data)
     
+    def _dumps(self, content: str = "") -> str:
+        front_data = copy.deepcopy(self.request)
+        if self.meta:
+            front_data['meta'] = copy.deepcopy(self.meta)
+        post = frontmatter.Post(content, None, **front_data)
+        return frontmatter.dumps(post, handler)
+    
     def dumps(self) -> str:
         serialized_data = self._serialize_data()
         if not self.meta and not self.request:
             return serialized_data
         else:
-            front_data = copy.deepcopy(self.request)
-            if self.meta:
-                front_data['meta'] = copy.deepcopy(self.meta)
-            post = frontmatter.Post(serialized_data, None, **front_data)
-            return frontmatter.dumps(post, handler)
+            return self._dumps(serialized_data)
     
     def dump(self, fd: io.IOBase) -> None:
         text = self.dumps()
