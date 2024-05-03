@@ -233,15 +233,16 @@ class HandyPrompt(ABC):
             return merged_request, merged_meta
     
     def _new_arguments(
-        self, arguments: dict, record: RequestRecordMode, 
-        blacklist: list[str], whitelist: list[str]) -> dict:
-        if record == RequestRecordMode.BLACKLIST:
+        self, arguments: dict, 
+        run_config: RunConfig,
+        ) -> dict:
+        if run_config.record == RequestRecordMode.BLACKLIST:
             # will modify the original arguments
-            for key in blacklist:
+            for key in run_config.blacklist:
                 arguments.pop(key, None)
-        elif record == RequestRecordMode.WHITELIST:
-            arguments = {key: value for key, value in arguments.items() if key in whitelist}
-        elif record == RequestRecordMode.NONE:
+        elif run_config.record == RequestRecordMode.WHITELIST:
+            arguments = {key: value for key, value in arguments.items() if key in run_config.whitelist}
+        elif run_config.record == RequestRecordMode.NONE:
             arguments = {}
         return arguments
     
@@ -314,7 +315,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
+            self._new_arguments(arguments, run_config),
             copy.deepcopy(self.meta)
         )
     
@@ -340,7 +341,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
+            self._new_arguments(arguments, run_config),
             copy.deepcopy(self.meta)
         )
 
@@ -423,7 +424,7 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
+            self._new_arguments(arguments, run_config),
             copy.deepcopy(self.meta)
         )
     
@@ -446,7 +447,7 @@ class CompletionsPrompt(HandyPrompt):
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content,
-            self._new_arguments(arguments, run_config.record, run_config.blacklist, run_config.whitelist),
+            self._new_arguments(arguments, run_config),
             copy.deepcopy(self.meta)
         )
     
