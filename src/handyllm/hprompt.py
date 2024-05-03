@@ -140,6 +140,17 @@ class HandyPrompt(ABC):
         self.request = request or {}
         self.meta = meta or {}
     
+    def __str__(self) -> str:
+        return str(self.data)
+    
+    def __repr__(self) -> str:
+        return "{}({}, {}, {})".format(
+            self.__class__.__name__,
+            repr(self.data),
+            repr(self.request),
+            repr(self.meta)
+        )
+    
     @property
     def result_str(self) -> str:
         return str(self.data)
