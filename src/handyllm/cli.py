@@ -1,5 +1,4 @@
 import argparse
-from handyllm import hprompt
 
 
 def register_hprompt_command(subparsers: argparse._SubParsersAction):
@@ -16,6 +15,9 @@ def register_hprompt_command(subparsers: argparse._SubParsersAction):
     parser_hprompt.add_argument("-vmp", "--var-map-path", help="Variable map file path")
 
 def hprompt_command(args):
+    import sys
+    from handyllm import hprompt
+    
     if args.verbose:
         print(f"Input path: {args.path}")
         print(f"Output path: {args.output}")
@@ -29,11 +31,11 @@ def hprompt_command(args):
         run_config.var_map = var_map
     if args.var_map_path:
         run_config.var_map_path = args.var_map_path
-    result = prompt.run(run_config=run_config)
     if args.output:
-        result.dump_to(args.output)
+        run_config.output_path = args.output
     else:
-        print(result.result_str)
+        run_config.output_fd = sys.stdout
+    result_prompt = prompt.run(run_config=run_config)
 
 def main():
     """Main entry point for the handyllm CLI."""
