@@ -14,12 +14,13 @@ __all__ = [
     "RequestRecordMode",
 ]
 
-from enum import Enum, auto
-from abc import abstractmethod, ABC
-import io
-from typing import Optional, Union, TypeVar
 import re
 import copy
+import io
+import os
+from typing import Optional, TypeAlias, Union, TypeVar
+from enum import Enum, auto
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 
 import frontmatter
@@ -34,6 +35,8 @@ from .utils import (
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
+PathType: TypeAlias = Union[str, os.PathLike[str]]
+
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 p_var_map = re.compile(r'(%\w+%)')
@@ -73,7 +76,7 @@ def load(
     return loads(text, encoding)
 
 def load_from(
-    path: str,
+    path: PathType,
     encoding: str = "utf-8"
 ) -> HandyPrompt:
     with open(path, "r", encoding=encoding) as fd:
@@ -92,11 +95,11 @@ def dump(
 
 def dump_to(
     prompt: HandyPrompt, 
-    path: str
+    path: PathType
 ) -> None:
     return prompt.dump_to(path)
 
-def load_var_map(path: str) -> dict[str, str]:
+def load_var_map(path: PathType) -> dict[str, str]:
     # read all content that needs to be replaced in the prompt from a text file
     with open(path, 'r', encoding='utf-8') as fin:
         content = fin.read()
@@ -167,7 +170,7 @@ class HandyPrompt(ABC):
         text = self.dumps()
         fd.write(text)
     
-    def dump_to(self, path: str) -> None:
+    def dump_to(self, path: PathType) -> None:
         with open(path, "w", encoding="utf-8") as fd:
             self.dump(fd)
     
