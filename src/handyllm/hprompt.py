@@ -121,8 +121,8 @@ class RequestRecordMode(Enum):
 
 @dataclass
 class RunConfig:
-    record: RequestRecordMode = RequestRecordMode.NONE
-    blacklist: Optional[list[str]] = None
+    record: RequestRecordMode = RequestRecordMode.BLACKLIST
+    blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
     whitelist: Optional[list[str]] = None
     var_map: Optional[dict[str, str]] = None
     var_map_path: Optional[str] = None
@@ -130,15 +130,7 @@ class RunConfig:
     output_fd: Optional[io.IOBase] = None
 
 
-DEFAULT_CONFIG = RunConfig(
-    record=RequestRecordMode.BLACKLIST,
-    blacklist=DEFAULT_BLACKLIST,
-    whitelist=None,
-    var_map=None,
-    var_map_path=None,
-    output_path=None,
-    output_fd=None,
-)
+DEFAULT_CONFIG = RunConfig()
 
 
 class HandyPrompt(ABC):
