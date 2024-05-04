@@ -150,10 +150,13 @@ class RunConfig:
     @classmethod
     def from_dict(cls, obj: dict):
         input_kwargs = {}
-        field_tuple = fields(cls)
-        for field in field_tuple:
+        for field in fields(cls):
             if field.name in obj:
                 input_kwargs[field.name] = obj[field.name]
+        # convert string to Enum
+        record_str = input_kwargs.get("record_request")
+        if record_str is not None:
+            input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
         return cls(**input_kwargs)
     
     def to_dict(self):
@@ -387,7 +390,10 @@ class HandyPrompt(ABC):
         run_config: RunConfig,
         ) -> dict:
         if run_config.record_request == RecordRequestMode.WHITELIST:
-            request = {key: value for key, value in request.items() if key in run_config.record_whitelist}
+            if run_config.record_whitelist:
+                request = {key: value for key, value in request.items() if key in run_config.record_whitelist}
+            else:
+                request = {}
         elif run_config.record_request == RecordRequestMode.NONE:
             request = {}
         elif run_config.record_request == RecordRequestMode.ALL:
