@@ -125,8 +125,8 @@ class RunConfig:
     blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
     whitelist: Optional[list[str]] = None
     var_map: Optional[dict[str, str]] = None
-    var_map_path: Optional[str] = None
-    output_path: Optional[str] = None
+    var_map_path: Optional[PathType] = None
+    output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
 
 
