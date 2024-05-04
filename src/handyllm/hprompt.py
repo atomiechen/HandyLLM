@@ -201,8 +201,8 @@ DEFAULT_CONFIG = RunConfig()
 
 class HandyPrompt(ABC):
     
-    OUTPUT_FILENAME_TEMPLATE = "result.%Y%m%d-%H%M%S.hprompt"
-    OUTPUT_EVAL_FILENAME_TEMPLATE = "evaled.%Y%m%d-%H%M%S.hprompt"
+    TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
+    TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
     
     def __init__(self, data: Union[str, list], request: dict = None, meta: dict = None):
         self.data = data
@@ -316,7 +316,21 @@ class HandyPrompt(ABC):
                 new_prompt = await self._arun_with_client(client, run_config, new_request, new_meta, stream)
         self._post_check_output(stream, run_config, new_prompt)
         return new_prompt
-
+    
+    def _prepare_output_path(
+        self, output_path: str, start_time: datetime, template_filename: str
+        ) -> str:
+        output_path = output_path.strip()
+        p = Path(output_path)
+        if p.is_dir() or output_path.endswith(('/', '\\')):
+            # output_path wants to be a directory, append the default filename
+            output_path = Path(output_path, template_filename)
+        # format output_path with the current time
+        output_path = start_time.strftime(str(output_path))
+        # create the parent directory if it does not exist
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        return output_path
+    
     def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
         new_request = copy.deepcopy(self.request)
         new_request.update(kwargs)
@@ -329,29 +343,14 @@ class HandyPrompt(ABC):
         
         start_time = datetime.now()
         if run_config.output_path:
-            if Path(run_config.output_path).is_dir():
-                # if output_path is a directory, append the default filename
-                run_config.output_path = Path(
-                    run_config.output_path, 
-                    start_time.strftime(self.OUTPUT_FILENAME_TEMPLATE)
-                )
-            else:
-                # format output_path with the current time
-                run_config.output_path = start_time.strftime(run_config.output_path)
-            # create the parent directory if it does not exist
-            Path(run_config.output_path).parent.mkdir(parents=True, exist_ok=True)
+            run_config.output_path = self._prepare_output_path(
+                run_config.output_path, start_time, self.TEMPLATE_OUTPUT_FILENAME
+            )
         if run_config.output_evaled_prompt_path:
-            if Path(run_config.output_evaled_prompt_path).is_dir():
-                # if output_evaled_prompt_path is a directory, append the default filename
-                run_config.output_evaled_prompt_path = Path(
-                    run_config.output_evaled_prompt_path, 
-                    start_time.strftime(self.OUTPUT_EVAL_FILENAME_TEMPLATE)
-                )
-            else:
-                # format output_evaled_prompt_path with the current time
-                run_config.output_evaled_prompt_path = start_time.strftime(run_config.output_evaled_prompt_path)
-            # create the parent directory if it does not exist
-            Path(run_config.output_evaled_prompt_path).parent.mkdir(parents=True, exist_ok=True)
+            run_config.output_evaled_prompt_path = self._prepare_output_path(
+                run_config.output_evaled_prompt_path, start_time, 
+                self.TEMPLATE_OUTPUT_EVAL_FILENAME
+            )
         
         if run_config.credential_path:
             if not run_config.credential_type:
