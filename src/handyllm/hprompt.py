@@ -164,6 +164,8 @@ class HandyPrompt(ABC):
     
     @staticmethod
     def _dumps(request, meta, content: str) -> str:
+        if not meta and not request:
+            return content
         front_data = copy.deepcopy(request)
         if meta:
             front_data['meta'] = copy.deepcopy(meta)
@@ -172,10 +174,7 @@ class HandyPrompt(ABC):
     
     def dumps(self) -> str:
         serialized_data = self._serialize_data()
-        if not self.meta and not self.request:
-            return serialized_data
-        else:
-            return self._dumps(self.request, self.meta, serialized_data)
+        return self._dumps(self.request, self.meta, serialized_data)
     
     def dump(self, fd: io.IOBase) -> None:
         text = self.dumps()
