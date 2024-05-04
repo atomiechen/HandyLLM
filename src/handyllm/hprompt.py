@@ -128,6 +128,9 @@ class RunConfig:
     var_map_path: Optional[PathType] = None
     output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
+    # output the evaluated prompt to a file or a file descriptor
+    output_evaled_prompt_path: bool = False
+    output_evaled_prompt_fd: Optional[io.IOBase] = None
 
 
 DEFAULT_CONFIG = RunConfig()
@@ -155,12 +158,12 @@ class HandyPrompt(ABC):
     def result_str(self) -> str:
         return str(self.data)
     
-    def _serialize_data(self) -> str:
+    def _serialize_data(self, data) -> str:
         '''
         Serialize the data to a string. 
         This method can be overridden by subclasses.
         '''
-        return str(self.data)
+        return str(data)
     
     @staticmethod
     def _dumps(request, meta, content: str) -> str:
@@ -173,7 +176,7 @@ class HandyPrompt(ABC):
         return frontmatter.dumps(post, handler)
     
     def dumps(self) -> str:
-        serialized_data = self._serialize_data()
+        serialized_data = self._serialize_data(self.data)
         return self._dumps(self.request, self.meta, serialized_data)
     
     def dump(self, fd: io.IOBase) -> None:
@@ -255,6 +258,18 @@ class HandyPrompt(ABC):
         new_meta = copy.deepcopy(self.meta)
         # TODO: meta contains origianl run_config; update runtime 
         # run_config according to origianl meta
+        
+        if run_config.output_evaled_prompt_path \
+            or run_config.output_evaled_prompt_fd:
+            # output the evaluated prompt to a file or a file descriptor
+            evaled_data = self._eval_data(run_config)
+            serialized_data = self._serialize_data(evaled_data)
+            text = self._dumps(self.request, self.meta, serialized_data)
+            if run_config.output_evaled_prompt_path:
+                with open(run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
+                    fout.write(text)
+            elif run_config.output_evaled_prompt_fd:
+                run_config.output_evaled_prompt_fd.write(text)
         return run_config, new_request, new_meta, stream
     
     def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
@@ -326,8 +341,8 @@ class ChatPrompt(HandyPrompt):
             return ""
         return self.chat[-1]['content']
     
-    def _serialize_data(self) -> str:
-        return converter.chat2raw(self.chat)
+    def _serialize_data(self, data) -> str:
+        return converter.chat2raw(data)
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
