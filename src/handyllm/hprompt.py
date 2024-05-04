@@ -124,8 +124,11 @@ class RunConfig:
     record: RequestRecordMode = RequestRecordMode.BLACKLIST
     blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
     whitelist: Optional[list[str]] = None
+    # variable map
     var_map: Optional[dict[str, str]] = None
+    # variable map file path
     var_map_path: Optional[PathType] = None
+    # output the result to a file or a file descriptor
     output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
     # output the evaluated prompt to a file or a file descriptor
