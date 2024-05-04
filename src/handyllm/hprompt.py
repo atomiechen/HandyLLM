@@ -14,6 +14,7 @@ __all__ = [
     "RecordRequestMode",
 ]
 
+import json
 import re
 import copy
 import io
@@ -25,8 +26,10 @@ from enum import Enum, auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields
 
+import yaml
 import frontmatter
 from mergedeep import merge, Strategy
+from dotenv import load_dotenv
 
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
@@ -137,6 +140,12 @@ class RunConfig:
     # output the evaluated prompt to a file or a file descriptor
     output_evaled_prompt_path: Optional[PathType] = None
     output_evaled_prompt_fd: Optional[io.IOBase] = None
+    # credential file path
+    credential_path: Optional[PathType] = None
+    # credential type: env, json, yaml
+    # if env, load environment variables from the credential file
+    # if json or yaml, load the content of the file as request arguments
+    credential_type: Optional[str] = None  # default: guess from the file extension
     
     @classmethod
     def from_dict(cls, obj: dict):
@@ -320,6 +329,26 @@ class HandyPrompt(ABC):
                 run_config.output_evaled_prompt_path, 
                 start_time.strftime(self.OUTPUT_EVAL_FILENAME_TEMPLATE)
             )
+        
+        if run_config.credential_path:
+            if not run_config.credential_type:
+                # guess the credential type from the file extension
+                p = Path(run_config.credential_path)
+                if p.suffix:
+                    run_config.credential_type = p.suffix[1:].lower()
+                else:
+                    run_config.credential_type = 'env'
+            if run_config.credential_type == "env":
+                load_dotenv(run_config.credential_path, override=True)
+            elif run_config.credential_type in ("json", "yaml"):
+                with open(run_config.credential_path, 'r', encoding='utf-8') as fin:
+                    if run_config.credential_type == "json":
+                        credential_dict = json.load(fin)
+                    else:
+                        credential_dict = yaml.safe_load(fin)
+                new_request.update(credential_dict)
+            else:
+                raise ValueError(f"unsupported credential type: {run_config.credential_type}")
         
         if run_config.output_evaled_prompt_path \
             or run_config.output_evaled_prompt_fd:
