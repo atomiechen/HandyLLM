@@ -338,6 +338,8 @@ class HandyPrompt(ABC):
             else:
                 # format output_path with the current time
                 run_config.output_path = start_time.strftime(run_config.output_path)
+            # create the parent directory if it does not exist
+            Path(run_config.output_path).parent.mkdir(parents=True, exist_ok=True)
         if run_config.output_evaled_prompt_path:
             if Path(run_config.output_evaled_prompt_path).is_dir():
                 # if output_evaled_prompt_path is a directory, append the default filename
@@ -348,6 +350,8 @@ class HandyPrompt(ABC):
             else:
                 # format output_evaled_prompt_path with the current time
                 run_config.output_evaled_prompt_path = start_time.strftime(run_config.output_evaled_prompt_path)
+            # create the parent directory if it does not exist
+            Path(run_config.output_evaled_prompt_path).parent.mkdir(parents=True, exist_ok=True)
         
         if run_config.credential_path:
             if not run_config.credential_type:
