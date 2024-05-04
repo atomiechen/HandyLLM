@@ -11,7 +11,7 @@ __all__ = [
     "dump_to",
     "load_var_map",
     "RunConfig",
-    "RequestRecordMode",
+    "RecordRequestMode",
 ]
 
 import re
@@ -112,7 +112,7 @@ def load_var_map(path: PathType) -> dict[str, str]:
     return substitute_map
 
 
-class RequestRecordMode(Enum):
+class RecordRequestMode(Enum):
     BLACKLIST = auto()  # record all request arguments except specified ones
     WHITELIST = auto()  # record only specified request arguments
     NONE = auto()  # record no request arguments
@@ -121,9 +121,10 @@ class RequestRecordMode(Enum):
 
 @dataclass
 class RunConfig:
-    record: RequestRecordMode = RequestRecordMode.BLACKLIST
-    blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
-    whitelist: Optional[list[str]] = None
+    # record request arguments
+    record_request: RecordRequestMode = RecordRequestMode.BLACKLIST
+    record_blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
+    record_whitelist: Optional[list[str]] = None
     # variable map
     var_map: Optional[dict[str, str]] = None
     # variable map file path
@@ -294,17 +295,17 @@ class HandyPrompt(ABC):
             merged_meta = merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
             return merged_request, merged_meta
     
-    def _filter_arguments(
+    def _filter_request(
         self, request: dict, 
         run_config: RunConfig,
         ) -> dict:
-        if run_config.record == RequestRecordMode.BLACKLIST:
+        if run_config.record_request == RecordRequestMode.BLACKLIST:
             # will modify the original request
-            for key in run_config.blacklist:
+            for key in run_config.record_blacklist:
                 request.pop(key, None)
-        elif run_config.record == RequestRecordMode.WHITELIST:
-            request = {key: value for key, value in request.items() if key in run_config.whitelist}
-        elif run_config.record == RequestRecordMode.NONE:
+        elif run_config.record_request == RecordRequestMode.WHITELIST:
+            request = {key: value for key, value in request.items() if key in run_config.record_whitelist}
+        elif run_config.record_request == RecordRequestMode.NONE:
             request = {}
         return request
     
@@ -383,7 +384,7 @@ class ChatPrompt(HandyPrompt):
             messages=self._eval_data(run_config),
             **new_request
             ).call()
-        new_request = self._filter_arguments(new_request, run_config)
+        new_request = self._filter_request(new_request, run_config)
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -430,7 +431,7 @@ class ChatPrompt(HandyPrompt):
             messages=self._eval_data(run_config),
             **new_request
             ).acall()
-        new_request = self._filter_arguments(new_request, run_config)
+        new_request = self._filter_request(new_request, run_config)
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -533,7 +534,7 @@ class CompletionsPrompt(HandyPrompt):
             prompt=self._eval_data(run_config),
             **new_request
             ).call()
-        new_request = self._filter_arguments(new_request, run_config)
+        new_request = self._filter_request(new_request, run_config)
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -571,7 +572,7 @@ class CompletionsPrompt(HandyPrompt):
             prompt=self._eval_data(run_config),
             **new_request
             ).acall()
-        new_request = self._filter_arguments(new_request, run_config)
+        new_request = self._filter_request(new_request, run_config)
         if stream:
             if run_config.output_path:
                 # stream response to a file
