@@ -1,3 +1,7 @@
+<div align="middle">
+  <img src="assets/banner.svg" />
+</div><br>
+
 # HandyLLM
 
 [![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)](https://github.com/atomiechen/HandyLLM) [![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white)](https://pypi.org/project/HandyLLM/) [![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)](https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm)
