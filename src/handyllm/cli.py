@@ -37,9 +37,10 @@ def hprompt_command(args):
         run_config.output_fd = sys.stdout
     result_prompt = prompt.run(run_config=run_config)
 
-def main():
+def cli():
     """Main entry point for the handyllm CLI."""
     parser = argparse.ArgumentParser(
+        prog="handyllm",
         description="HandyLLM CLI",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -51,5 +52,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    cli()
 
