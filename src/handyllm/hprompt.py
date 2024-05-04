@@ -122,8 +122,8 @@ class RecordRequestMode(Enum):
 @dataclass
 class RunConfig:
     # record request arguments
-    record_request: RecordRequestMode = RecordRequestMode.BLACKLIST
-    record_blacklist: Optional[list[str]] = DEFAULT_BLACKLIST
+    record_request: Optional[RecordRequestMode] = None  # default: RecordRequestMode.BLACKLIST
+    record_blacklist: Optional[list[str]] = None  # default: DEFAULT_BLACKLIST
     record_whitelist: Optional[list[str]] = None
     # variable map
     var_map: Optional[dict[str, str]] = None
@@ -336,14 +336,18 @@ class HandyPrompt(ABC):
         self, request: dict, 
         run_config: RunConfig,
         ) -> dict:
-        if run_config.record_request == RecordRequestMode.BLACKLIST:
-            # will modify the original request
-            for key in run_config.record_blacklist:
-                request.pop(key, None)
-        elif run_config.record_request == RecordRequestMode.WHITELIST:
+        if run_config.record_request == RecordRequestMode.WHITELIST:
             request = {key: value for key, value in request.items() if key in run_config.record_whitelist}
         elif run_config.record_request == RecordRequestMode.NONE:
             request = {}
+        elif run_config.record_request == RecordRequestMode.ALL:
+            pass
+        else:
+            # default: blacklist
+            # will modify the original request
+            real_blacklist = run_config.record_blacklist or DEFAULT_BLACKLIST
+            for key in real_blacklist:
+                request.pop(key, None)
         return request
     
     def _parse_var_map(self, run_config: RunConfig):
