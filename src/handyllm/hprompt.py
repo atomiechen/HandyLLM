@@ -21,7 +21,7 @@ import os
 from typing import Optional, Union, TypeVar
 from enum import Enum, auto
 from abc import abstractmethod, ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict, fields
 
 import frontmatter
 from mergedeep import merge, Strategy
@@ -135,6 +135,41 @@ class RunConfig:
     # output the evaluated prompt to a file or a file descriptor
     output_evaled_prompt_path: bool = False
     output_evaled_prompt_fd: Optional[io.IOBase] = None
+    
+    @classmethod
+    def from_dict(cls, obj: dict):
+        input_kwargs = {}
+        field_tuple = fields(cls)
+        for field in field_tuple:
+            if field.name in obj:
+                input_kwargs[field.name] = obj[field.name]
+        return cls(**input_kwargs)
+    
+    def to_dict(self):
+        # record and remove file descriptors
+        tmp_output_fd = self.output_fd
+        tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
+        self.output_fd = None
+        self.output_evaled_prompt_fd = None
+        # convert to dict
+        obj = asdict(self)
+        # restore file descriptors
+        self.output_fd = tmp_output_fd
+        self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
+        obj["output_fd"] = self.output_fd
+        obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
+        # convert Enum to string
+        obj["record_request"] = obj["record_request"].name
+        return obj
+    
+    def update(self, other: Union[RunConfig, dict]):
+        if isinstance(other, dict):
+            other = self.__class__.from_dict(other)
+        for field in fields(self):
+            v = getattr(other, field.name)
+            if v is not None:
+                setattr(self, field.name, v)
+        return self
 
 
 DEFAULT_CONFIG = RunConfig()
@@ -259,9 +294,11 @@ class HandyPrompt(ABC):
         new_request = copy.deepcopy(self.request)
         new_request.update(kwargs)
         stream = new_request.get("stream", False)
+        
         new_meta = copy.deepcopy(self.meta)
-        # TODO: meta contains origianl run_config; update runtime 
-        # run_config according to origianl meta
+        # meta contains origianl run_config; update runtime run_config 
+        # according to original meta
+        run_config = RunConfig.from_dict(new_meta).update(run_config)
         
         if run_config.output_evaled_prompt_path \
             or run_config.output_evaled_prompt_fd:
