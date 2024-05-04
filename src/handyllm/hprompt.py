@@ -349,6 +349,8 @@ class HandyPrompt(ABC):
                 p = Path(run_config.credential_path)
                 if p.suffix:
                     run_config.credential_type = p.suffix[1:]
+                    if run_config.credential_type == "yml":
+                        run_config.credential_type = "yaml"
                 else:
                     run_config.credential_type = 'env'
             run_config.credential_type = run_config.credential_type.lower()
