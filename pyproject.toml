@@ -21,15 +21,14 @@ dependencies = [
   "requests",
   "httpx",
   "python-frontmatter",
-  "mergedeep"
+  "mergedeep",
+  "python-dotenv",
+  "PyYAML",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/atomiechen/HandyLLM"
 "Bug Tracker" = "https://github.com/atomiechen/HandyLLM/issues"
-
-[project.optional-dependencies]
-test = ["python-dotenv"]
 
 [project.scripts]
 handyllm = "handyllm.__main__:cli"
