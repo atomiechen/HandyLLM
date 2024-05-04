@@ -482,6 +482,7 @@ class CompletionsPrompt(HandyPrompt):
             new_prompt = self.prompt
             for key, value in var_map.items():
                 new_prompt = new_prompt.replace(key, value)
+            return new_prompt
         else:
             return self.prompt
     
