@@ -203,6 +203,9 @@ class HandyPrompt(ABC):
         self: PromptType, 
         client: OpenAIClient, 
         run_config: RunConfig,
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
         ) -> PromptType:
         ...
     
@@ -225,7 +228,10 @@ class HandyPrompt(ABC):
         self: PromptType, 
         client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> PromptType:
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
+        ) -> PromptType:
         ...
     
     async def arun(
