@@ -133,7 +133,7 @@ class RunConfig:
     output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
     # output the evaluated prompt to a file or a file descriptor
-    output_evaled_prompt_path: bool = False
+    output_evaled_prompt_path: Optional[PathType] = None
     output_evaled_prompt_fd: Optional[io.IOBase] = None
     
     @classmethod
