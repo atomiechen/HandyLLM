@@ -338,9 +338,10 @@ class HandyPrompt(ABC):
                 # guess the credential type from the file extension
                 p = Path(run_config.credential_path)
                 if p.suffix:
-                    run_config.credential_type = p.suffix[1:].lower()
+                    run_config.credential_type = p.suffix[1:]
                 else:
                     run_config.credential_type = 'env'
+            run_config.credential_type = run_config.credential_type.lower()
             if run_config.credential_type == "env":
                 load_dotenv(run_config.credential_path, override=True)
             elif run_config.credential_type in ("json", "yaml"):
