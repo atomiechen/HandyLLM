@@ -328,20 +328,26 @@ class HandyPrompt(ABC):
         run_config = RunConfig.from_dict(new_meta).update(run_config)
         
         start_time = datetime.now()
-        if run_config.output_path \
-            and Path(run_config.output_path).is_dir():
-            # if output_path is a directory, append the default filename
-            run_config.output_path = Path(
-                run_config.output_path, 
-                start_time.strftime(self.OUTPUT_FILENAME_TEMPLATE)
-            )
-        if run_config.output_evaled_prompt_path \
-            and Path(run_config.output_evaled_prompt_path).is_dir():
-            # if output_evaled_prompt_path is a directory, append the default filename
-            run_config.output_evaled_prompt_path = Path(
-                run_config.output_evaled_prompt_path, 
-                start_time.strftime(self.OUTPUT_EVAL_FILENAME_TEMPLATE)
-            )
+        if run_config.output_path:
+            if Path(run_config.output_path).is_dir():
+                # if output_path is a directory, append the default filename
+                run_config.output_path = Path(
+                    run_config.output_path, 
+                    start_time.strftime(self.OUTPUT_FILENAME_TEMPLATE)
+                )
+            else:
+                # format output_path with the current time
+                run_config.output_path = start_time.strftime(run_config.output_path)
+        if run_config.output_evaled_prompt_path:
+            if Path(run_config.output_evaled_prompt_path).is_dir():
+                # if output_evaled_prompt_path is a directory, append the default filename
+                run_config.output_evaled_prompt_path = Path(
+                    run_config.output_evaled_prompt_path, 
+                    start_time.strftime(self.OUTPUT_EVAL_FILENAME_TEMPLATE)
+                )
+            else:
+                # format output_evaled_prompt_path with the current time
+                run_config.output_evaled_prompt_path = start_time.strftime(run_config.output_evaled_prompt_path)
         
         if run_config.credential_path:
             if not run_config.credential_type:
