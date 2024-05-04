@@ -203,7 +203,7 @@ class HandyPrompt(ABC):
         self: PromptType, 
         client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> PromptType:
+        ) -> PromptType:
         ...
     
     def run(
@@ -211,11 +211,14 @@ class HandyPrompt(ABC):
         client: OpenAIClient = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
+        run_config, new_request, new_meta, stream = self._prepare_run(run_config, kwargs)
         if client:
-            return self._run_with_client(client, run_config, **kwargs)
+            new_prompt = self._run_with_client(client, run_config, new_request, new_meta, stream)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                return self._run_with_client(client, run_config, **kwargs)
+                new_prompt = self._run_with_client(client, run_config, new_request, new_meta, stream)
+        self._post_check_output(stream, run_config, new_prompt)
+        return new_prompt
     
     @abstractmethod
     async def _arun_with_client(
@@ -230,11 +233,33 @@ class HandyPrompt(ABC):
         client: OpenAIClient = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
+        run_config, new_request, new_meta, stream = self._prepare_run(run_config, kwargs)
         if client:
-            return await self._arun_with_client(client, run_config, **kwargs)
+            new_prompt = await self._arun_with_client(client, run_config, new_request, new_meta, stream)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                return await self._arun_with_client(client, run_config, **kwargs)
+                new_prompt = await self._arun_with_client(client, run_config, new_request, new_meta, stream)
+        self._post_check_output(stream, run_config, new_prompt)
+        return new_prompt
+
+    def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
+        new_request = copy.deepcopy(self.request)
+        new_request.update(kwargs)
+        stream = new_request.get("stream", False)
+        new_meta = copy.deepcopy(self.meta)
+        # TODO: meta contains origianl run_config; update runtime 
+        # run_config according to origianl meta
+        return run_config, new_request, new_meta, stream
+    
+    def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
+        if not stream:
+            # if stream is True, the response is already streamed to 
+            # a file or a file descriptor
+            if run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
+            elif run_config.output_fd:
+                new_prompt.dump(run_config.output_fd)
+        return new_prompt
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
         if inplace:
@@ -326,38 +351,32 @@ class ChatPrompt(HandyPrompt):
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> ChatPrompt:
-        new_request = copy.deepcopy(self.request)
-        new_request.update(kwargs)
-        stream = new_request.get("stream", False)
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
+        ) -> ChatPrompt:
         response = client.chat(
             messages=self._eval_data(run_config),
             **new_request
             ).call()
         new_request = self._filter_arguments(new_request, run_config)
-        new_meta = copy.deepcopy(self.meta)
         if stream:
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     role, content = self._stream_chat_proc(new_request, new_meta, response, fout)
             elif run_config.output_fd:
+                # stream response to a file descriptor
                 role, content = self._stream_chat_proc(new_request, new_meta, response, run_config.output_fd)
             else:
                 role, content = self._stream_chat_proc(new_request, new_meta, response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
-        new_prompt = ChatPrompt(
+        return ChatPrompt(
             [{"role": role, "content": content}],
             new_request, new_meta
         )
-        if not stream:
-            if run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
-            elif run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-        return new_prompt
     
     async def _astream_chat_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
         if fd:
@@ -379,38 +398,32 @@ class ChatPrompt(HandyPrompt):
     async def _arun_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> ChatPrompt:
-        new_request = copy.deepcopy(self.request)
-        new_request.update(kwargs)
-        stream = new_request.get("stream", False)
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
+        ) -> ChatPrompt:
         response = await client.chat(
             messages=self._eval_data(run_config),
             **new_request
             ).acall()
         new_request = self._filter_arguments(new_request, run_config)
-        new_meta = copy.deepcopy(self.meta)
         if stream:
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     role, content = await self._astream_chat_proc(new_request, new_meta, response, fout)
             elif run_config.output_fd:
+                # stream response to a file descriptor
                 role, content = await self._astream_chat_proc(new_request, new_meta, response, run_config.output_fd)
             else:
                 role, content = await self._astream_chat_proc(new_request, new_meta, response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
-        new_prompt = ChatPrompt(
+        return ChatPrompt(
             [{"role": role, "content": content}],
             new_request, new_meta
         )
-        if not stream:
-            if run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
-            elif run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-        return new_prompt
 
     def __add__(self, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
@@ -487,34 +500,28 @@ class CompletionsPrompt(HandyPrompt):
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> CompletionsPrompt:
-        new_request = copy.deepcopy(self.request)
-        new_request.update(kwargs)
-        stream = new_request.get("stream", False)
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
+        ) -> CompletionsPrompt:
         response = client.completions(
             prompt=self._eval_data(run_config),
             **new_request
             ).call()
         new_request = self._filter_arguments(new_request, run_config)
-        new_meta = copy.deepcopy(self.meta)
         if stream:
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     content = self._stream_completions_proc(new_request, new_meta, response, fout)
             elif run_config.output_fd:
+                # stream response to a file descriptor
                 content = self._stream_completions_proc(new_request, new_meta, response, run_config.output_fd)
             else:
                 content = self._stream_completions_proc(new_request, new_meta, response)
         else:
             content = response['choices'][0]['text']
-        new_prompt = CompletionsPrompt(content, new_request, new_meta)
-        if not stream:
-            if run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
-            elif run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-        return new_prompt
+        return CompletionsPrompt(content, new_request, new_meta)
 
     async def _astream_completions_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> str:
         if fd:
@@ -531,34 +538,28 @@ class CompletionsPrompt(HandyPrompt):
     async def _arun_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
-        **kwargs) -> CompletionsPrompt:
-        new_request = copy.deepcopy(self.request)
-        new_request.update(kwargs)
-        stream = new_request.get("stream", False)
+        new_request: dict,
+        new_meta: dict,
+        stream: bool,
+        ) -> CompletionsPrompt:
         response = await client.completions(
             prompt=self._eval_data(run_config),
             **new_request
             ).acall()
         new_request = self._filter_arguments(new_request, run_config)
-        new_meta = copy.deepcopy(self.meta)
         if stream:
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     content = await self._astream_completions_proc(new_request, new_meta, response, fout)
             elif run_config.output_fd:
+                # stream response to a file descriptor
                 content = await self._astream_completions_proc(new_request, new_meta, response, run_config.output_fd)
             else:
                 content = await self._astream_completions_proc(new_request, new_meta, response)
         else:
             content = response['choices'][0]['text']
-        new_prompt = CompletionsPrompt(content, new_request, new_meta)
-        if not stream:
-            if run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
-            elif run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-        return new_prompt
+        return CompletionsPrompt(content, new_request, new_meta)
     
     def __add__(self, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
