@@ -1,20 +1,20 @@
 # HandyLLM
 
-[![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)](https://github.com/atomiechen/HandyLLM) [![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white)](https://pypi.org/project/HandyLLM/)
+[![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)](https://github.com/atomiechen/HandyLLM) [![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white)](https://pypi.org/project/HandyLLM/) [![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)](https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm)
 
-A handy toolkit for using LLM.
+A handy toolkit for using LLM, with both [***development support***](https://pypi.org/project/HandyLLM/) and [***VSCode editor support***](https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm).
 
 
 
 ## 🌟 Why HandyLLM?
+
+📃 **Handy Prompt**: Writing chat prompt in a human-friendly mark-up format `.hprompt`. You can run it with CLI interface ***WITHOUT*** any code!
 
 ☯️ Both sync and async APIs supported with unified design
 
 🍡 OpenAI and Azure APIs all in one
 
 ☕️ Easy life with API endpoint management
-
-📃 Writing chat prompt in a human-friendly mark-up format
 
 
 
@@ -32,9 +32,36 @@ pip3 install git+https://github.com/atomiechen/handyllm.git
 
 
 
-## Usage
+## CLI Usage
 
-More example scripts are placed in [tests](./tests) folder.
+`handyllm` CLI program (triggered by `handyllm` or `python -m handyllm`) comes with handy commands. 
+
+The `handyllm hprompt` command helps you quickly test hprompt files and get results, without writing any python code:
+
+```
+usage: handyllm hprompt [-h] [-o OUTPUT] [-v] [-vm VAR_MAP] [-vmp VAR_MAP_PATH] path
+
+Run hprompt files
+
+positional arguments:
+  path                  Path to hprompt file
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        Output path; if not provided, output to stderr (default: None)
+  -v, --verbose         Verbose output (default: False)
+  -vm VAR_MAP, --var-map VAR_MAP
+                        Variable map in the format key1=value1|key2=value2 (default: None)
+  -vmp VAR_MAP_PATH, --var-map-path VAR_MAP_PATH
+                        Variable map file path (default: None)
+```
+
+
+
+## Dev Usage
+
+Example scripts are placed in [tests](./tests) folder.
 
 ### Using OpenAIClient
 
