@@ -183,7 +183,8 @@ class RunConfig:
         obj["output_fd"] = self.output_fd
         obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
         # convert Enum to string
-        obj["record_request"] = obj["record_request"].name
+        if obj["record_request"] is not None:
+            obj["record_request"] = obj["record_request"].name
         return obj
     
     def update(self, other: Union[RunConfig, dict]):
