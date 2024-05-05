@@ -36,6 +36,43 @@ pip3 install git+https://github.com/atomiechen/handyllm.git
 
 
 
+## Hprompt
+
+**Handy prompt** files, or `.hprompt` files, are the key to success.
+
+Here is a minimal example:
+```hprompt
+---
+# frontmatter data
+model: gpt-3.5-turbo
+temperature: 0.5
+meta:
+  credential_path: .env
+  var_map_path: substitute.txt
+  output_path: out/%Y-%m-%d/result.%H-%M-%S.hprompt
+---
+
+$system$
+You are a helpful assistant.
+
+$user$
+Your current context: 
+%context%
+
+Please follow my instructions:
+%instructions%
+```
+
+Key features:
+
+- Frontmatter:
+  - Specify request arguments
+  - Specify output path and other runtime configurations
+- Body:
+  - Construct chat messages with `$system$`, `$user$` and `$assistant$`
+
+
+
 ## CLI Usage
 
 `handyllm` CLI program (triggered by `handyllm` or `python -m handyllm`) comes with handy commands. 
@@ -233,6 +270,10 @@ Please refer to [OpenAI official API reference](https://platform.openai.com/docs
 
 
 ## Chat Prompt
+
+>  [!IMPORTANT]
+>
+> This is the legacy documentations. Please refer to `hprompt` files.
 
 ### Prompt Conversion
 
