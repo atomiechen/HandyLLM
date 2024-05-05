@@ -19,6 +19,7 @@ import re
 import copy
 import io
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Union, TypeVar
@@ -157,6 +158,9 @@ class RunConfig:
     # if json or yaml, load the content of the file as request arguments
     credential_type: Optional[str] = None  # default: guess from the file extension
     
+    # verbose output to stderr
+    verbose: Optional[bool] = None  # default: False
+    
     @classmethod
     def from_dict(cls, obj: dict):
         input_kwargs = {}
@@ -168,6 +172,13 @@ class RunConfig:
         if record_str is not None:
             input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
         return cls(**input_kwargs)
+    
+    def pretty_print(self, file=sys.stderr):
+        print("RunConfig:", file=file)
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if value is not None:
+                print(f"  {field.name}: {value}", file=file)
     
     def to_dict(self):
         # record and remove file descriptors
@@ -375,6 +386,14 @@ class HandyPrompt(ABC):
         
         # evaluate the run_config
         run_config = self.eval_run_config(run_config)
+        
+        # verbose output
+        if run_config.verbose:
+            print("---", file=sys.stderr)
+            print("NEW RUN")
+            print(f"Start time: {datetime.now()}", file=sys.stderr)
+            run_config.pretty_print()
+            print("---", file=sys.stderr)
         
         # load the credential file
         if run_config.credential_path:
