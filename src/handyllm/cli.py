@@ -8,7 +8,7 @@ def register_hprompt_command(subparsers: argparse._SubParsersAction):
         description="Run hprompt files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_hprompt.add_argument("path", help="Path to hprompt file")
+    parser_hprompt.add_argument("path", nargs='+', help="Path(s) to hprompt file")
     parser_hprompt.add_argument("-o", "--output", help="Output path; if not provided, output to stderr")
     parser_hprompt.add_argument("-v", "--verbose", action="store_true", default=False, help="Verbose output")
     parser_hprompt.add_argument("-vm", "--var-map", help="Variable map in the format key1=value1|key2=value2")
@@ -18,7 +18,6 @@ def hprompt_command(args):
     import sys
     from handyllm import hprompt
     
-    prompt = hprompt.load_from(args.path)
     run_config = hprompt.RunConfig()
     if args.var_map:
         var_map = {}
@@ -36,7 +35,12 @@ def hprompt_command(args):
         print(f"Verbose: {args.verbose}")
         print(f"- Input: {args.path}")
         print(f"- Output: {args.output or 'stderr'}")
+    prompt = hprompt.load_from(args.path[0])
     result_prompt = prompt.run(run_config=run_config)
+    for next_path in args.path[1:]:
+        prompt += result_prompt
+        prompt += hprompt.load_from(next_path)
+        result_prompt = prompt.run(run_config=run_config)
 
 def cli():
     """Main entry point for the handyllm CLI."""
