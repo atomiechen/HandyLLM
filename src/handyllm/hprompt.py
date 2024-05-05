@@ -267,6 +267,38 @@ class HandyPrompt(ABC):
             )
         return self
     
+    def eval_run_config(
+        self: PromptType, 
+        run_config: RunConfig, 
+        ) -> RunConfig:
+        # meta contains origianl run_config; update runtime run_config 
+        # according to original meta
+        run_config = RunConfig.from_dict(self.meta).update(run_config)
+        
+        start_time = datetime.now()
+        if run_config.output_path:
+            run_config.output_path = self._prepare_output_path(
+                run_config.output_path, start_time, self.TEMPLATE_OUTPUT_FILENAME
+            )
+        if run_config.output_evaled_prompt_path:
+            run_config.output_evaled_prompt_path = self._prepare_output_path(
+                run_config.output_evaled_prompt_path, start_time, 
+                self.TEMPLATE_OUTPUT_EVAL_FILENAME
+            )
+        
+        if run_config.credential_path:
+            if not run_config.credential_type:
+                # guess the credential type from the file extension
+                p = Path(run_config.credential_path)
+                if p.suffix:
+                    run_config.credential_type = p.suffix[1:]
+                    if run_config.credential_type == "yml":
+                        run_config.credential_type = "yaml"
+                else:
+                    run_config.credential_type = 'env'
+            run_config.credential_type = run_config.credential_type.lower()
+        return run_config
+    
     @abstractmethod
     def _run_with_client(
         self: PromptType, 
@@ -332,37 +364,19 @@ class HandyPrompt(ABC):
         return output_path
     
     def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
+        # update the request with the keyword arguments
         new_request = copy.deepcopy(self.request)
         new_request.update(kwargs)
+        # get the stream flag
         stream = new_request.get("stream", False)
-        
+        # copy the meta
         new_meta = copy.deepcopy(self.meta)
-        # meta contains origianl run_config; update runtime run_config 
-        # according to original meta
-        run_config = RunConfig.from_dict(new_meta).update(run_config)
         
-        start_time = datetime.now()
-        if run_config.output_path:
-            run_config.output_path = self._prepare_output_path(
-                run_config.output_path, start_time, self.TEMPLATE_OUTPUT_FILENAME
-            )
-        if run_config.output_evaled_prompt_path:
-            run_config.output_evaled_prompt_path = self._prepare_output_path(
-                run_config.output_evaled_prompt_path, start_time, 
-                self.TEMPLATE_OUTPUT_EVAL_FILENAME
-            )
+        # evaluate the run_config
+        run_config = self.eval_run_config(run_config)
         
+        # load the credential file
         if run_config.credential_path:
-            if not run_config.credential_type:
-                # guess the credential type from the file extension
-                p = Path(run_config.credential_path)
-                if p.suffix:
-                    run_config.credential_type = p.suffix[1:]
-                    if run_config.credential_type == "yml":
-                        run_config.credential_type = "yaml"
-                else:
-                    run_config.credential_type = 'env'
-            run_config.credential_type = run_config.credential_type.lower()
             if run_config.credential_type == "env":
                 load_dotenv(run_config.credential_path, override=True)
             elif run_config.credential_type in ("json", "yaml"):
@@ -375,9 +389,9 @@ class HandyPrompt(ABC):
             else:
                 raise ValueError(f"unsupported credential type: {run_config.credential_type}")
         
+        # output the evaluated prompt to a file or a file descriptor
         if run_config.output_evaled_prompt_path \
             or run_config.output_evaled_prompt_fd:
-            # output the evaluated prompt to a file or a file descriptor
             evaled_data = self._eval_data(run_config)
             serialized_data = self._serialize_data(evaled_data)
             text = self._dumps(self.request, self.meta, serialized_data)
