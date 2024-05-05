@@ -32,9 +32,8 @@ def hprompt_command(args):
     else:
         run_config.output_fd = sys.stderr
     if args.verbose:
-        print(f"Verbose: {args.verbose}")
-        print(f"- Input: {args.path}")
-        print(f"- Output: {args.output or 'stderr'}")
+        run_config.verbose = True
+        print(f"Input paths: {args.path}", file=sys.stderr)
     prompt = hprompt.load_from(args.path[0])
     result_prompt = prompt.run(run_config=run_config)
     for next_path in args.path[1:]:
