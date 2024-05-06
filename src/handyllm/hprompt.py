@@ -25,7 +25,7 @@ from datetime import datetime
 from typing import Optional, Union, TypeVar
 from enum import Enum, auto
 from abc import abstractmethod, ABC
-from dataclasses import dataclass, asdict, fields
+from dataclasses import dataclass, asdict, fields, replace
 
 import yaml
 import frontmatter
@@ -56,7 +56,8 @@ DEFAULT_BLACKLIST = (
 
 def loads(
     text: str, 
-    encoding: str = "utf-8"
+    encoding: str = "utf-8",
+    base_path: Optional[PathType] = None
 ) -> HandyPrompt:
     if handler.detect(text):
         metadata, content = frontmatter.parse(text, encoding, handler)
@@ -79,35 +80,38 @@ def loads(
         else:
             api = "completions"
     if api == "completions":
-        return CompletionsPrompt(content, request, meta)
+        return CompletionsPrompt(content, request, meta, base_path)
     else:
         chat = converter.raw2chat(content)
-        return ChatPrompt(chat, request, meta)
+        return ChatPrompt(chat, request, meta, base_path)
 
 def load(
     fd: io.IOBase, 
-    encoding: str = "utf-8"
+    encoding: str = "utf-8",
+    base_path: Optional[PathType] = None
 ) -> HandyPrompt:
     text = fd.read()
-    return loads(text, encoding)
+    return loads(text, encoding, base_path=base_path)
 
 def load_from(
     path: PathType,
     encoding: str = "utf-8"
 ) -> HandyPrompt:
     with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding)
+        return load(fd, encoding, base_path=path)
 
 def dumps(
     prompt: HandyPrompt, 
+    base_path: Optional[PathType] = None
 ) -> str:
-    return prompt.dumps()
+    return prompt.dumps(base_path)
 
 def dump(
     prompt: HandyPrompt, 
     fd: io.IOBase, 
+    base_path: Optional[PathType] = None
 ) -> None:
-    return prompt.dump(fd)
+    return prompt.dump(fd, base_path)
 
 def dump_to(
     prompt: HandyPrompt, 
@@ -161,8 +165,11 @@ class RunConfig:
     # verbose output to stderr
     verbose: Optional[bool] = None  # default: False
     
+    def __len__(self):
+        return len([f for f in fields(self) if getattr(self, f.name) is not None])
+    
     @classmethod
-    def from_dict(cls, obj: dict):
+    def from_dict(cls, obj: dict, base_path: Optional[PathType] = None):
         input_kwargs = {}
         for field in fields(cls):
             if field.name in obj:
@@ -171,6 +178,16 @@ class RunConfig:
         record_str = input_kwargs.get("record_request")
         if record_str is not None:
             input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
+        # add base_path to path fields and convert to absolute path
+        if base_path:
+            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
+                if path_field in input_kwargs:
+                    org_path = input_kwargs[path_field]
+                    new_path = str(Path(base_path, org_path).absolute())
+                    # retain trailing slash
+                    if org_path.endswith(('/')):
+                        new_path += '/'
+                    input_kwargs[path_field] = new_path
         return cls(**input_kwargs)
     
     def pretty_print(self, file=sys.stderr):
@@ -180,7 +197,7 @@ class RunConfig:
             if value is not None:
                 print(f"  {field.name}: {value}", file=file)
     
-    def to_dict(self):
+    def to_dict(self, retain_fd=False, base_path: Optional[PathType] = None) -> dict:
         # record and remove file descriptors
         tmp_output_fd = self.output_fd
         tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
@@ -191,21 +208,38 @@ class RunConfig:
         # restore file descriptors
         self.output_fd = tmp_output_fd
         self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
-        obj["output_fd"] = self.output_fd
-        obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
+        if retain_fd:
+            # keep file descriptors
+            obj["output_fd"] = self.output_fd
+            obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
         # convert Enum to string
         if obj["record_request"] is not None:
             obj["record_request"] = obj["record_request"].name
+        # convert path to relative path
+        if base_path:
+            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
+                if path_field in obj:
+                    org_path = obj[path_field]
+                    try:
+                        new_path = str(Path(org_path).relative_to(base_path))
+                        obj[path_field] = new_path
+                    except ValueError:
+                        # org_path is not under base_path, keep the original path
+                        pass
         return obj
-    
-    def update(self, other: Union[RunConfig, dict]):
-        if isinstance(other, dict):
-            other = self.__class__.from_dict(other)
-        for field in fields(self):
+
+    def merge(self, other: RunConfig, inplace=False) -> RunConfig:
+        # merge the RunConfig object with another RunConfig object
+        # return a new RunConfig object if inplace is False
+        if not inplace:
+            new_run_config = replace(self)
+        else:
+            new_run_config = self
+        for field in fields(new_run_config):
             v = getattr(other, field.name)
             if v is not None:
-                setattr(self, field.name, v)
-        return self
+                setattr(new_run_config, field.name, v)
+        return new_run_config
 
 
 DEFAULT_CONFIG = RunConfig()
@@ -216,10 +250,18 @@ class HandyPrompt(ABC):
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
     
-    def __init__(self, data: Union[str, list], request: dict = None, meta: dict = None):
+    def __init__(
+        self, data: Union[str, list], request: Optional[dict] = None, 
+        meta: Optional[Union[dict, RunConfig]] = None, 
+        base_path: Optional[PathType] = None):
         self.data = data
         self.request = request or {}
-        self.meta = meta or {}
+        # parse meta to run_config
+        if isinstance(meta, RunConfig):
+            self.run_config = meta
+        else:
+            self.run_config = RunConfig.from_dict(meta or {}, base_path=base_path)
+        self.base_path = base_path
     
     def __str__(self) -> str:
         return str(self.data)
@@ -229,7 +271,7 @@ class HandyPrompt(ABC):
             self.__class__.__name__,
             repr(self.data),
             repr(self.request),
-            repr(self.meta)
+            repr(self.run_config)
         )
     
     @property
@@ -244,26 +286,32 @@ class HandyPrompt(ABC):
         return str(data)
     
     @staticmethod
-    def _dumps(request, meta, content: str) -> str:
-        if not meta and not request:
-            return content
+    def _dumps_frontmatter(request: dict, run_config: RunConfig, base_path: Optional[PathType] = None) -> str:
+        # dump frontmatter
+        if not run_config and not request:
+            return ""
         front_data = copy.deepcopy(request)
-        if meta:
-            front_data['meta'] = copy.deepcopy(meta)
-        post = frontmatter.Post(content, None, **front_data)
-        return frontmatter.dumps(post, handler)
+        if run_config:
+            front_data['meta'] = run_config.to_dict(retain_fd=False, base_path=base_path)
+        post = frontmatter.Post("", None, **front_data)
+        return frontmatter.dumps(post, handler).strip() + "\n\n"
     
-    def dumps(self) -> str:
+    @classmethod
+    def _dumps(cls, request, run_config: RunConfig, content: str, base_path: Optional[PathType] = None) -> str:
+        return cls._dumps_frontmatter(request, run_config, base_path) + content
+    
+    def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
-        return self._dumps(self.request, self.meta, serialized_data)
+        base_path = base_path or self.base_path
+        return self._dumps(self.request, self.run_config, serialized_data, base_path)
     
-    def dump(self, fd: io.IOBase) -> None:
-        text = self.dumps()
+    def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
+        text = self.dumps(base_path=base_path)
         fd.write(text)
     
     def dump_to(self, path: PathType) -> None:
         with open(path, "w", encoding="utf-8") as fd:
-            self.dump(fd)
+            self.dump(fd, base_path=path)
     
     @abstractmethod
     def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
@@ -275,7 +323,7 @@ class HandyPrompt(ABC):
             return self.__class__(
                 new_data,
                 copy.deepcopy(self.request),
-                copy.deepcopy(self.meta)
+                copy.deepcopy(self.run_config),
             )
         return self
     
@@ -283,9 +331,8 @@ class HandyPrompt(ABC):
         self: PromptType, 
         run_config: RunConfig, 
         ) -> RunConfig:
-        # meta contains origianl run_config; update runtime run_config 
-        # according to original meta
-        run_config = RunConfig.from_dict(self.meta).update(run_config)
+        # merge runtime run_config with the original run_config
+        run_config = self.run_config.merge(run_config)
         
         start_time = datetime.now()
         if run_config.output_path:
@@ -317,7 +364,6 @@ class HandyPrompt(ABC):
         client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> PromptType:
         ...
@@ -327,12 +373,12 @@ class HandyPrompt(ABC):
         client: OpenAIClient = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
-        run_config, new_request, new_meta, stream = self._prepare_run(run_config, kwargs)
+        run_config, new_request, stream = self._prepare_run(run_config, kwargs)
         if client:
-            new_prompt = self._run_with_client(client, run_config, new_request, new_meta, stream)
+            new_prompt = self._run_with_client(client, run_config, new_request, stream)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                new_prompt = self._run_with_client(client, run_config, new_request, new_meta, stream)
+                new_prompt = self._run_with_client(client, run_config, new_request, stream)
         self._post_check_output(stream, run_config, new_prompt)
         return new_prompt
     
@@ -342,7 +388,6 @@ class HandyPrompt(ABC):
         client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> PromptType:
         ...
@@ -352,12 +397,12 @@ class HandyPrompt(ABC):
         client: OpenAIClient = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
         **kwargs) -> PromptType:
-        run_config, new_request, new_meta, stream = self._prepare_run(run_config, kwargs)
+        run_config, new_request, stream = self._prepare_run(run_config, kwargs)
         if client:
-            new_prompt = await self._arun_with_client(client, run_config, new_request, new_meta, stream)
+            new_prompt = await self._arun_with_client(client, run_config, new_request, stream)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                new_prompt = await self._arun_with_client(client, run_config, new_request, new_meta, stream)
+                new_prompt = await self._arun_with_client(client, run_config, new_request, stream)
         self._post_check_output(stream, run_config, new_prompt)
         return new_prompt
     
@@ -366,7 +411,7 @@ class HandyPrompt(ABC):
         ) -> str:
         output_path = str(output_path).strip()
         p = Path(output_path)
-        if p.is_dir() or output_path.endswith(('/', '\\')):
+        if p.is_dir() or output_path.endswith(('/')):
             # output_path wants to be a directory, append the default filename
             output_path = Path(output_path, template_filename)
         # format output_path with the current time
@@ -381,8 +426,6 @@ class HandyPrompt(ABC):
         new_request.update(kwargs)
         # get the stream flag
         stream = new_request.get("stream", False)
-        # copy the meta
-        new_meta = copy.deepcopy(self.meta)
         
         # evaluate the run_config
         run_config = self.eval_run_config(run_config)
@@ -414,13 +457,13 @@ class HandyPrompt(ABC):
             or run_config.output_evaled_prompt_fd:
             evaled_data = self._eval_data(run_config)
             serialized_data = self._serialize_data(evaled_data)
-            text = self._dumps(self.request, self.meta, serialized_data)
+            text = self._dumps(self.request, self.run_config, serialized_data, run_config.output_evaled_prompt_path)
             if run_config.output_evaled_prompt_path:
                 with open(run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
                     fout.write(text)
             elif run_config.output_evaled_prompt_fd:
                 run_config.output_evaled_prompt_fd.write(text)
-        return run_config, new_request, new_meta, stream
+        return run_config, new_request, stream
     
     def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
         if not stream:
@@ -432,14 +475,14 @@ class HandyPrompt(ABC):
                 new_prompt.dump(run_config.output_fd)
         return new_prompt
 
-    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, dict]]:
+    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, RunConfig]]:
         if inplace:
             merge(self.request, other.request, strategy=Strategy.ADDITIVE)
-            merge(self.meta, other.meta, strategy=Strategy.ADDITIVE)
+            self.run_config.merge(other.run_config, inplace=True)
         else:
             merged_request = merge({}, self.request, other.request, strategy=Strategy.ADDITIVE)
-            merged_meta = merge({}, self.meta, other.meta, strategy=Strategy.ADDITIVE)
-            return merged_request, merged_meta
+            merged_run_config = self.run_config.merge(other.run_config)
+            return merged_request, merged_run_config
     
     def _filter_request(
         self, request: dict, 
@@ -481,8 +524,8 @@ class HandyPrompt(ABC):
 
 class ChatPrompt(HandyPrompt):
         
-    def __init__(self, chat: list, request: dict, meta: dict):
-        super().__init__(chat, request, meta)
+    def __init__(self, chat: list, request: dict, meta: Union[dict, RunConfig], base_path: Optional[PathType] = None):
+        super().__init__(chat, request, meta, base_path)
     
     @property
     def chat(self) -> list:
@@ -509,10 +552,7 @@ class ChatPrompt(HandyPrompt):
         else:
             return self.chat
     
-    def _stream_chat_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
-        if fd:
-            # dump frontmatter
-            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+    def _stream_chat_proc(self, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
         # stream response to fd
         role = ""
         content = ""
@@ -530,7 +570,6 @@ class ChatPrompt(HandyPrompt):
         self, client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> ChatPrompt:
         response = client.chat(
@@ -542,24 +581,25 @@ class ChatPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    role, content = self._stream_chat_proc(new_request, new_meta, response, fout)
+                    # dump frontmatter
+                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    role, content = self._stream_chat_proc(response, fout)
             elif run_config.output_fd:
+                # dump frontmatter, no base_path
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
                 # stream response to a file descriptor
-                role, content = self._stream_chat_proc(new_request, new_meta, response, run_config.output_fd)
+                role, content = self._stream_chat_proc(response, run_config.output_fd)
             else:
-                role, content = self._stream_chat_proc(new_request, new_meta, response)
+                role, content = self._stream_chat_proc(response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            new_request, new_meta
+            new_request, replace(self.run_config), self.base_path
         )
     
-    async def _astream_chat_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
-        if fd:
-            # dump frontmatter
-            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+    async def _astream_chat_proc(self, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
         # stream response to fd
         role = ""
         content = ""
@@ -577,7 +617,6 @@ class ChatPrompt(HandyPrompt):
         self, client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> ChatPrompt:
         response = await client.chat(
@@ -589,18 +628,20 @@ class ChatPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    role, content = await self._astream_chat_proc(new_request, new_meta, response, fout)
+                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    role, content = await self._astream_chat_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
-                role, content = await self._astream_chat_proc(new_request, new_meta, response, run_config.output_fd)
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                role, content = await self._astream_chat_proc(response, run_config.output_fd)
             else:
-                role, content = await self._astream_chat_proc(new_request, new_meta, response)
+                role, content = await self._astream_chat_proc(response)
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            new_request, new_meta
+            new_request, replace(self.run_config), self.base_path
         )
 
     def __add__(self, other: Union[str, list, ChatPrompt]):
@@ -609,19 +650,22 @@ class ChatPrompt(HandyPrompt):
             return ChatPrompt(
                 self.chat + [{"role": "user", "content": other}],
                 copy.deepcopy(self.request),
-                copy.deepcopy(self.meta)
+                replace(self.run_config),
+                self.base_path
             )
         elif isinstance(other, list):
             return ChatPrompt(
                 self.chat + [{"role": msg['role'], "content": msg['content']} for msg in other],
                 copy.deepcopy(self.request),
-                copy.deepcopy(self.meta)
+                replace(self.run_config),
+                self.base_path
             )
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
-            merged_request, merged_meta = self._merge_non_data(other)
+            merged_request, merged_run_config = self._merge_non_data(other)
             return ChatPrompt(
-                self.chat + other.chat, merged_request, merged_meta
+                self.chat + other.chat, merged_request, merged_run_config, 
+                self.base_path
             )
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
@@ -643,8 +687,8 @@ class ChatPrompt(HandyPrompt):
 
 class CompletionsPrompt(HandyPrompt):
     
-    def __init__(self, prompt: str, request: dict, meta: dict):
-        super().__init__(prompt, request, meta)
+    def __init__(self, prompt: str, request: dict, meta: Union[dict, RunConfig], base_path: PathType = None):
+        super().__init__(prompt, request, meta, base_path)
     
     @property
     def prompt(self) -> str:
@@ -664,10 +708,7 @@ class CompletionsPrompt(HandyPrompt):
         else:
             return self.prompt
     
-    def _stream_completions_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> str:
-        if fd:
-            # dump frontmatter
-            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+    def _stream_completions_proc(self, response, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         for text in stream_completions(response):
@@ -680,7 +721,6 @@ class CompletionsPrompt(HandyPrompt):
         self, client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> CompletionsPrompt:
         response = client.completions(
@@ -692,20 +732,19 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    content = self._stream_completions_proc(new_request, new_meta, response, fout)
+                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    content = self._stream_completions_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
-                content = self._stream_completions_proc(new_request, new_meta, response, run_config.output_fd)
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = self._stream_completions_proc(response, run_config.output_fd)
             else:
-                content = self._stream_completions_proc(new_request, new_meta, response)
+                content = self._stream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, new_meta)
+        return CompletionsPrompt(content, new_request, replace(self.run_config), self.base_path)
 
-    async def _astream_completions_proc(self, request, meta, response, fd: Optional[io.IOBase] = None) -> str:
-        if fd:
-            # dump frontmatter
-            fd.write(self._dumps(request, meta, "").strip() + "\n\n")
+    async def _astream_completions_proc(self, response, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         async for text in astream_completions(response):
@@ -718,7 +757,6 @@ class CompletionsPrompt(HandyPrompt):
         self, client: OpenAIClient, 
         run_config: RunConfig,
         new_request: dict,
-        new_meta: dict,
         stream: bool,
         ) -> CompletionsPrompt:
         response = await client.completions(
@@ -730,15 +768,17 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    content = await self._astream_completions_proc(new_request, new_meta, response, fout)
+                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    content = await self._astream_completions_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
-                content = await self._astream_completions_proc(new_request, new_meta, response, run_config.output_fd)
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = await self._astream_completions_proc(response, run_config.output_fd)
             else:
-                content = await self._astream_completions_proc(new_request, new_meta, response)
+                content = await self._astream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, new_meta)
+        return CompletionsPrompt(content, new_request, replace(self.run_config), self.base_path)
     
     def __add__(self, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
@@ -746,13 +786,15 @@ class CompletionsPrompt(HandyPrompt):
             return CompletionsPrompt(
                 self.prompt + other,
                 copy.deepcopy(self.request),
-                copy.deepcopy(self.meta)
+                replace(self.run_config),
+                self.base_path
             )
         elif isinstance(other, CompletionsPrompt):
             # merge two CompletionsPrompt objects
-            merged_request, merged_meta = self._merge_non_data(other)
+            merged_request, merged_run_config = self._merge_non_data(other)
             return CompletionsPrompt(
-                self.prompt + other.prompt, merged_request, merged_meta
+                self.prompt + other.prompt, merged_request, merged_run_config,
+                self.base_path
             )
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
