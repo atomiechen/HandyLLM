@@ -441,7 +441,6 @@ class HandyPrompt(ABC):
         
         # load the credential file
         if run_config.credential_path:
-            print(f"# Loading credential file: {run_config.credential_path}", file=sys.stderr)
             if run_config.credential_type == "env":
                 load_dotenv(run_config.credential_path, override=True)
             elif run_config.credential_type in ("json", "yaml"):
