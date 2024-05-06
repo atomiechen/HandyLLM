@@ -362,9 +362,9 @@ class HandyPrompt(ABC):
         return new_prompt
     
     def _prepare_output_path(
-        self, output_path: str, start_time: datetime, template_filename: str
+        self, output_path: PathType, start_time: datetime, template_filename: str
         ) -> str:
-        output_path = output_path.strip()
+        output_path = str(output_path).strip()
         p = Path(output_path)
         if p.is_dir() or output_path.endswith(('/', '\\')):
             # output_path wants to be a directory, append the default filename
