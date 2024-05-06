@@ -12,6 +12,12 @@ class PromptConverter:
         # build a regex pattern to split the prompt by role keys
         return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
 
+    def detect(self, raw_prompt: str):
+        # detect the role keys in the prompt
+        if re.search(self.split_pattern, raw_prompt, flags=re.MULTILINE):
+            return True
+        return False
+
     def read_substitute_content(self, path: str):
         # 从文本文件读取所有prompt中需要替换的内容
         with open(path, 'r', encoding='utf-8') as fin:

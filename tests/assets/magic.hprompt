@@ -1,0 +1,32 @@
+---
+# you can run this script by `handyllm hprompt magic.hprompt`
+meta:
+  # paths are relative to the parent dir of this file
+  credential_path: ../credential.yml
+  var_map_path: substitute.txt
+  output_path: tmp_out/%Y-%m-%d/result.%H-%M-%S.hprompt
+  output_evaled_prompt_path: tmp_out/%Y-%m-%d/evaled.%H-%M-%S.hprompt
+model: gpt-3.5-turbo
+temperature: 0.2
+stream: true
+---
+
+$system$
+You are a helpful assistant.
+
+$user$
+Please help me merge the following two JSON documents into one.
+
+$assistant$
+Sure, please give me the two JSON documents.
+
+$user$
+{
+    "item1": "It is really a good day."
+}
+{
+    "item2": "Indeed."
+}
+%output_format%
+%variable1%
+%variable2%
