@@ -324,7 +324,7 @@ class HandyPrompt(ABC):
             return self.__class__(
                 new_data,
                 copy.deepcopy(self.request),
-                copy.deepcopy(self.run_config),
+                replace(self.run_config),
             )
         return self
     
@@ -458,7 +458,11 @@ class HandyPrompt(ABC):
             or run_config.output_evaled_prompt_fd:
             evaled_data = self._eval_data(run_config)
             serialized_data = self._serialize_data(evaled_data)
-            text = self._dumps(self.request, self.run_config, serialized_data, run_config.output_evaled_prompt_path)
+            text = self._dumps(
+                self.request, run_config, serialized_data, 
+                Path(run_config.output_evaled_prompt_path).parent.absolute() \
+                    if run_config.output_evaled_prompt_path else None
+            )
             if run_config.output_evaled_prompt_path:
                 with open(run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
                     fout.write(text)
@@ -583,7 +587,10 @@ class ChatPrompt(HandyPrompt):
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
-                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    fout.write(self._dumps_frontmatter(
+                        new_request, run_config, 
+                        Path(run_config.output_path).parent.absolute()
+                        ))
                     role, content = self._stream_chat_proc(response, fout)
             elif run_config.output_fd:
                 # dump frontmatter, no base_path
@@ -597,7 +604,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            new_request, replace(self.run_config), self.base_path
+            new_request, run_config, self.base_path
         )
     
     async def _astream_chat_proc(self, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
@@ -629,7 +636,10 @@ class ChatPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    fout.write(self._dumps_frontmatter(
+                        new_request, run_config, 
+                        Path(run_config.output_path).parent.absolute()
+                        ))
                     role, content = await self._astream_chat_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
@@ -642,7 +652,7 @@ class ChatPrompt(HandyPrompt):
             content = response['choices'][0]['message']['content']
         return ChatPrompt(
             [{"role": role, "content": content}],
-            new_request, replace(self.run_config), self.base_path
+            new_request, run_config, self.base_path
         )
 
     def __add__(self, other: Union[str, list, ChatPrompt]):
@@ -733,7 +743,10 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    fout.write(self._dumps_frontmatter(
+                        new_request, run_config, 
+                        Path(run_config.output_path).parent.absolute()
+                        ))
                     content = self._stream_completions_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
@@ -743,7 +756,7 @@ class CompletionsPrompt(HandyPrompt):
                 content = self._stream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, replace(self.run_config), self.base_path)
+        return CompletionsPrompt(content, new_request, run_config, self.base_path)
 
     async def _astream_completions_proc(self, response, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
@@ -769,7 +782,10 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    fout.write(self._dumps_frontmatter(new_request, run_config, run_config.output_path))
+                    fout.write(self._dumps_frontmatter(
+                        new_request, run_config, 
+                        Path(run_config.output_path).parent.absolute()
+                        ))
                     content = await self._astream_completions_proc(response, fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
@@ -779,7 +795,7 @@ class CompletionsPrompt(HandyPrompt):
                 content = await self._astream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, replace(self.run_config), self.base_path)
+        return CompletionsPrompt(content, new_request, run_config, self.base_path)
     
     def __add__(self, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
