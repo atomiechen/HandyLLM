@@ -98,7 +98,7 @@ def load_from(
     encoding: str = "utf-8"
 ) -> HandyPrompt:
     with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding, base_path=path)
+        return load(fd, encoding, base_path=Path(path).parent.absolute())
 
 def dumps(
     prompt: HandyPrompt, 
@@ -311,7 +311,7 @@ class HandyPrompt(ABC):
     
     def dump_to(self, path: PathType) -> None:
         with open(path, "w", encoding="utf-8") as fd:
-            self.dump(fd, base_path=path)
+            self.dump(fd, base_path=Path(path).parent.absolute())
     
     @abstractmethod
     def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
