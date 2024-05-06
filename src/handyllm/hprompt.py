@@ -98,7 +98,7 @@ def load_from(
     encoding: str = "utf-8"
 ) -> HandyPrompt:
     with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding, base_path=Path(path).parent.absolute())
+        return load(fd, encoding, base_path=Path(path).parent.resolve())
 
 def dumps(
     prompt: HandyPrompt, 
@@ -178,12 +178,12 @@ class RunConfig:
         record_str = input_kwargs.get("record_request")
         if record_str is not None:
             input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
-        # add base_path to path fields and convert to absolute path
+        # add base_path to path fields and convert to resolved path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
                 if path_field in input_kwargs:
                     org_path = input_kwargs[path_field]
-                    new_path = str(Path(base_path, org_path).absolute())
+                    new_path = str(Path(base_path, org_path).resolve())
                     # retain trailing slash
                     if org_path.endswith(('/')):
                         new_path += '/'
@@ -312,7 +312,7 @@ class HandyPrompt(ABC):
     
     def dump_to(self, path: PathType) -> None:
         with open(path, "w", encoding="utf-8") as fd:
-            self.dump(fd, base_path=Path(path).parent.absolute())
+            self.dump(fd, base_path=Path(path).parent.resolve())
     
     @abstractmethod
     def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
@@ -441,6 +441,7 @@ class HandyPrompt(ABC):
         
         # load the credential file
         if run_config.credential_path:
+            print(f"# Loading credential file: {run_config.credential_path}", file=sys.stderr)
             if run_config.credential_type == "env":
                 load_dotenv(run_config.credential_path, override=True)
             elif run_config.credential_type in ("json", "yaml"):
@@ -460,7 +461,7 @@ class HandyPrompt(ABC):
             serialized_data = self._serialize_data(evaled_data)
             text = self._dumps(
                 self.request, run_config, serialized_data, 
-                Path(run_config.output_evaled_prompt_path).parent.absolute() \
+                Path(run_config.output_evaled_prompt_path).parent.resolve() \
                     if run_config.output_evaled_prompt_path else None
             )
             if run_config.output_evaled_prompt_path:
@@ -582,7 +583,7 @@ class ChatPrompt(HandyPrompt):
             **new_request
             ).call()
         new_request = self._filter_request(new_request, run_config)
-        base_path = Path(run_config.output_path).parent.absolute() if run_config.output_path else None
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -630,7 +631,7 @@ class ChatPrompt(HandyPrompt):
             **new_request
             ).acall()
         new_request = self._filter_request(new_request, run_config)
-        base_path = Path(run_config.output_path).parent.absolute() if run_config.output_path else None
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -735,7 +736,7 @@ class CompletionsPrompt(HandyPrompt):
             **new_request
             ).call()
         new_request = self._filter_request(new_request, run_config)
-        base_path = Path(run_config.output_path).parent.absolute() if run_config.output_path else None
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_path:
                 # stream response to a file
@@ -772,7 +773,7 @@ class CompletionsPrompt(HandyPrompt):
             **new_request
             ).acall()
         new_request = self._filter_request(new_request, run_config)
-        base_path = Path(run_config.output_path).parent.absolute() if run_config.output_path else None
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_path:
                 # stream response to a file
