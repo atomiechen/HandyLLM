@@ -204,7 +204,7 @@ class RunConfig:
         self.output_fd = None
         self.output_evaled_prompt_fd = None
         # convert to dict
-        obj = asdict(self)
+        obj = asdict(self, dict_factory=lambda x: { k: v for k, v in x if v is not None })
         # restore file descriptors
         self.output_fd = tmp_output_fd
         self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
@@ -213,7 +213,8 @@ class RunConfig:
             obj["output_fd"] = self.output_fd
             obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
         # convert Enum to string
-        if obj["record_request"] is not None:
+        record_enum = obj.get("record_request")
+        if record_enum is not None:
             obj["record_request"] = obj["record_request"].name
         # convert path to relative path
         if base_path:
