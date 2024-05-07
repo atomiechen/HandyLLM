@@ -53,6 +53,8 @@ def cli():
     args = parser.parse_args()
     if args.command == "hprompt":
         return hprompt_command(args)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
