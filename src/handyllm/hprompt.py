@@ -182,10 +182,8 @@ class RunConfig:
         if name == "record_request":
             # validate record_request value
             if isinstance(value, str):
-                option = value.upper()
-                if option not in RecordRequestMode.__members__:
+                if value not in iter(RecordRequestMode):
                     raise ValueError(f"unsupported record_request value: {value}")
-                value = RecordRequestMode[option].value
             elif isinstance(value, RecordRequestMode):
                 value = value.value
             elif value is None:  # this field is optional
