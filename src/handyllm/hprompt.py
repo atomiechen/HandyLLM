@@ -12,6 +12,7 @@ __all__ = [
     "load_var_map",
     "RunConfig",
     "RecordRequestMode",
+    "CredentialType",
 ]
 
 import json
