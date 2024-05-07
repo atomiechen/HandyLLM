@@ -132,7 +132,20 @@ def load_var_map(path: PathType) -> dict[str, str]:
     return substitute_map
 
 
-class RecordRequestMode(Enum):
+class AutoName(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values):
+        return name.lower()  # use lower case as the value
+    
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Enum):
+            return self.value == other.value
+        elif isinstance(other, str):
+            return self.value == other.lower()
+        return False
+
+
+class RecordRequestMode(AutoName):
     BLACKLIST = auto()  # record all request arguments except specified ones
     WHITELIST = auto()  # record only specified request arguments
     NONE = auto()  # record no request arguments
@@ -165,6 +178,22 @@ class RunConfig:
     # verbose output to stderr
     verbose: Optional[bool] = None  # default: False
     
+    def __setattr__(self, name: str, value: object):
+        if name == "record_request":
+            # validate record_request value
+            if isinstance(value, str):
+                option = value.upper()
+                if option not in RecordRequestMode.__members__:
+                    raise ValueError(f"unsupported record_request value: {value}")
+                value = RecordRequestMode[option].value
+            elif isinstance(value, RecordRequestMode):
+                value = value.value
+            elif value is None:  # this field is optional
+                pass
+            else:
+                raise ValueError(f"unsupported record_request value: {value}")
+        super().__setattr__(name, value)
+    
     def __len__(self):
         return len([f for f in fields(self) if getattr(self, f.name) is not None])
     
@@ -174,10 +203,6 @@ class RunConfig:
         for field in fields(cls):
             if field.name in obj:
                 input_kwargs[field.name] = obj[field.name]
-        # convert string to Enum
-        record_str = input_kwargs.get("record_request")
-        if record_str is not None:
-            input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
         # add base_path to path fields and convert to resolved path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
@@ -212,10 +237,6 @@ class RunConfig:
             # keep file descriptors
             obj["output_fd"] = self.output_fd
             obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
-        # convert Enum to string
-        record_enum = obj.get("record_request")
-        if record_enum is not None:
-            obj["record_request"] = obj["record_request"].name
         # convert path to relative path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
