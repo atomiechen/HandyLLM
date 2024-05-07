@@ -22,7 +22,10 @@ result_prompt.dump_to(cur_dir / './assets/tmp_out.hprompt')
 prompt += result_prompt
 # chain another hprompt
 prompt += hprompt.load_from(cur_dir / './assets/magic.hprompt')
-# run again
-result2 = prompt.run()
+# create a new run config
+run_config = hprompt.RunConfig()
+run_config.record_request = hprompt.RecordRequestMode.NONE  # record no request args
+# run again, with run config
+result2 = prompt.run(run_config=run_config)
 
 
