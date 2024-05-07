@@ -139,6 +139,14 @@ class RecordRequestMode(AutoStrEnum):
     ALL = auto()  # record all request arguments
 
 
+class CredentialType(AutoStrEnum):
+    # load environment variables from the credential file
+    ENV = auto()
+    # load the content of the file as request arguments
+    JSON = auto()
+    YAML = auto()
+
+
 @dataclass
 class RunConfig:
     # record request arguments
@@ -160,7 +168,7 @@ class RunConfig:
     # credential type: env, json, yaml
     # if env, load environment variables from the credential file
     # if json or yaml, load the content of the file as request arguments
-    credential_type: Optional[str] = None  # default: guess from the file extension
+    credential_type: Optional[CredentialType] = None  # default: guess from the file extension
     
     # verbose output to stderr
     verbose: Optional[bool] = None  # default: False
@@ -177,6 +185,19 @@ class RunConfig:
                 pass
             else:
                 raise ValueError(f"unsupported record_request value: {value}")
+        elif name == "credential_type":
+            # validate credential_type value
+            if isinstance(value, str):
+                if value == 'yml':
+                    value = CredentialType.YAML.value
+                elif value not in CredentialType:
+                    raise ValueError(f"unsupported credential_type value: {value}")
+            elif isinstance(value, CredentialType):
+                value = value.value
+            elif value is None:  # this field is optional
+                pass
+            else:
+                raise ValueError(f"unsupported credential_type value: {value}")
         super().__setattr__(name, value)
     
     def __len__(self):
@@ -358,11 +379,8 @@ class HandyPrompt(ABC):
                 p = Path(run_config.credential_path)
                 if p.suffix:
                     run_config.credential_type = p.suffix[1:]
-                    if run_config.credential_type == "yml":
-                        run_config.credential_type = "yaml"
                 else:
-                    run_config.credential_type = 'env'
-            run_config.credential_type = run_config.credential_type.lower()
+                    run_config.credential_type = CredentialType.ENV
         return run_config
     
     @abstractmethod
@@ -447,11 +465,11 @@ class HandyPrompt(ABC):
         
         # load the credential file
         if run_config.credential_path:
-            if run_config.credential_type == "env":
+            if run_config.credential_type == CredentialType.ENV:
                 load_dotenv(run_config.credential_path, override=True)
-            elif run_config.credential_type in ("json", "yaml"):
+            elif run_config.credential_type in (CredentialType.JSON, CredentialType.YAML):
                 with open(run_config.credential_path, 'r', encoding='utf-8') as fin:
-                    if run_config.credential_type == "json":
+                    if run_config.credential_type == CredentialType.JSON:
                         credential_dict = json.load(fin)
                     else:
                         credential_dict = yaml.safe_load(fin)
