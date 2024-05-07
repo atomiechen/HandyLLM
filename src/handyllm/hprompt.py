@@ -12,6 +12,7 @@ __all__ = [
     "load_var_map",
     "RunConfig",
     "RecordRequestMode",
+    "CredentialType",
 ]
 
 import json
@@ -23,7 +24,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Union, TypeVar
-from enum import Enum, auto
+from enum import auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields, replace
 
@@ -38,6 +39,7 @@ from .utils import (
     astream_chat_with_role, astream_completions, 
     stream_chat_with_role, stream_completions, 
 )
+from ._str_enum import AutoStrEnum
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -131,12 +133,19 @@ def load_var_map(path: PathType) -> dict[str, str]:
         substitute_map[key] = value.strip()
     return substitute_map
 
-
-class RecordRequestMode(Enum):
+class RecordRequestMode(AutoStrEnum):
     BLACKLIST = auto()  # record all request arguments except specified ones
     WHITELIST = auto()  # record only specified request arguments
     NONE = auto()  # record no request arguments
     ALL = auto()  # record all request arguments
+
+
+class CredentialType(AutoStrEnum):
+    # load environment variables from the credential file
+    ENV = auto()
+    # load the content of the file as request arguments
+    JSON = auto()
+    YAML = auto()
 
 
 @dataclass
@@ -160,10 +169,37 @@ class RunConfig:
     # credential type: env, json, yaml
     # if env, load environment variables from the credential file
     # if json or yaml, load the content of the file as request arguments
-    credential_type: Optional[str] = None  # default: guess from the file extension
+    credential_type: Optional[CredentialType] = None  # default: guess from the file extension
     
     # verbose output to stderr
     verbose: Optional[bool] = None  # default: False
+    
+    def __setattr__(self, name: str, value: object):
+        if name == "record_request":
+            # validate record_request value
+            if isinstance(value, str):
+                if value not in RecordRequestMode:
+                    raise ValueError(f"unsupported record_request value: {value}")
+            elif isinstance(value, RecordRequestMode):
+                value = value.value
+            elif value is None:  # this field is optional
+                pass
+            else:
+                raise ValueError(f"unsupported record_request value: {value}")
+        elif name == "credential_type":
+            # validate credential_type value
+            if isinstance(value, str):
+                if value == 'yml':
+                    value = CredentialType.YAML.value
+                elif value not in CredentialType:
+                    raise ValueError(f"unsupported credential_type value: {value}")
+            elif isinstance(value, CredentialType):
+                value = value.value
+            elif value is None:  # this field is optional
+                pass
+            else:
+                raise ValueError(f"unsupported credential_type value: {value}")
+        super().__setattr__(name, value)
     
     def __len__(self):
         return len([f for f in fields(self) if getattr(self, f.name) is not None])
@@ -174,10 +210,6 @@ class RunConfig:
         for field in fields(cls):
             if field.name in obj:
                 input_kwargs[field.name] = obj[field.name]
-        # convert string to Enum
-        record_str = input_kwargs.get("record_request")
-        if record_str is not None:
-            input_kwargs["record_request"] = RecordRequestMode[record_str.upper()]
         # add base_path to path fields and convert to resolved path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
@@ -212,10 +244,6 @@ class RunConfig:
             # keep file descriptors
             obj["output_fd"] = self.output_fd
             obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
-        # convert Enum to string
-        record_enum = obj.get("record_request")
-        if record_enum is not None:
-            obj["record_request"] = obj["record_request"].name
         # convert path to relative path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
@@ -352,11 +380,8 @@ class HandyPrompt(ABC):
                 p = Path(run_config.credential_path)
                 if p.suffix:
                     run_config.credential_type = p.suffix[1:]
-                    if run_config.credential_type == "yml":
-                        run_config.credential_type = "yaml"
                 else:
-                    run_config.credential_type = 'env'
-            run_config.credential_type = run_config.credential_type.lower()
+                    run_config.credential_type = CredentialType.ENV
         return run_config
     
     @abstractmethod
@@ -441,11 +466,11 @@ class HandyPrompt(ABC):
         
         # load the credential file
         if run_config.credential_path:
-            if run_config.credential_type == "env":
+            if run_config.credential_type == CredentialType.ENV:
                 load_dotenv(run_config.credential_path, override=True)
-            elif run_config.credential_type in ("json", "yaml"):
+            elif run_config.credential_type in (CredentialType.JSON, CredentialType.YAML):
                 with open(run_config.credential_path, 'r', encoding='utf-8') as fin:
-                    if run_config.credential_type == "json":
+                    if run_config.credential_type == CredentialType.JSON:
                         credential_dict = json.load(fin)
                     else:
                         credential_dict = yaml.safe_load(fin)
