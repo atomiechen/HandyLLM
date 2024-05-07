@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Union, TypeVar
-from enum import Enum, auto
+from enum import Enum, EnumMeta, auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields, replace
 
@@ -132,7 +132,14 @@ def load_var_map(path: PathType) -> dict[str, str]:
     return substitute_map
 
 
-class AutoName(Enum):
+class StrEnumMeta(EnumMeta):
+    def __contains__(cls, item):
+        if isinstance(item, str):
+            return item in iter(cls)
+        return super().__contains__(item)
+
+
+class AutoStrEnum(Enum, metaclass=StrEnumMeta):
     @staticmethod
     def _generate_next_value_(name, start, count, last_values):
         return name.lower()  # use lower case as the value
@@ -145,7 +152,7 @@ class AutoName(Enum):
         return False
 
 
-class RecordRequestMode(AutoName):
+class RecordRequestMode(AutoStrEnum):
     BLACKLIST = auto()  # record all request arguments except specified ones
     WHITELIST = auto()  # record only specified request arguments
     NONE = auto()  # record no request arguments
@@ -182,7 +189,7 @@ class RunConfig:
         if name == "record_request":
             # validate record_request value
             if isinstance(value, str):
-                if value not in iter(RecordRequestMode):
+                if value not in RecordRequestMode:
                     raise ValueError(f"unsupported record_request value: {value}")
             elif isinstance(value, RecordRequestMode):
                 value = value.value
