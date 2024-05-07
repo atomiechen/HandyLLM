@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Union, TypeVar
-from enum import Enum, EnumMeta, auto
+from enum import auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields, replace
 
@@ -38,6 +38,7 @@ from .utils import (
     astream_chat_with_role, astream_completions, 
     stream_chat_with_role, stream_completions, 
 )
+from ._str_enum import AutoStrEnum
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -130,27 +131,6 @@ def load_var_map(path: PathType) -> dict[str, str]:
         value = blocks[idx+1]
         substitute_map[key] = value.strip()
     return substitute_map
-
-
-class StrEnumMeta(EnumMeta):
-    def __contains__(cls, item):
-        if isinstance(item, str):
-            return item in iter(cls)
-        return super().__contains__(item)
-
-
-class AutoStrEnum(Enum, metaclass=StrEnumMeta):
-    @staticmethod
-    def _generate_next_value_(name, start, count, last_values):
-        return name.lower()  # use lower case as the value
-    
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, Enum):
-            return self.value == other.value
-        elif isinstance(other, str):
-            return self.value == other.lower()
-        return False
-
 
 class RecordRequestMode(AutoStrEnum):
     BLACKLIST = auto()  # record all request arguments except specified ones
