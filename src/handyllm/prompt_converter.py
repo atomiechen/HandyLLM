@@ -47,7 +47,7 @@ class PromptConverter:
                 content = content.strip()
             parsed = False
             if extra:
-                key_values_pairs = extra.split()
+                key_values_pairs = extra[1:-1].split()  # remove curly braces
                 extra_properties = dict(pair.split('=') for pair in key_values_pairs)
                 if 'type' in extra_properties and extra_properties['type'].strip('"') == 'tool_calls':
                     chat.append({
@@ -83,8 +83,11 @@ class PromptConverter:
         messages = []
         for message in chat:
             tool_calls = message.get('tool_calls')
+            tool_call_id = message.get('tool_call_id')
             if tool_calls:
                 messages.append(f'${message["role"]}$ {{type="tool_calls"}}\n{repr(tool_calls)}')
+            elif tool_call_id:
+                messages.append(f'${message["role"]}$ {{tool_call_id="{tool_call_id}"}}\n{message["content"]}')
             else:
                 messages.append(f"${message['role']}$\n{message['content']}")
         raw_prompt = "\n\n".join(messages)
@@ -102,15 +105,15 @@ class PromptConverter:
         if inplace:
             for message in chat:
                 for var, value in variable_map.items():
-                    if var in message['content']:
+                    if message.get('content') and var in message['content']:
                         message['content'] = message['content'].replace(var, value)
             return chat
         else:
             new_chat = []
             for message in chat:
-                new_message = {"role": message['role'], "content": message['content']}
+                new_message = message.copy()
                 for var, value in variable_map.items():
-                    if var in new_message['content']:
+                    if new_message.get('content') and var in new_message['content']:
                         new_message['content'] = new_message['content'].replace(var, value)
                 new_chat.append(new_message)
             return new_chat
