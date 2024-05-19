@@ -2,7 +2,7 @@ import re
 
 class PromptConverter:
     
-    role_keys = ['system', 'user', 'assistant']
+    role_keys = ['system', 'user', 'assistant', 'tool']
 
     def __init__(self):
         self.substitute_map = {}
@@ -10,7 +10,8 @@ class PromptConverter:
     @property
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
-        return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
+        # return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
+        return r'^\$(' + '|'.join(self.role_keys) + r')\$[^\S\r\n]*({[^}]*?})?[^\S\r\n]*$'
 
     def detect(self, raw_prompt: str):
         # detect the role keys in the prompt
@@ -38,10 +39,35 @@ class PromptConverter:
         # convert plain text to chat format
         chat = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
-        for idx in range(1, len(blocks), 2):
-            key = blocks[idx]
-            value = blocks[idx+1]
-            chat.append({"role": key, "content": value.strip()})
+        for idx in range(1, len(blocks), 3):
+            role = blocks[idx]
+            extra = blocks[idx+1]
+            content = blocks[idx+2]
+            if content:
+                content = content.strip()
+            parsed = False
+            if extra:
+                key_values_pairs = extra.split()
+                extra_properties = dict(pair.split('=') for pair in key_values_pairs)
+                if 'type' in extra_properties and extra_properties['type'].strip('"') == 'tool_calls':
+                    chat.append({
+                        "role": role, 
+                        "content": None, 
+                        "tool_calls": eval(content)  # this may be dangerous
+                        })
+                    parsed = True
+                elif 'tool_call_id' in extra_properties:
+                    chat.append({
+                        "role": role, 
+                        "content": content, 
+                        "tool_call_id": extra_properties['tool_call_id'].strip('"')
+                        })
+                    parsed = True
+            if not parsed:
+                chat.append({
+                    "role": role, 
+                    "content": content, 
+                    })
         
         return chat
     
@@ -56,7 +82,11 @@ class PromptConverter:
         # convert chat format to plain text
         messages = []
         for message in chat:
-            messages.append(f"${message['role']}$\n{message['content']}")
+            tool_calls = message.get('tool_calls')
+            if tool_calls:
+                messages.append(f'${message["role"]}$ {{type="tool_calls"}}\n{repr(tool_calls)}')
+            else:
+                messages.append(f"${message['role']}$\n{message['content']}")
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
     
