@@ -45,29 +45,23 @@ class PromptConverter:
             content = blocks[idx+2]
             if content:
                 content = content.strip()
-            parsed = False
+            msg = {"role": role, "content": content}
             if extra:
-                key_values_pairs = extra[1:-1].split()  # remove curly braces
-                extra_properties = dict(pair.split('=') for pair in key_values_pairs)
-                if 'type' in extra_properties and extra_properties['type'].strip('"') == 'tool_calls':
-                    chat.append({
-                        "role": role, 
-                        "content": None, 
-                        "tool_calls": eval(content)  # this may be dangerous
-                        })
-                    parsed = True
-                elif 'tool_call_id' in extra_properties:
-                    chat.append({
-                        "role": role, 
-                        "content": content, 
-                        "tool_call_id": extra_properties['tool_call_id'].strip('"')
-                        })
-                    parsed = True
-            if not parsed:
-                chat.append({
-                    "role": role, 
-                    "content": content, 
-                    })
+                # remove curly braces
+                key_values_pairs = re.findall(r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra[1:-1])
+                # parse extra properties
+                extra_properties = {}
+                for key, value in key_values_pairs:
+                    # remove quotes of the value
+                    extra_properties[key] = value[1:-1]
+                if 'type' in extra_properties:
+                    type_of_msg = extra_properties.pop('type')
+                    if type_of_msg == 'tool_calls':
+                        msg['tool_calls'] = eval(content)  # this may be dangerous
+                        msg['content'] = None
+                for key in extra_properties:
+                    msg[key] = extra_properties[key]
+            chat.append(msg)
         
         return chat
     
@@ -82,14 +76,18 @@ class PromptConverter:
         # convert chat format to plain text
         messages = []
         for message in chat:
+            role = message.get('role')
+            content = message.get('content')
             tool_calls = message.get('tool_calls')
-            tool_call_id = message.get('tool_call_id')
+            extra_properties = {key: message[key] for key in message if key not in ['role', 'content', 'tool_calls']}
             if tool_calls:
-                messages.append(f'${message["role"]}$ {{type="tool_calls"}}\n{repr(tool_calls)}')
-            elif tool_call_id:
-                messages.append(f'${message["role"]}$ {{tool_call_id="{tool_call_id}"}}\n{message["content"]}')
+                extra_properties['type'] = 'tool_calls'
+                content = repr(tool_calls)
+            if extra_properties:
+                extra = " {" + " ".join([f'{key}="{extra_properties[key]}"' for key in extra_properties]) + "}"
             else:
-                messages.append(f"${message['role']}$\n{message['content']}")
+                extra = ""
+            messages.append(f"${role}${extra}\n{content}")
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
     
