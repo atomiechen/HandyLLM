@@ -1,4 +1,6 @@
+import io
 import re
+from typing import Optional
 import yaml
 
 
@@ -98,6 +100,68 @@ class PromptConverter:
             messages.append(f"${role}${extra}\n{content}")
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
+
+    @staticmethod
+    def stream_chat2raw(gen_sync, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        # stream response to fd
+        role = ""
+        content = ""
+        tool_calls = []
+        role_completed = False
+        for r, text, tool_call in gen_sync:
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$")  # do not add newline
+            if tool_call:
+                if not role_completed:
+                    if fd:
+                        fd.write(' {type="tool_calls"}\n')
+                    role_completed = True
+                tool_calls.append(tool_call)  # do not stream, wait for the end
+            elif text:
+                if not role_completed:
+                    if fd:
+                        fd.write('\n')
+                    role_completed = True
+                if fd:
+                    fd.write(text)
+                content += text
+        if tool_calls and fd:
+            # dump tool calls
+            fd.write(yaml.dump(tool_calls))
+        return role, content, tool_calls
+
+    @staticmethod
+    async def astream_chat2raw(gen_async, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        # stream response to fd
+        role = ""
+        content = ""
+        tool_calls = []
+        role_completed = False
+        async for r, text, tool_call in gen_async:
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$")  # do not add newline
+            if tool_call:
+                if not role_completed:
+                    if fd:
+                        fd.write(' {type="tool_calls"}\n')
+                    role_completed = True
+                tool_calls.append(tool_call)  # do not stream, wait for the end
+            elif text:
+                if not role_completed:
+                    if fd:
+                        fd.write('\n')
+                    role_completed = True
+                if fd:
+                    fd.write(text)
+                content += text
+        if tool_calls and fd:
+            # dump tool calls
+            fd.write(yaml.dump(tool_calls))
+        return role, content, tool_calls
     
     @classmethod
     def chat2rawfile(cls, chat, raw_prompt_path: str):

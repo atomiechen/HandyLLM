@@ -36,8 +36,8 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_chat_with_role, astream_completions, 
-    stream_chat_all, stream_chat_with_role, stream_completions, 
+    astream_chat_all, astream_completions, 
+    stream_chat_all, stream_completions, 
 )
 from ._str_enum import AutoStrEnum
 
@@ -637,14 +637,14 @@ class ChatPrompt(HandyPrompt):
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = self._stream_chat_proc(response, fout)
+                    role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), fout)
             elif run_config.output_fd:
                 # dump frontmatter, no base_path
                 run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
                 # stream response to a file descriptor
-                role, content, tool_calls = self._stream_chat_proc(response, run_config.output_fd)
+                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), run_config.output_fd)
             else:
-                role, content, tool_calls = self._stream_chat_proc(response)
+                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -702,13 +702,13 @@ class ChatPrompt(HandyPrompt):
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await self._astream_chat_proc(response, fout)
+                    role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await self._astream_chat_proc(response, run_config.output_fd)
+                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), run_config.output_fd)
             else:
-                role, content, tool_calls = await self._astream_chat_proc(response)
+                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
