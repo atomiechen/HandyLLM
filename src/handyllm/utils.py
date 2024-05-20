@@ -51,17 +51,8 @@ def stream_chat_all(response):
         yield role, None, tool_call
 
 def stream_chat_with_role(response):
-    role = ''
-    for data in response:
-        try:
-            message = data['choices'][0]['delta']
-            if 'role' in message:
-                role = message['role']
-            if 'content' in message:
-                text = message['content']
-                yield role, text
-        except (KeyError, IndexError):
-            pass
+    for role, text, _ in stream_chat_all(response):
+        yield role, text
 
 def stream_chat(response):
     for _, text in stream_chat_with_role(response):
@@ -102,17 +93,8 @@ async def astream_chat_all(response):
         yield role, None, tool_call
 
 async def astream_chat_with_role(response):
-    role = ''
-    async for data in response:
-        try:
-            message = data['choices'][0]['delta']
-            if 'role' in message:
-                role = message['role']
-            if 'content' in message:
-                text = message['content']
-                yield role, text
-        except (KeyError, IndexError):
-            pass
+    async for role, text, _ in astream_chat_all(response):
+        yield role, text
 
 async def astream_chat(response):
     async for _, text in astream_chat_with_role(response):
