@@ -6,9 +6,32 @@ meta:
   var_map_path: substitute.txt
   output_path: tmp_out/%Y-%m-%d/result.%H-%M-%S.hprompt
   output_evaled_prompt_path: tmp_out/%Y-%m-%d/evaled.%H-%M-%S.hprompt
-model: gpt-3.5-turbo
+model: gpt-4o
 temperature: 0.2
 stream: true
+tools: [
+    {
+      "type": "function",
+      "function": {
+        "name": "get_current_weather",
+        "description": "Get the current weather in a given location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state, e.g. San Francisco, CA"
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["celsius", "fahrenheit"]
+            }
+          },
+          "required": ["location", "unit"]
+        }
+      }
+    }
+  ]
 ---
 
 $system$
@@ -20,13 +43,35 @@ Please help me merge the following two JSON documents into one.
 $assistant$
 Sure, please give me the two JSON documents.
 
-$user$
+$user$ {name='debug'}
 {
-    "item1": "It is really a good day."
+    "item1": "It is really a good day in SF."
 }
 {
-    "item2": "Indeed."
+    "item2": "Indeed. I'm in NY now."
 }
 %output_format%
 %variable1%
 %variable2%
+Add extra weather information before merging the JSON document.
+
+$assistant$ {type="tool_calls"}
+- function:
+    arguments: '{"location": "San Francisco, CA", "unit": "fahrenheit"}'
+    name: get_current_weather
+  id: call_9mP5nuiMvdQeSLdsyFK0DufP
+  index: 0
+  type: function
+- function:
+    arguments: '{"location": "New York, NY", "unit": "fahrenheit"}'
+    name: get_current_weather
+  id: call_VIkJJBlvLm9r1kxPxHHJG9R2
+  index: 1
+  type: function
+
+$tool$ {tool_call_id="call_9mP5nuiMvdQeSLdsyFK0DufP"}
+24
+
+$tool$ {tool_call_id="call_VIkJJBlvLm9r1kxPxHHJG9R2"}
+75
+
