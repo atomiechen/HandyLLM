@@ -1,4 +1,6 @@
 import re
+import yaml
+
 
 class PromptConverter:
     
@@ -57,7 +59,7 @@ class PromptConverter:
                 if 'type' in extra_properties:
                     type_of_msg = extra_properties.pop('type')
                     if type_of_msg == 'tool_calls':
-                        msg['tool_calls'] = eval(content)  # this may be dangerous
+                        msg['tool_calls'] = yaml.safe_load(content)
                         msg['content'] = None
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
@@ -82,7 +84,7 @@ class PromptConverter:
             extra_properties = {key: message[key] for key in message if key not in ['role', 'content', 'tool_calls']}
             if tool_calls:
                 extra_properties['type'] = 'tool_calls'
-                content = repr(tool_calls)
+                content = yaml.dump(tool_calls)
             if extra_properties:
                 extra = " {" + " ".join([f'{key}="{extra_properties[key]}"' for key in extra_properties]) + "}"
             else:

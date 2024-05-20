@@ -616,7 +616,7 @@ class ChatPrompt(HandyPrompt):
                 content += text
         if tool_calls and fd:
             # dump tool calls
-            fd.write(repr(tool_calls))
+            fd.write(yaml.dump(tool_calls))
         return role, content, tool_calls
     
     def _run_with_client(
@@ -682,7 +682,7 @@ class ChatPrompt(HandyPrompt):
                 content += text
         if tool_calls and fd:
             # dump tool calls
-            fd.write(repr(tool_calls))
+            fd.write(yaml.dump(tool_calls))
         return role, content, tool_calls
     
     async def _arun_with_client(
