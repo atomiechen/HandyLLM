@@ -19,7 +19,7 @@ A handy toolkit for using LLM, with both [***development support***](https://pyp
 - **Easy chain**: You can chain `hprompt` files to construct dynamic logic.
 
 <p float="left" align="center">
-  <img src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.jpg" width="60%" />
+  <img src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.png" width="60%" />
 </p>
 
 **Other features:**
