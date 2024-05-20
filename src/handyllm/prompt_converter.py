@@ -61,6 +61,9 @@ class PromptConverter:
                     if type_of_msg == 'tool_calls':
                         msg['tool_calls'] = yaml.safe_load(content)
                         msg['content'] = None
+                    elif type_of_msg == 'content_array':
+                        # parse content array
+                        msg['content'] = yaml.safe_load(content)
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
             chat.append(msg)
@@ -85,6 +88,9 @@ class PromptConverter:
             if tool_calls:
                 extra_properties['type'] = 'tool_calls'
                 content = yaml.dump(tool_calls)
+            elif isinstance(content, list):
+                extra_properties['type'] = 'content_array'
+                content = yaml.dump(content)
             if extra_properties:
                 extra = " {" + " ".join([f'{key}="{extra_properties[key]}"' for key in extra_properties]) + "}"
             else:
