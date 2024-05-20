@@ -19,8 +19,9 @@ A handy toolkit for using LLM, with both [***development support***](https://pyp
 - **Easy chain**: You can chain `hprompt` files to construct dynamic logic.
 
 <p float="left" align="center">
-  <img src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.png" width="60%" />
+  <img src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.png" width="70%" />
 </p>
+
 
 **Other features:**
 
@@ -51,4 +52,10 @@ Please check [HandyLLM VSCode extension](https://marketplace.visualstudio.com/it
 ## Documentation
 
 Please check out our [wiki](https://github.com/atomiechen/HandyLLM/wiki) for comprehensive guides ^_^
+
+
+
+## License
+
+[HandyLLM](https://github.com/atomiechen/HandyLLM) © 2024 by [Atomie CHEN](https://github.com/atomiechen) is licensed under the MIT License - see the [LICENSE](https://github.com/atomiechen/HandyLLM/blob/main/LICENSE) file for details.
 
