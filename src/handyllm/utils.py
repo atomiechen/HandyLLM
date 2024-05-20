@@ -23,18 +23,36 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def stream_chat_with_role(response):
+def stream_chat_all(response):
     role = ''
+    tool_call = {}
     for data in response:
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
                 role = message['role']
-            if 'content' in message:
-                text = message['content']
-                yield role, text
+            content = message.get('content')
+            tool_calls = message.get('tool_calls')
+            if tool_calls:
+                for chunk in tool_calls:
+                    if chunk['index'] == tool_call.get('index'):
+                        tool_call['function']['arguments'] += chunk['function']['arguments']
+                    else:
+                        # this is a new tool call, yield the previous one
+                        yield role, content, tool_call
+                        # reset the tool call
+                        tool_call = chunk
+            elif content:
+                yield role, content, tool_call
         except (KeyError, IndexError):
             pass
+    if tool_call:
+        # yield the last tool call
+        yield role, None, tool_call
+
+def stream_chat_with_role(response):
+    for role, text, _ in stream_chat_all(response):
+        yield role, text
 
 def stream_chat(response):
     for _, text in stream_chat_with_role(response):
@@ -47,18 +65,36 @@ def stream_completions(response):
         except (KeyError, IndexError):
             pass
 
-async def astream_chat_with_role(response):
+async def astream_chat_all(response):
     role = ''
+    tool_call = {}
     async for data in response:
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
                 role = message['role']
-            if 'content' in message:
-                text = message['content']
-                yield role, text
+            content = message.get('content')
+            tool_calls = message.get('tool_calls')
+            if tool_calls:
+                for chunk in tool_calls:
+                    if chunk['index'] == tool_call.get('index'):
+                        tool_call['function']['arguments'] += chunk['function']['arguments']
+                    else:
+                        # this is a new tool call, yield the previous one
+                        yield role, content, tool_call
+                        # reset the tool call
+                        tool_call = chunk
+            elif content:
+                yield role, content, tool_call
         except (KeyError, IndexError):
             pass
+    if tool_call:
+        # yield the last tool call
+        yield role, None, tool_call
+
+async def astream_chat_with_role(response):
+    async for role, text, _ in astream_chat_all(response):
+        yield role, text
 
 async def astream_chat(response):
     async for _, text in astream_chat_with_role(response):

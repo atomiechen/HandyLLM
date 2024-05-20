@@ -36,8 +36,8 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_with_role, astream_completions, 
-    stream_chat_with_role, stream_completions, 
+    astream_chat_all, astream_completions, 
+    stream_chat_all, stream_completions, 
 )
 from ._str_enum import AutoStrEnum
 
@@ -282,7 +282,9 @@ class HandyPrompt(ABC):
     def __init__(
         self, data: Union[str, list], request: Optional[dict] = None, 
         meta: Optional[Union[dict, RunConfig]] = None, 
-        base_path: Optional[PathType] = None):
+        base_path: Optional[PathType] = None,
+        response: Optional[dict] = None,
+        ):
         self.data = data
         self.request = request or {}
         # parse meta to run_config
@@ -291,6 +293,7 @@ class HandyPrompt(ABC):
         else:
             self.run_config = RunConfig.from_dict(meta or {}, base_path=base_path)
         self.base_path = base_path
+        self.response = response
     
     def __str__(self) -> str:
         return str(self.data)
@@ -554,8 +557,12 @@ class HandyPrompt(ABC):
 
 class ChatPrompt(HandyPrompt):
         
-    def __init__(self, chat: list, request: dict, meta: Union[dict, RunConfig], base_path: Optional[PathType] = None):
-        super().__init__(chat, request, meta, base_path)
+    def __init__(
+        self, chat: list, request: dict, meta: Union[dict, RunConfig], 
+        base_path: Optional[PathType] = None,
+        response: Optional[dict] = None,
+        ):
+        super().__init__(chat, request, meta, base_path, response)
     
     @property
     def chat(self) -> list:
@@ -582,20 +589,6 @@ class ChatPrompt(HandyPrompt):
         else:
             return self.chat
     
-    def _stream_chat_proc(self, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
-        # stream response to fd
-        role = ""
-        content = ""
-        for r, text in stream_chat_with_role(response):
-            if r != role:
-                role = r
-                if fd:
-                    fd.write(f"${role}$\n")
-            elif fd:
-                fd.write(text)
-            content += text
-        return role, content
-    
     def _run_with_client(
         self, client: OpenAIClient, 
         run_config: RunConfig,
@@ -614,35 +607,23 @@ class ChatPrompt(HandyPrompt):
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content = self._stream_chat_proc(response, fout)
+                    role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), fout)
             elif run_config.output_fd:
                 # dump frontmatter, no base_path
                 run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
                 # stream response to a file descriptor
-                role, content = self._stream_chat_proc(response, run_config.output_fd)
+                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), run_config.output_fd)
             else:
-                role, content = self._stream_chat_proc(response)
+                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message']['content']
+            content = response['choices'][0]['message'].get('content')
+            tool_calls = response['choices'][0]['message'].get('tool_calls')
         return ChatPrompt(
-            [{"role": role, "content": content}],
-            new_request, run_config, base_path
+            [{"role": role, "content": content, "tool_calls": tool_calls}],
+            new_request, run_config, base_path,
+            response=response
         )
-    
-    async def _astream_chat_proc(self, response, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
-        # stream response to fd
-        role = ""
-        content = ""
-        async for r, text in astream_chat_with_role(response):
-            if r != role:
-                role = r
-                if fd:
-                    fd.write(f"${role}$\n")
-            elif fd:
-                fd.write(text)
-            content += text
-        return role, content
     
     async def _arun_with_client(
         self, client: OpenAIClient, 
@@ -661,19 +642,21 @@ class ChatPrompt(HandyPrompt):
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content = await self._astream_chat_proc(response, fout)
+                    role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), fout)
             elif run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                role, content = await self._astream_chat_proc(response, run_config.output_fd)
+                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), run_config.output_fd)
             else:
-                role, content = await self._astream_chat_proc(response)
+                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message']['content']
+            content = response['choices'][0]['message'].get('content')
+            tool_calls = response['choices'][0]['message'].get('tool_calls')
         return ChatPrompt(
-            [{"role": role, "content": content}],
-            new_request, run_config, base_path
+            [{"role": role, "content": content, "tool_calls": tool_calls}],
+            new_request, run_config, base_path,
+            response=response
         )
 
     def __add__(self, other: Union[str, list, ChatPrompt]):
@@ -719,8 +702,12 @@ class ChatPrompt(HandyPrompt):
 
 class CompletionsPrompt(HandyPrompt):
     
-    def __init__(self, prompt: str, request: dict, meta: Union[dict, RunConfig], base_path: PathType = None):
-        super().__init__(prompt, request, meta, base_path)
+    def __init__(
+        self, prompt: str, request: dict, meta: Union[dict, RunConfig], 
+        base_path: PathType = None,
+        response: Optional[dict] = None,
+        ):
+        super().__init__(prompt, request, meta, base_path, response)
     
     @property
     def prompt(self) -> str:
@@ -775,7 +762,9 @@ class CompletionsPrompt(HandyPrompt):
                 content = self._stream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, run_config, base_path)
+        return CompletionsPrompt(
+            content, new_request, run_config, base_path, response=response
+            )
 
     async def _astream_completions_proc(self, response, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
@@ -812,7 +801,9 @@ class CompletionsPrompt(HandyPrompt):
                 content = await self._astream_completions_proc(response)
         else:
             content = response['choices'][0]['text']
-        return CompletionsPrompt(content, new_request, run_config, base_path)
+        return CompletionsPrompt(
+            content, new_request, run_config, base_path, response=response
+            )
     
     def __add__(self, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt

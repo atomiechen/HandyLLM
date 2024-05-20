@@ -1,8 +1,12 @@
+import io
 import re
+from typing import Optional
+import yaml
+
 
 class PromptConverter:
     
-    role_keys = ['system', 'user', 'assistant']
+    role_keys = ['system', 'user', 'assistant', 'tool']
 
     def __init__(self):
         self.substitute_map = {}
@@ -10,7 +14,8 @@ class PromptConverter:
     @property
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
-        return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
+        # return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
+        return r'^\$(' + '|'.join(self.role_keys) + r')\$[^\S\r\n]*({[^}]*?})?[^\S\r\n]*$'
 
     def detect(self, raw_prompt: str):
         # detect the role keys in the prompt
@@ -38,10 +43,32 @@ class PromptConverter:
         # convert plain text to chat format
         chat = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
-        for idx in range(1, len(blocks), 2):
-            key = blocks[idx]
-            value = blocks[idx+1]
-            chat.append({"role": key, "content": value.strip()})
+        for idx in range(1, len(blocks), 3):
+            role = blocks[idx]
+            extra = blocks[idx+1]
+            content = blocks[idx+2]
+            if content:
+                content = content.strip()
+            msg = {"role": role, "content": content}
+            if extra:
+                # remove curly braces
+                key_values_pairs = re.findall(r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra[1:-1])
+                # parse extra properties
+                extra_properties = {}
+                for key, value in key_values_pairs:
+                    # remove quotes of the value
+                    extra_properties[key] = value[1:-1]
+                if 'type' in extra_properties:
+                    type_of_msg = extra_properties.pop('type')
+                    if type_of_msg == 'tool_calls':
+                        msg['tool_calls'] = yaml.safe_load(content)
+                        msg['content'] = None
+                    elif type_of_msg == 'content_array':
+                        # parse content array
+                        msg['content'] = yaml.safe_load(content)
+                for key in extra_properties:
+                    msg[key] = extra_properties[key]
+            chat.append(msg)
         
         return chat
     
@@ -56,9 +83,85 @@ class PromptConverter:
         # convert chat format to plain text
         messages = []
         for message in chat:
-            messages.append(f"${message['role']}$\n{message['content']}")
+            role = message.get('role')
+            content = message.get('content')
+            tool_calls = message.get('tool_calls')
+            extra_properties = {key: message[key] for key in message if key not in ['role', 'content', 'tool_calls']}
+            if tool_calls:
+                extra_properties['type'] = 'tool_calls'
+                content = yaml.dump(tool_calls)
+            elif isinstance(content, list):
+                extra_properties['type'] = 'content_array'
+                content = yaml.dump(content)
+            if extra_properties:
+                extra = " {" + " ".join([f'{key}="{extra_properties[key]}"' for key in extra_properties]) + "}"
+            else:
+                extra = ""
+            messages.append(f"${role}${extra}\n{content}")
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
+
+    @staticmethod
+    def stream_chat2raw(gen_sync, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        # stream response to fd
+        role = ""
+        content = ""
+        tool_calls = []
+        role_completed = False
+        for r, text, tool_call in gen_sync:
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$")  # do not add newline
+            if tool_call:
+                if not role_completed:
+                    if fd:
+                        fd.write(' {type="tool_calls"}\n')
+                    role_completed = True
+                tool_calls.append(tool_call)  # do not stream, wait for the end
+            elif text:
+                if not role_completed:
+                    if fd:
+                        fd.write('\n')
+                    role_completed = True
+                if fd:
+                    fd.write(text)
+                content += text
+        if tool_calls and fd:
+            # dump tool calls
+            fd.write(yaml.dump(tool_calls))
+        return role, content, tool_calls
+
+    @staticmethod
+    async def astream_chat2raw(gen_async, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+        # stream response to fd
+        role = ""
+        content = ""
+        tool_calls = []
+        role_completed = False
+        async for r, text, tool_call in gen_async:
+            if r != role:
+                role = r
+                if fd:
+                    fd.write(f"${role}$")  # do not add newline
+            if tool_call:
+                if not role_completed:
+                    if fd:
+                        fd.write(' {type="tool_calls"}\n')
+                    role_completed = True
+                tool_calls.append(tool_call)  # do not stream, wait for the end
+            elif text:
+                if not role_completed:
+                    if fd:
+                        fd.write('\n')
+                    role_completed = True
+                if fd:
+                    fd.write(text)
+                content += text
+        if tool_calls and fd:
+            # dump tool calls
+            fd.write(yaml.dump(tool_calls))
+        return role, content, tool_calls
     
     @classmethod
     def chat2rawfile(cls, chat, raw_prompt_path: str):
@@ -72,15 +175,15 @@ class PromptConverter:
         if inplace:
             for message in chat:
                 for var, value in variable_map.items():
-                    if var in message['content']:
+                    if message.get('content') and var in message['content']:
                         message['content'] = message['content'].replace(var, value)
             return chat
         else:
             new_chat = []
             for message in chat:
-                new_message = {"role": message['role'], "content": message['content']}
+                new_message = message.copy()
                 for var, value in variable_map.items():
-                    if var in new_message['content']:
+                    if new_message.get('content') and var in new_message['content']:
                         new_message['content'] = new_message['content'].replace(var, value)
                 new_chat.append(new_message)
             return new_chat
