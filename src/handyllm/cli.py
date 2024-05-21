@@ -56,7 +56,7 @@ def cli():
     """Main entry point for the handyllm CLI."""
     parser = argparse.ArgumentParser(
         prog="handyllm",
-        description="HandyLLM CLI",
+        description="HandyLLM CLI" + f" v{get_version()}",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
