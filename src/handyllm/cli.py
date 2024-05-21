@@ -1,5 +1,17 @@
 import argparse
+import sys
 
+
+def get_version():
+    package_name = __name__.split(".")[0]
+    if sys.version_info >= (3, 8):
+        # if python 3.8 or later, use importlib.metadata
+        import importlib.metadata
+        return importlib.metadata.version(package_name)
+    else:
+        # if older python, use pkg_resources
+        import pkg_resources
+        return pkg_resources.get_distribution(package_name).version
 
 def register_hprompt_command(subparsers: argparse._SubParsersAction):
     parser_hprompt = subparsers.add_parser(
@@ -15,7 +27,6 @@ def register_hprompt_command(subparsers: argparse._SubParsersAction):
     parser_hprompt.add_argument("-vmp", "--var-map-path", help="Variable map file path")
 
 def hprompt_command(args):
-    import sys
     from handyllm import hprompt
     
     run_config = hprompt.RunConfig()
@@ -47,6 +58,11 @@ def cli():
         prog="handyllm",
         description="HandyLLM CLI",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-v", "--version",
+        action="version",
+        version=get_version(),
     )
     subparsers = parser.add_subparsers(dest="command")
     register_hprompt_command(subparsers)
