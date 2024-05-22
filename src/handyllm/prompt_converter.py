@@ -1,6 +1,6 @@
 import io
 import re
-from typing import Optional
+from typing import Optional, Tuple
 import yaml
 
 
@@ -35,13 +35,13 @@ class PromptConverter:
             value = blocks[idx+1]
             self.substitute_map[key] = value.strip()
 
-    def raw2chat(self, raw_prompt: str):
+    def raw2msgs(self, raw_prompt: str):
         # substitute pre-defined variables
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
 
-        # convert plain text to chat format
-        chat = []
+        # convert plain text to messages format
+        msgs = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
         for idx in range(1, len(blocks), 3):
             role = blocks[idx]
@@ -68,21 +68,21 @@ class PromptConverter:
                         msg['content'] = yaml.safe_load(content)
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
-            chat.append(msg)
+            msgs.append(msg)
         
-        return chat
+        return msgs
     
-    def rawfile2chat(self, raw_prompt_path: str):
+    def rawfile2msgs(self, raw_prompt_path: str):
         with open(raw_prompt_path, 'r', encoding='utf-8') as fin:
             raw_prompt = fin.read()
         
-        return self.raw2chat(raw_prompt)
+        return self.raw2msgs(raw_prompt)
     
     @staticmethod
-    def chat2raw(chat):
-        # convert chat format to plain text
+    def msgs2raw(msgs):
+        # convert messages format to plain text
         messages = []
-        for message in chat:
+        for message in msgs:
             role = message.get('role')
             content = message.get('content')
             tool_calls = message.get('tool_calls')
@@ -102,7 +102,7 @@ class PromptConverter:
         return raw_prompt
 
     @staticmethod
-    def stream_chat2raw(gen_sync, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+    def stream_msgs2raw(gen_sync, fd: Optional[io.IOBase] = None) -> Tuple[str, str]:
         # stream response to fd
         role = ""
         content = ""
@@ -133,7 +133,7 @@ class PromptConverter:
         return role, content, tool_calls
 
     @staticmethod
-    async def astream_chat2raw(gen_async, fd: Optional[io.IOBase] = None) -> tuple[str, str]:
+    async def astream_msgs2raw(gen_async, fd: Optional[io.IOBase] = None) -> Tuple[str, str]:
         # stream response to fd
         role = ""
         content = ""
@@ -164,36 +164,32 @@ class PromptConverter:
         return role, content, tool_calls
     
     @classmethod
-    def chat2rawfile(cls, chat, raw_prompt_path: str):
-        raw_prompt = cls.chat2raw(chat)
+    def msgs2rawfile(cls, msgs, raw_prompt_path: str):
+        raw_prompt = cls.msgs2raw(msgs)
         with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
             fout.write(raw_prompt)
     
     @staticmethod
-    def chat_replace_variables(chat, variable_map: dict, inplace=False):
-        # replace every variable in chat content
+    def msgs_replace_variables(msgs, variable_map: dict, inplace=False):
+        # replace every variable in messages content
         if inplace:
-            for message in chat:
+            for message in msgs:
                 for var, value in variable_map.items():
                     if message.get('content') and var in message['content']:
                         message['content'] = message['content'].replace(var, value)
-            return chat
+            return msgs
         else:
-            new_chat = []
-            for message in chat:
+            new_msgs = []
+            for message in msgs:
                 new_message = message.copy()
                 for var, value in variable_map.items():
                     if new_message.get('content') and var in new_message['content']:
                         new_message['content'] = new_message['content'].replace(var, value)
-                new_chat.append(new_message)
-            return new_chat
+                new_msgs.append(new_message)
+            return new_msgs
     
-    @staticmethod
-    def chat_append_msg(chat, content: str, role: str = 'user', inplace=False):
-        if inplace:
-            chat.append({"role": role, "content": content})
-            return chat
-        else:
-            new_chat = chat.copy()
-            new_chat.append({"role": role, "content": content})
-            return new_chat
+    raw2chat = raw2msgs
+    rawfile2chat = rawfile2msgs
+    chat2raw = msgs2raw
+    chat2rawfile = msgs2rawfile
+    chat_replace_variables = msgs_replace_variables

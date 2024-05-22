@@ -80,9 +80,9 @@ def exception2err_msg(exception: Exception):
 def _chat_log_response_final(logger, log_marks, kwargs, messages, start_time, role, content, err_msg=None):
     end_time = time.perf_counter()
     duration = end_time - start_time
-    input_content = PromptConverter.chat2raw(messages)
+    input_content = PromptConverter.msgs2raw(messages)
     if not err_msg:
-        output_content = PromptConverter.chat2raw([{'role': role, 'content': content}])
+        output_content = PromptConverter.msgs2raw([{'role': role, 'content': content}])
         log_result(logger, "Chat request", duration, log_marks, kwargs, input_content, output_content)
     else:
         log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
@@ -137,7 +137,7 @@ def _chat_log_exception(logger, log_marks, kwargs, messages, start_time, excepti
     if logger is not None:
         end_time = time.perf_counter()
         duration = end_time - start_time
-        input_content = PromptConverter.chat2raw(messages)
+        input_content = PromptConverter.msgs2raw(messages)
         err_msg = exception2err_msg(exception)
         log_exception(logger, "Chat request", duration, log_marks, kwargs, input_content, err_msg)
 

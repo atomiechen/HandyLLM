@@ -43,7 +43,10 @@ from ._str_enum import AutoStrEnum
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
-PathType = Union[str, os.PathLike[str]]
+if sys.version_info >= (3, 9):
+    PathType = Union[str, os.PathLike[str]]
+else:
+    PathType = Union[str, os.PathLike]
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
@@ -84,8 +87,8 @@ def loads(
     if api == "completions":
         return CompletionsPrompt(content, request, meta, base_path)
     else:
-        chat = converter.raw2chat(content)
-        return ChatPrompt(chat, request, meta, base_path)
+        messages = converter.raw2msgs(content)
+        return ChatPrompt(messages, request, meta, base_path)
 
 def load(
     fd: io.IOBase, 
@@ -558,36 +561,36 @@ class HandyPrompt(ABC):
 class ChatPrompt(HandyPrompt):
         
     def __init__(
-        self, chat: list, request: dict, meta: Union[dict, RunConfig], 
+        self, messages: list, request: dict, meta: Union[dict, RunConfig], 
         base_path: Optional[PathType] = None,
         response: Optional[dict] = None,
         ):
-        super().__init__(chat, request, meta, base_path, response)
+        super().__init__(messages, request, meta, base_path, response)
     
     @property
-    def chat(self) -> list:
+    def messages(self) -> list:
         return self.data
     
-    @chat.setter
-    def chat(self, value: list):
+    @messages.setter
+    def messages(self, value: list):
         self.data = value
     
     @property
     def result_str(self) -> str:
-        if len(self.chat) == 0:
+        if len(self.messages) == 0:
             return ""
-        return self.chat[-1]['content']
+        return self.messages[-1]['content']
     
     def _serialize_data(self, data) -> str:
-        return converter.chat2raw(data)
+        return converter.msgs2raw(data)
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
         if var_map:
-            return converter.chat_replace_variables(
-                self.chat, var_map, inplace=False)
+            return converter.msgs_replace_variables(
+                self.messages, var_map, inplace=False)
         else:
-            return self.chat
+            return self.messages
     
     def _run_with_client(
         self, client: OpenAIClient, 
@@ -602,19 +605,19 @@ class ChatPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # dump frontmatter, no base_path
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                # stream response to a file descriptor
+                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), fout)
-            elif run_config.output_fd:
-                # dump frontmatter, no base_path
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                # stream response to a file descriptor
-                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response), run_config.output_fd)
+                    role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), fout)
             else:
-                role, content, tool_calls = converter.stream_chat2raw(stream_chat_all(response))
+                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -638,17 +641,17 @@ class ChatPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response), run_config.output_fd)
+                    role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), fout)
             else:
-                role, content, tool_calls = await converter.astream_chat2raw(astream_chat_all(response))
+                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response))
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -663,14 +666,14 @@ class ChatPrompt(HandyPrompt):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
             return ChatPrompt(
-                self.chat + [{"role": "user", "content": other}],
+                self.messages + [{"role": "user", "content": other}],
                 copy.deepcopy(self.request),
                 replace(self.run_config),
                 self.base_path
             )
         elif isinstance(other, list):
             return ChatPrompt(
-                self.chat + [{"role": msg['role'], "content": msg['content']} for msg in other],
+                self.messages + other,
                 copy.deepcopy(self.request),
                 replace(self.run_config),
                 self.base_path
@@ -679,7 +682,7 @@ class ChatPrompt(HandyPrompt):
             # merge two ChatPrompt objects
             merged_request, merged_run_config = self._merge_non_data(other)
             return ChatPrompt(
-                self.chat + other.chat, merged_request, merged_run_config, 
+                self.messages + other.messages, merged_request, merged_run_config, 
                 self.base_path
             )
         else:
@@ -688,12 +691,12 @@ class ChatPrompt(HandyPrompt):
     def __iadd__(self, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
-            self.chat.append({"role": "user", "content": other})
+            self.messages.append({"role": "user", "content": other})
         elif isinstance(other, list):
-            self.chat += [{"role": msg['role'], "content": msg['content']} for msg in other]
+            self.messages += other
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
-            self.chat += other.chat
+            self.messages += other.messages
             self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
@@ -749,15 +752,15 @@ class CompletionsPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = self._stream_completions_proc(response, run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     content = self._stream_completions_proc(response, fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                content = self._stream_completions_proc(response, run_config.output_fd)
             else:
                 content = self._stream_completions_proc(response)
         else:
@@ -788,15 +791,15 @@ class CompletionsPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = await self._astream_completions_proc(response, run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     content = await self._astream_completions_proc(response, fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                content = await self._astream_completions_proc(response, run_config.output_fd)
             else:
                 content = await self._astream_completions_proc(response)
         else:
