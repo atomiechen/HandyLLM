@@ -84,8 +84,8 @@ def loads(
     if api == "completions":
         return CompletionsPrompt(content, request, meta, base_path)
     else:
-        chat = converter.raw2chat(content)
-        return ChatPrompt(chat, request, meta, base_path)
+        messages = converter.raw2chat(content)
+        return ChatPrompt(messages, request, meta, base_path)
 
 def load(
     fd: io.IOBase, 
@@ -558,25 +558,25 @@ class HandyPrompt(ABC):
 class ChatPrompt(HandyPrompt):
         
     def __init__(
-        self, chat: list, request: dict, meta: Union[dict, RunConfig], 
+        self, messages: list, request: dict, meta: Union[dict, RunConfig], 
         base_path: Optional[PathType] = None,
         response: Optional[dict] = None,
         ):
-        super().__init__(chat, request, meta, base_path, response)
+        super().__init__(messages, request, meta, base_path, response)
     
     @property
-    def chat(self) -> list:
+    def messages(self) -> list:
         return self.data
     
-    @chat.setter
-    def chat(self, value: list):
+    @messages.setter
+    def messages(self, value: list):
         self.data = value
     
     @property
     def result_str(self) -> str:
-        if len(self.chat) == 0:
+        if len(self.messages) == 0:
             return ""
-        return self.chat[-1]['content']
+        return self.messages[-1]['content']
     
     def _serialize_data(self, data) -> str:
         return converter.chat2raw(data)
@@ -585,9 +585,9 @@ class ChatPrompt(HandyPrompt):
         var_map = self._parse_var_map(run_config)
         if var_map:
             return converter.chat_replace_variables(
-                self.chat, var_map, inplace=False)
+                self.messages, var_map, inplace=False)
         else:
-            return self.chat
+            return self.messages
     
     def _run_with_client(
         self, client: OpenAIClient, 
@@ -663,14 +663,14 @@ class ChatPrompt(HandyPrompt):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
             return ChatPrompt(
-                self.chat + [{"role": "user", "content": other}],
+                self.messages + [{"role": "user", "content": other}],
                 copy.deepcopy(self.request),
                 replace(self.run_config),
                 self.base_path
             )
         elif isinstance(other, list):
             return ChatPrompt(
-                self.chat + [{"role": msg['role'], "content": msg['content']} for msg in other],
+                self.messages + [{"role": msg['role'], "content": msg['content']} for msg in other],
                 copy.deepcopy(self.request),
                 replace(self.run_config),
                 self.base_path
@@ -679,7 +679,7 @@ class ChatPrompt(HandyPrompt):
             # merge two ChatPrompt objects
             merged_request, merged_run_config = self._merge_non_data(other)
             return ChatPrompt(
-                self.chat + other.chat, merged_request, merged_run_config, 
+                self.messages + other.messages, merged_request, merged_run_config, 
                 self.base_path
             )
         else:
@@ -688,12 +688,12 @@ class ChatPrompt(HandyPrompt):
     def __iadd__(self, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
-            self.chat.append({"role": "user", "content": other})
+            self.messages.append({"role": "user", "content": other})
         elif isinstance(other, list):
-            self.chat += [{"role": msg['role'], "content": msg['content']} for msg in other]
+            self.messages += [{"role": msg['role'], "content": msg['content']} for msg in other]
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
-            self.chat += other.chat
+            self.messages += other.messages
             self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
