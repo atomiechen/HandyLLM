@@ -605,17 +605,17 @@ class ChatPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # dump frontmatter, no base_path
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                # stream response to a file descriptor
+                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), fout)
-            elif run_config.output_fd:
-                # dump frontmatter, no base_path
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                # stream response to a file descriptor
-                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), run_config.output_fd)
             else:
                 role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response))
         else:
@@ -641,15 +641,15 @@ class ChatPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), run_config.output_fd)
             else:
                 role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response))
         else:
@@ -752,15 +752,15 @@ class CompletionsPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = self._stream_completions_proc(response, run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     content = self._stream_completions_proc(response, fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                content = self._stream_completions_proc(response, run_config.output_fd)
             else:
                 content = self._stream_completions_proc(response)
         else:
@@ -791,15 +791,15 @@ class CompletionsPrompt(HandyPrompt):
         new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
-            if run_config.output_path:
+            if run_config.output_fd:
+                # stream response to a file descriptor
+                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
+                content = await self._astream_completions_proc(response, run_config.output_fd)
+            elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(self._dumps_frontmatter(new_request, run_config, base_path))
                     content = await self._astream_completions_proc(response, fout)
-            elif run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(self._dumps_frontmatter(new_request, run_config))
-                content = await self._astream_completions_proc(response, run_config.output_fd)
             else:
                 content = await self._astream_completions_proc(response)
         else:
