@@ -43,7 +43,10 @@ from ._str_enum import AutoStrEnum
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
-PathType = Union[str, os.PathLike[str]]
+if sys.version_info >= (3, 9):
+    PathType = Union[str, os.PathLike[str]]
+else:
+    PathType = Union[str, os.PathLike]
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
