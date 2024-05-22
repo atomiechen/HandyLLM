@@ -38,14 +38,16 @@ def hprompt_command(args):
         run_config.var_map = var_map
     if args.var_map_path:
         run_config.var_map_path = args.var_map_path
+    prompt = hprompt.load_from(args.path[0])
     if args.output:
         run_config.output_path = args.output
     else:
-        run_config.output_fd = sys.stderr
+        # check if prompt has output_path set
+        if not prompt.run_config.output_path:
+            run_config.output_fd = sys.stderr
     if args.verbose:
         run_config.verbose = True
         print(f"Input paths: {args.path}", file=sys.stderr)
-    prompt = hprompt.load_from(args.path[0])
     result_prompt = prompt.run(run_config=run_config)
     for next_path in args.path[1:]:
         prompt += result_prompt
