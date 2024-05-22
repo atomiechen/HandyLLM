@@ -670,7 +670,7 @@ class ChatPrompt(HandyPrompt):
             )
         elif isinstance(other, list):
             return ChatPrompt(
-                self.messages + [{"role": msg['role'], "content": msg['content']} for msg in other],
+                self.messages + other,
                 copy.deepcopy(self.request),
                 replace(self.run_config),
                 self.base_path
@@ -690,7 +690,7 @@ class ChatPrompt(HandyPrompt):
         if isinstance(other, str):
             self.messages.append({"role": "user", "content": other})
         elif isinstance(other, list):
-            self.messages += [{"role": msg['role'], "content": msg['content']} for msg in other]
+            self.messages += other
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
             self.messages += other.messages
