@@ -19,7 +19,3 @@ new_chat = converter.msgs_replace_variables(
 )
 # print(json.dumps(new_chat, indent=2))
 print(converter.msgs2raw(new_chat))
-print(converter.chat_append_msg(new_chat, '''{
-    "item1": "It is really a good day.",
-    "item2": "Indeed."
-}''', role='assistant'))

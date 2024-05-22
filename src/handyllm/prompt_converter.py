@@ -188,16 +188,6 @@ class PromptConverter:
                 new_chat.append(new_message)
             return new_chat
     
-    @staticmethod
-    def chat_append_msg(chat, content: str, role: str = 'user', inplace=False):
-        if inplace:
-            chat.append({"role": role, "content": content})
-            return chat
-        else:
-            new_chat = chat.copy()
-            new_chat.append({"role": role, "content": content})
-            return new_chat
-    
     raw2chat = raw2msgs
     rawfile2chat = rawfile2msgs
     chat2raw = msgs2raw
