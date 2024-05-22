@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union, TYPE_CHECKING
+from typing import Union
 import os
 import json
 import time
@@ -9,7 +9,7 @@ import asyncio
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
-from ._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE
+from ._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, TYPE_API_TYPES
 
 
 def api(func):
@@ -27,7 +27,7 @@ class OpenAIClient:
     # set this to your API type;
     # or environment variable OPENAI_API_TYPE will be used;
     # can be None (roll back to default).
-    api_type: Union[str, None]
+    api_type: Union[TYPE_API_TYPES, None]
 
     # set this to your API base;
     # or environment variable OPENAI_API_BASE will be used.
@@ -57,12 +57,12 @@ class OpenAIClient:
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
         *,
-        api_base=None,
-        api_key=None,
-        organization=None,
-        api_type=None,
-        api_version=None,
-        model_engine_map=None,
+        api_base: Union[str, None] = None,
+        api_key: Union[str, None] = None,
+        organization: Union[str, None] = None,
+        api_type: Union[TYPE_API_TYPES, None] = None,
+        api_version: Union[str, None] = None,
+        model_engine_map: Union[dict, None] = None,
         ) -> None:
         self._sync_client = None
         self._async_client = None
