@@ -57,12 +57,12 @@ class OpenAIClient:
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
         *,
-        api_base=None,
-        api_key=None,
-        organization=None,
+        api_base: Union[str, None] = None,
+        api_key: Union[str, None] = None,
+        organization: Union[str, None] = None,
         api_type: Union[TYPE_API_TYPES, None] = None,
-        api_version=None,
-        model_engine_map=None,
+        api_version: Union[str, None] = None,
+        model_engine_map: Union[dict, None] = None,
         ) -> None:
         self._sync_client = None
         self._async_client = None
