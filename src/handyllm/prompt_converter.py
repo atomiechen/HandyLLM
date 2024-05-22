@@ -130,6 +130,9 @@ class PromptConverter:
         if tool_calls and fd:
             # dump tool calls
             fd.write(yaml.dump(tool_calls))
+        if not tool_calls:
+            # should return None if no tool calls
+            tool_calls = None
         return role, content, tool_calls
 
     @staticmethod
@@ -161,6 +164,9 @@ class PromptConverter:
         if tool_calls and fd:
             # dump tool calls
             fd.write(yaml.dump(tool_calls))
+        if not tool_calls:
+            # should return None if no tool calls
+            tool_calls = None
         return role, content, tool_calls
     
     @classmethod
