@@ -84,7 +84,7 @@ def loads(
     if api == "completions":
         return CompletionsPrompt(content, request, meta, base_path)
     else:
-        messages = converter.raw2chat(content)
+        messages = converter.raw2msgs(content)
         return ChatPrompt(messages, request, meta, base_path)
 
 def load(
@@ -579,12 +579,12 @@ class ChatPrompt(HandyPrompt):
         return self.messages[-1]['content']
     
     def _serialize_data(self, data) -> str:
-        return converter.chat2raw(data)
+        return converter.msgs2raw(data)
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
         if var_map:
-            return converter.chat_replace_variables(
+            return converter.msgs_replace_variables(
                 self.messages, var_map, inplace=False)
         else:
             return self.messages
