@@ -40,8 +40,8 @@ class PromptConverter:
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
 
-        # convert plain text to chat format
-        chat = []
+        # convert plain text to messages format
+        msgs = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
         for idx in range(1, len(blocks), 3):
             role = blocks[idx]
@@ -68,9 +68,9 @@ class PromptConverter:
                         msg['content'] = yaml.safe_load(content)
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
-            chat.append(msg)
+            msgs.append(msg)
         
-        return chat
+        return msgs
     
     def rawfile2msgs(self, raw_prompt_path: str):
         with open(raw_prompt_path, 'r', encoding='utf-8') as fin:
@@ -79,10 +79,10 @@ class PromptConverter:
         return self.raw2msgs(raw_prompt)
     
     @staticmethod
-    def msgs2raw(chat):
-        # convert chat format to plain text
+    def msgs2raw(msgs):
+        # convert messages format to plain text
         messages = []
-        for message in chat:
+        for message in msgs:
             role = message.get('role')
             content = message.get('content')
             tool_calls = message.get('tool_calls')
@@ -164,29 +164,29 @@ class PromptConverter:
         return role, content, tool_calls
     
     @classmethod
-    def msgs2rawfile(cls, chat, raw_prompt_path: str):
-        raw_prompt = cls.msgs2raw(chat)
+    def msgs2rawfile(cls, msgs, raw_prompt_path: str):
+        raw_prompt = cls.msgs2raw(msgs)
         with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
             fout.write(raw_prompt)
     
     @staticmethod
-    def msgs_replace_variables(chat, variable_map: dict, inplace=False):
-        # replace every variable in chat content
+    def msgs_replace_variables(msgs, variable_map: dict, inplace=False):
+        # replace every variable in messages content
         if inplace:
-            for message in chat:
+            for message in msgs:
                 for var, value in variable_map.items():
                     if message.get('content') and var in message['content']:
                         message['content'] = message['content'].replace(var, value)
-            return chat
+            return msgs
         else:
-            new_chat = []
-            for message in chat:
+            new_msgs = []
+            for message in msgs:
                 new_message = message.copy()
                 for var, value in variable_map.items():
                     if new_message.get('content') and var in new_message['content']:
                         new_message['content'] = new_message['content'].replace(var, value)
-                new_chat.append(new_message)
-            return new_chat
+                new_msgs.append(new_message)
+            return new_msgs
     
     raw2chat = raw2msgs
     rawfile2chat = rawfile2msgs
