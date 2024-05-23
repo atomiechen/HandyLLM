@@ -192,12 +192,18 @@ class OpenAIClient:
         engine = kwargs.pop('engine', deployment_id)
         # if using Azure and engine not provided, try to get it from model parameter
         if api_type and api_type.lower() in _API_TYPES_AZURE:
-            model = kwargs.pop('model', None)
-            if not engine and model:
-                if model_engine_map:
-                    engine = model_engine_map.get(model, model)
+            if not engine:
+                # keep or consume model parameter
+                keep_model = kwargs.pop('keep_model', False)
+                if keep_model:
+                    model = kwargs.get('model', None)
                 else:
-                    engine = model
+                    model = kwargs.pop('model', None)
+                if model:
+                    if model_engine_map:
+                        engine = model_engine_map.get(model, model)
+                    else:
+                        engine = model
         dest_url = kwargs.pop('dest_url', dest_url)
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
@@ -346,6 +352,7 @@ class OpenAIClient:
     @api
     def audio_speech(self, stream=False, chunk_size=1024, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
+        # NOTE: this api needs both model and engine parameters
         return self._make_requestor(
             get_request_url('/audio/speech', api_type, api_version, engine),
             method='post', 
@@ -357,6 +364,8 @@ class OpenAIClient:
             stream=stream, 
             chunk_size=chunk_size, 
             raw=True,
+            # avoid poping model parameter
+            keep_model=True,
             **kwargs
             )
 
