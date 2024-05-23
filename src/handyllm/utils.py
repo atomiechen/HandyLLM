@@ -1,3 +1,4 @@
+import io
 from urllib.parse import urlparse
 import os
 import time
@@ -107,3 +108,18 @@ async def astream_completions(response):
         except (KeyError, IndexError):
             pass
 
+def stream_to_fd(response, fd: io.IOBase):
+    for data in response:
+        fd.write(data)
+
+def stream_to_file(response, file_path):
+    with open(file_path, 'wb') as f:
+        stream_to_fd(response, f)
+
+async def astream_to_fd(response, fd: io.IOBase):
+    async for data in response:
+        fd.write(data)
+
+async def astream_to_file(response, file_path):
+    with open(file_path, 'wb') as f:
+        await astream_to_fd(response, f)
