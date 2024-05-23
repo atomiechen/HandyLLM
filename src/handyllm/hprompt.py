@@ -355,16 +355,19 @@ class HandyPrompt(ABC):
     def eval(
         self: PromptType, 
         run_config: RunConfig = DEFAULT_CONFIG,
-        ) -> PromptType:
+        **kwargs) -> PromptType:
         '''
         Evaluate the prompt with the given run_config. 
         A new prompt object is returned.
         '''
         new_run_config = self.eval_run_config(run_config)
         new_data = self._eval_data(new_run_config)
+        # update the request with the keyword arguments
+        evaled_request = copy.deepcopy(self.request)
+        evaled_request.update(kwargs)
         return self.__class__(
             new_data,
-            copy.deepcopy(self.request),
+            evaled_request,
             new_run_config,
         )
     
@@ -460,12 +463,10 @@ class HandyPrompt(ABC):
     
     def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
         # evaluate the prompt with the given run_config
-        evaled_prompt = self.eval(run_config=run_config)
+        evaled_prompt = self.eval(run_config=run_config, **kwargs)
         evaled_run_config = evaled_prompt.run_config
         evaled_request = evaled_prompt.request
         
-        # update the request with the keyword arguments
-        evaled_request.update(kwargs)
         # get the stream flag
         stream = evaled_request.get("stream", False)
         
