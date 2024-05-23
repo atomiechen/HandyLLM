@@ -320,12 +320,13 @@ class HandyPrompt(ABC):
         '''
         return str(data)
     
-    @staticmethod
-    def _dumps_frontmatter(request: dict, run_config: RunConfig, base_path: Optional[PathType] = None) -> str:
+    @classmethod
+    def _dumps_frontmatter(cls, request: dict, run_config: RunConfig, base_path: Optional[PathType] = None) -> str:
         # dump frontmatter
         if not run_config and not request:
             return ""
-        front_data = copy.deepcopy(request)
+        # need to filter the request
+        front_data = cls._filter_request(request, run_config)
         if run_config:
             front_data['meta'] = run_config.to_dict(retain_fd=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
@@ -338,7 +339,6 @@ class HandyPrompt(ABC):
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
-        # TODO: filter request
         return self._dumps(self.request, self.run_config, serialized_data, base_path)
     
     def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
@@ -521,8 +521,9 @@ class HandyPrompt(ABC):
             merged_run_config = self.run_config.merge(other.run_config)
             return merged_request, merged_run_config
     
+    @staticmethod
     def _filter_request(
-        self, request: dict, 
+        request: dict, 
         run_config: RunConfig,
         ) -> dict:
         if run_config.record_request == RecordRequestMode.WHITELIST:
@@ -536,7 +537,7 @@ class HandyPrompt(ABC):
             pass
         else:
             # default: blacklist
-            # will modify the original request
+            request = copy.deepcopy(request)
             real_blacklist = run_config.record_blacklist or DEFAULT_BLACKLIST
             for key in real_blacklist:
                 request.pop(key, None)
