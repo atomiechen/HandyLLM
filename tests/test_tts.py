@@ -2,6 +2,7 @@ from dotenv import load_dotenv, find_dotenv
 # load env parameters from file
 load_dotenv(find_dotenv('.env'))
 
+import os
 import asyncio
 
 from handyllm import OpenAIClient
@@ -49,10 +50,29 @@ async def async_speech_stream():
         ).acall()
         await astream_to_file(response, 'output-async-stream.mp3')
 
+def sync_speech_azure():
+    with OpenAIClient(
+        api_type='azure', 
+        api_base=os.getenv("AZURE_OPENAI_ENDPOINT"), 
+        api_key=os.getenv("AZURE_OPENAI_KEY"), 
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION")  # cannot be None if using Azure API.
+        ) as client:
+        # NOTE: Azure TTS API needs both deployment_id and model
+        response = client.audio_speech(
+            deployment_id='tts',
+            model='tts-1',
+            input="Hello, world! oh yes. This is a test. Sync speech no-stream version.",
+            voice='alloy',
+        ).call()
+        with open('output-sync-azure.mp3', 'wb') as f:
+            f.write(response)
+
 
 if __name__ == '__main__':
     sync_speech()
     sync_speech_stream()
     asyncio.run(async_speech())
     asyncio.run(async_speech_stream())
+    
+    sync_speech_azure() # Azure TTS API
 
