@@ -345,9 +345,15 @@ class OpenAIClient:
 
     @api
     def audio_speech(self, stream=False, chunk_size=1024, **kwargs) -> Requestor:
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         return self._make_requestor(
-            '/audio/speech', 
+            get_request_url('/audio/speech', api_type, api_version, engine),
             method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            dest_url=dest_url,
             stream=stream, 
             chunk_size=chunk_size, 
             raw=True,
@@ -357,7 +363,18 @@ class OpenAIClient:
     @api
     def audio_transcriptions(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
-        return self._make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)
+        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
+        return self._make_requestor(
+            get_request_url('/audio/transcriptions', api_type, api_version, engine),
+            method='post', 
+            api_key=api_key,
+            organization=organization,
+            api_base=api_base,
+            api_type=api_type,
+            dest_url=dest_url,
+            files=files, 
+            **kwargs
+            )
 
     @api
     def audio_translations(self, file, **kwargs) -> Requestor:
