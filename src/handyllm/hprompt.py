@@ -15,6 +15,7 @@ __all__ = [
     "CredentialType",
 ]
 
+import inspect
 import json
 import re
 import copy
@@ -23,7 +24,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Union, TypeVar
+from typing import Callable, Optional, Union, TypeVar
 from enum import auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields, replace
@@ -161,6 +162,8 @@ class RunConfig:
     var_map: Optional[dict[str, str]] = None
     # variable map file path
     var_map_path: Optional[PathType] = None
+    # callback for each chunk generated in stream mode of the response
+    on_chunk: Optional[Callable] = None
     # output the result to a file or a file descriptor
     output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
@@ -236,17 +239,21 @@ class RunConfig:
         # record and remove file descriptors
         tmp_output_fd = self.output_fd
         tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
+        tmp_on_chunk = self.on_chunk
         self.output_fd = None
         self.output_evaled_prompt_fd = None
+        self.on_chunk = None
         # convert to dict
         obj = asdict(self, dict_factory=lambda x: { k: v for k, v in x if v is not None })
         # restore file descriptors
         self.output_fd = tmp_output_fd
         self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
+        self.on_chunk = tmp_on_chunk
         if retain_fd:
             # keep file descriptors
             obj["output_fd"] = self.output_fd
             obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
+            obj["on_chunk"] = self.on_chunk
         # convert path to relative path
         if base_path:
             for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
@@ -590,6 +597,23 @@ class ChatPrompt(HandyPrompt):
         return converter.msgs_replace_variables(
             self.messages, var_map, inplace=False)
     
+    @staticmethod
+    def _wrap_gen_chat(response, run_config: RunConfig):
+        for role, content, tool_call in stream_chat_all(response):
+            if run_config.on_chunk:
+                run_config.on_chunk(role, content, tool_call)
+            yield role, content, tool_call
+    
+    @staticmethod
+    async def _awrap_gen_chat(response, run_config: RunConfig):
+        async for role, content, tool_call in astream_chat_all(response):
+            if run_config.on_chunk:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(role, content, tool_call)
+                else:
+                    run_config.on_chunk(role, content, tool_call)
+            yield role, content, tool_call
+
     @classmethod
     def _run_with_client(
         cls, 
@@ -609,15 +633,23 @@ class ChatPrompt(HandyPrompt):
                 # dump frontmatter, no base_path
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
                 # stream response to a file descriptor
-                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), run_config.output_fd)
+                role, content, tool_calls = converter.stream_msgs2raw(
+                    cls._wrap_gen_chat(response, run_config), 
+                    run_config.output_fd
+                    )
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), fout)
+                    role, content, tool_calls = converter.stream_msgs2raw(
+                        cls._wrap_gen_chat(response, run_config), 
+                        fout
+                        )
             else:
-                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response))
+                role, content, tool_calls = converter.stream_msgs2raw(
+                    cls._wrap_gen_chat(response, run_config)
+                    )
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -646,14 +678,22 @@ class ChatPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), run_config.output_fd)
+                role, content, tool_calls = await converter.astream_msgs2raw(
+                    cls._awrap_gen_chat(response, run_config), 
+                    run_config.output_fd
+                    )
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), fout)
+                    role, content, tool_calls = await converter.astream_msgs2raw(
+                        cls._awrap_gen_chat(response, run_config), 
+                        fout
+                        )
             else:
-                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response))
+                role, content, tool_calls = await converter.astream_msgs2raw(
+                    cls._awrap_gen_chat(response, run_config)
+                    )
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -730,10 +770,12 @@ class CompletionsPrompt(HandyPrompt):
         return new_prompt
     
     @staticmethod
-    def _stream_completions_proc(response, fd: Optional[io.IOBase] = None) -> str:
+    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         for text in stream_completions(response):
+            if run_config.on_chunk:
+                run_config.on_chunk(text)
             if fd:
                 fd.write(text)
             content += text
@@ -757,14 +799,14 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = cls._stream_completions_proc(response, run_config.output_fd)
+                content = cls._stream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
+                    fout.write(cls._dumps_frontmatter(new_request, run_config, run_config, base_path))
                     content = cls._stream_completions_proc(response, fout)
             else:
-                content = cls._stream_completions_proc(response)
+                content = cls._stream_completions_proc(response, run_config)
         else:
             content = response['choices'][0]['text']
         return CompletionsPrompt(
@@ -772,10 +814,15 @@ class CompletionsPrompt(HandyPrompt):
             )
 
     @staticmethod
-    async def _astream_completions_proc(response, fd: Optional[io.IOBase] = None) -> str:
+    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         async for text in astream_completions(response):
+            if run_config.on_chunk:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(text)
+                else:
+                    run_config.on_chunk(text)
             if fd:
                 fd.write(text)
             content += text
@@ -799,14 +846,14 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = await cls._astream_completions_proc(response, run_config.output_fd)
+                content = await cls._astream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = await cls._astream_completions_proc(response, fout)
+                    content = await cls._astream_completions_proc(response, run_config, fout)
             else:
-                content = await cls._astream_completions_proc(response)
+                content = await cls._astream_completions_proc(response, run_config)
         else:
             content = response['choices'][0]['text']
         return CompletionsPrompt(
