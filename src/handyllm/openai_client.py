@@ -344,6 +344,17 @@ class OpenAIClient:
         return self._make_requestor('/images/variations', method='post', files=files, **kwargs)
 
     @api
+    def audio_speech(self, stream=False, chunk_size=1024, **kwargs) -> Requestor:
+        return self._make_requestor(
+            '/audio/speech', 
+            method='post', 
+            stream=stream, 
+            chunk_size=chunk_size, 
+            raw=True,
+            **kwargs
+            )
+
+    @api
     def audio_transcriptions(self, file, **kwargs) -> Requestor:
         files = { 'file': file }
         return self._make_requestor('/audio/transcriptions', method='post', files=files, **kwargs)

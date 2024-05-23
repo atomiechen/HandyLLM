@@ -27,6 +27,8 @@ class Requestor:
         timeout=None, 
         files=None, 
         azure_poll=False, 
+        raw=False, 
+        chunk_size=1024, 
         dest_url=None, 
         **kwargs) -> None:
         
@@ -53,6 +55,8 @@ class Requestor:
         self.timeout = timeout
         self.files = files
         self.azure_poll = azure_poll
+        self.raw = raw
+        self.chunk_size = chunk_size
         self.dest_url = dest_url
 
         self.stream = kwargs.get('stream', False)
@@ -137,12 +141,17 @@ class Requestor:
             raw_response = self._call_raw()
 
             if self.stream:
-                response = self._gen_stream_response(raw_response, prepare_ret)
+                if self.raw:
+                    response = self._gen_stream_bin_response(raw_response, prepare_ret)
+                else:
+                    response = self._gen_stream_response(raw_response, prepare_ret)
             else:
                 if self.azure_poll:
                     poll_url = raw_response.headers['operation-location']
                     response = self.poll(poll_url, timeout_ddl=timeout_ddl).json()
                     response = response.get('result', response)
+                elif self.raw:
+                    response = raw_response.content
                 else:
                     response = raw_response.json()
             
@@ -188,6 +197,16 @@ class Requestor:
                 if self._exception_callback:
                     self._exception_callback(e, prepare_ret)
                 raise e
+    
+    def _gen_stream_bin_response(self, raw_response: requests.Response, prepare_ret):
+        with raw_response:
+            try:
+                for chunk in raw_response.iter_content(chunk_size=self.chunk_size):
+                    yield chunk
+            except Exception as e:
+                if self._exception_callback:
+                    self._exception_callback(e, prepare_ret)
+                raise e
 
     def poll(self, url, timeout_ddl=None, params=None) -> requests.Response:
         self._check_timeout(timeout_ddl)
@@ -215,12 +234,17 @@ class Requestor:
             raw_response = await self._acall_raw()
 
             if self.stream:
-                response = self._agen_stream_response(raw_response, prepare_ret)
+                if self.raw:
+                    response = self._agen_stream_bin_response(raw_response, prepare_ret)
+                else:
+                    response = self._agen_stream_response(raw_response, prepare_ret)
             else:
                 if self.azure_poll:
                     poll_url = raw_response.headers['operation-location']
                     response = await self.apoll(poll_url, timeout_ddl=timeout_ddl).json()
                     response = response.get('result', response)
+                elif self.raw:
+                    response = raw_response.content
                 else:
                     response = raw_response.json()
             
@@ -264,6 +288,17 @@ class Requestor:
                     if raw_line.startswith("data: "):
                         line = raw_line[len("data: "):]
                         yield json.loads(line)
+        except Exception as e:
+            if self._exception_callback:
+                self._exception_callback(e, prepare_ret)
+            raise e
+        finally:
+            await raw_response.aclose()
+
+    async def _agen_stream_bin_response(self, raw_response: httpx.Response, prepare_ret):
+        try:
+            async for chunk in raw_response.aiter_bytes():
+                yield chunk
         except Exception as e:
             if self._exception_callback:
                 self._exception_callback(e, prepare_ret)
