@@ -492,7 +492,10 @@ class HandyPrompt(ABC):
                         credential_dict = json.load(fin)
                     else:
                         credential_dict = yaml.safe_load(fin)
-                evaled_request.update(credential_dict)
+                # do not overwrite the existing request arguments
+                for key, value in credential_dict.items():
+                    if key not in evaled_request:
+                        evaled_request[key] = value
             else:
                 raise ValueError(f"unsupported credential type: {evaled_run_config.credential_type}")
         
