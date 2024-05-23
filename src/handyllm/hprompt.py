@@ -338,6 +338,7 @@ class HandyPrompt(ABC):
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
+        # TODO: filter request
         return self._dumps(self.request, self.run_config, serialized_data, base_path)
     
     def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
@@ -478,6 +479,13 @@ class HandyPrompt(ABC):
             evaled_run_config.pretty_print()
             print("---", file=sys.stderr)
         
+        # output the evaluated prompt to a file or a file descriptor
+        # NOTE: should be done before loading the credential file
+        if evaled_run_config.output_evaled_prompt_fd:
+            evaled_prompt.dump(evaled_run_config.output_evaled_prompt_fd)
+        elif evaled_run_config.output_evaled_prompt_path:
+            evaled_prompt.dump_to(evaled_run_config.output_evaled_prompt_path)
+        
         # load the credential file
         if evaled_run_config.credential_path:
             if evaled_run_config.credential_type == CredentialType.ENV:
@@ -492,21 +500,6 @@ class HandyPrompt(ABC):
             else:
                 raise ValueError(f"unsupported credential type: {evaled_run_config.credential_type}")
         
-        # output the evaluated prompt to a file or a file descriptor
-        if evaled_run_config.output_evaled_prompt_path \
-            or evaled_run_config.output_evaled_prompt_fd:
-            evaled_data = evaled_prompt.data
-            serialized_data = self._serialize_data(evaled_data)
-            text = self._dumps(
-                self.request, evaled_run_config, serialized_data, 
-                Path(evaled_run_config.output_evaled_prompt_path).parent.resolve() \
-                    if evaled_run_config.output_evaled_prompt_path else None
-            )
-            if evaled_run_config.output_evaled_prompt_fd:
-                evaled_run_config.output_evaled_prompt_fd.write(text)
-            elif evaled_run_config.output_evaled_prompt_path:
-                with open(evaled_run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
-                    fout.write(text)
         return evaled_run_config, evaled_request, stream
     
     def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
