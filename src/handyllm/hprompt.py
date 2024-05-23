@@ -597,7 +597,6 @@ class ChatPrompt(HandyPrompt):
             messages=self._eval_data(run_config),
             **new_request
             ).call()
-        new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_fd:
@@ -633,7 +632,6 @@ class ChatPrompt(HandyPrompt):
             messages=self._eval_data(run_config),
             **new_request
             ).acall()
-        new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_fd:
@@ -741,7 +739,6 @@ class CompletionsPrompt(HandyPrompt):
             prompt=self._eval_data(run_config),
             **new_request
             ).call()
-        new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_fd:
@@ -780,7 +777,6 @@ class CompletionsPrompt(HandyPrompt):
             prompt=self._eval_data(run_config),
             **new_request
             ).acall()
-        new_request = self._filter_request(new_request, run_config)
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             if run_config.output_fd:
