@@ -505,10 +505,10 @@ class HandyPrompt(ABC):
         if not stream:
             # if stream is True, the response is already streamed to 
             # a file or a file descriptor
-            if run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
-            elif run_config.output_fd:
+            if run_config.output_fd:
                 new_prompt.dump(run_config.output_fd)
+            elif run_config.output_path:
+                new_prompt.dump_to(run_config.output_path)
         return new_prompt
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, RunConfig]]:
