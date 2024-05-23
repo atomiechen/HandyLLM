@@ -352,7 +352,10 @@ class HandyPrompt(ABC):
     def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
         ...
     
-    def eval(self: PromptType, run_config: RunConfig) -> PromptType:
+    def eval(
+        self: PromptType, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        ) -> PromptType:
         '''
         Evaluate the prompt with the given run_config. 
         A new prompt object is returned.
