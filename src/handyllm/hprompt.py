@@ -353,14 +353,17 @@ class HandyPrompt(ABC):
         ...
     
     def eval(self: PromptType, run_config: RunConfig) -> PromptType:
-        new_data = self._eval_data(run_config)
-        if new_data != self.data:
-            return self.__class__(
-                new_data,
-                copy.deepcopy(self.request),
-                replace(self.run_config),
-            )
-        return self
+        '''
+        Evaluate the prompt with the given run_config. 
+        A new prompt object is returned.
+        '''
+        new_run_config = self.eval_run_config(run_config)
+        new_data = self._eval_data(new_run_config)
+        return self.__class__(
+            new_data,
+            copy.deepcopy(self.request),
+            new_run_config,
+        )
     
     def eval_run_config(
         self: PromptType, 
@@ -586,11 +589,8 @@ class ChatPrompt(HandyPrompt):
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
-        if var_map:
-            return converter.msgs_replace_variables(
-                self.messages, var_map, inplace=False)
-        else:
-            return self.messages
+        return converter.msgs_replace_variables(
+            self.messages, var_map, inplace=False)
     
     def _run_with_client(
         self, client: OpenAIClient, 
@@ -722,13 +722,10 @@ class CompletionsPrompt(HandyPrompt):
     
     def _eval_data(self, run_config: RunConfig) -> str:
         var_map = self._parse_var_map(run_config)
-        if var_map:
-            new_prompt = self.prompt
-            for key, value in var_map.items():
-                new_prompt = new_prompt.replace(key, value)
-            return new_prompt
-        else:
-            return self.prompt
+        new_prompt = self.prompt
+        for key, value in var_map.items():
+            new_prompt = new_prompt.replace(key, value)
+        return new_prompt
     
     def _stream_completions_proc(self, response, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
