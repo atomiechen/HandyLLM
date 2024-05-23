@@ -494,11 +494,11 @@ class HandyPrompt(ABC):
                 Path(run_config.output_evaled_prompt_path).parent.resolve() \
                     if run_config.output_evaled_prompt_path else None
             )
-            if run_config.output_evaled_prompt_path:
+            if run_config.output_evaled_prompt_fd:
+                run_config.output_evaled_prompt_fd.write(text)
+            elif run_config.output_evaled_prompt_path:
                 with open(run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
                     fout.write(text)
-            elif run_config.output_evaled_prompt_fd:
-                run_config.output_evaled_prompt_fd.write(text)
         return run_config, new_request, stream
     
     def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
