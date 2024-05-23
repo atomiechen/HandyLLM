@@ -332,14 +332,10 @@ class HandyPrompt(ABC):
         post = frontmatter.Post("", None, **front_data)
         return frontmatter.dumps(post, handler).strip() + "\n\n"
     
-    @classmethod
-    def _dumps(cls, request, run_config: RunConfig, content: str, base_path: Optional[PathType] = None) -> str:
-        return cls._dumps_frontmatter(request, run_config, base_path) + content
-    
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
-        return self._dumps(self.request, self.run_config, serialized_data, base_path)
+        return self._dumps_frontmatter(self.request, self.run_config, base_path) + serialized_data
     
     def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
         text = self.dumps(base_path=base_path)
