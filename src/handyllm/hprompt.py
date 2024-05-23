@@ -459,53 +459,54 @@ class HandyPrompt(ABC):
         return output_path
     
     def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
-        # update the request with the keyword arguments
-        new_request = copy.deepcopy(self.request)
-        new_request.update(kwargs)
-        # get the stream flag
-        stream = new_request.get("stream", False)
+        # evaluate the prompt with the given run_config
+        evaled_prompt = self.eval(run_config=run_config)
+        evaled_run_config = evaled_prompt.run_config
+        evaled_request = evaled_prompt.request
         
-        # evaluate the run_config
-        run_config = self.eval_run_config(run_config)
+        # update the request with the keyword arguments
+        evaled_request.update(kwargs)
+        # get the stream flag
+        stream = evaled_request.get("stream", False)
         
         # verbose output
-        if run_config.verbose:
+        if evaled_run_config.verbose:
             print("---", file=sys.stderr)
             print("NEW RUN")
             print(f"Start time: {datetime.now()}", file=sys.stderr)
-            run_config.pretty_print()
+            evaled_run_config.pretty_print()
             print("---", file=sys.stderr)
         
         # load the credential file
-        if run_config.credential_path:
-            if run_config.credential_type == CredentialType.ENV:
-                load_dotenv(run_config.credential_path, override=True)
-            elif run_config.credential_type in (CredentialType.JSON, CredentialType.YAML):
-                with open(run_config.credential_path, 'r', encoding='utf-8') as fin:
-                    if run_config.credential_type == CredentialType.JSON:
+        if evaled_run_config.credential_path:
+            if evaled_run_config.credential_type == CredentialType.ENV:
+                load_dotenv(evaled_run_config.credential_path, override=True)
+            elif evaled_run_config.credential_type in (CredentialType.JSON, CredentialType.YAML):
+                with open(evaled_run_config.credential_path, 'r', encoding='utf-8') as fin:
+                    if evaled_run_config.credential_type == CredentialType.JSON:
                         credential_dict = json.load(fin)
                     else:
                         credential_dict = yaml.safe_load(fin)
-                new_request.update(credential_dict)
+                evaled_request.update(credential_dict)
             else:
-                raise ValueError(f"unsupported credential type: {run_config.credential_type}")
+                raise ValueError(f"unsupported credential type: {evaled_run_config.credential_type}")
         
         # output the evaluated prompt to a file or a file descriptor
-        if run_config.output_evaled_prompt_path \
-            or run_config.output_evaled_prompt_fd:
-            evaled_data = self._eval_data(run_config)
+        if evaled_run_config.output_evaled_prompt_path \
+            or evaled_run_config.output_evaled_prompt_fd:
+            evaled_data = evaled_prompt.data
             serialized_data = self._serialize_data(evaled_data)
             text = self._dumps(
-                self.request, run_config, serialized_data, 
-                Path(run_config.output_evaled_prompt_path).parent.resolve() \
-                    if run_config.output_evaled_prompt_path else None
+                self.request, evaled_run_config, serialized_data, 
+                Path(evaled_run_config.output_evaled_prompt_path).parent.resolve() \
+                    if evaled_run_config.output_evaled_prompt_path else None
             )
-            if run_config.output_evaled_prompt_fd:
-                run_config.output_evaled_prompt_fd.write(text)
-            elif run_config.output_evaled_prompt_path:
-                with open(run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
+            if evaled_run_config.output_evaled_prompt_fd:
+                evaled_run_config.output_evaled_prompt_fd.write(text)
+            elif evaled_run_config.output_evaled_prompt_path:
+                with open(evaled_run_config.output_evaled_prompt_path, 'w', encoding='utf-8') as fout:
                     fout.write(text)
-        return run_config, new_request, stream
+        return evaled_run_config, evaled_request, stream
     
     def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
         if not stream:
