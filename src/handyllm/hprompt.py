@@ -55,6 +55,8 @@ AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]
 AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
 OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
 
+VarMapType = Dict[str, str]
+
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 p_var_map = re.compile(r'(%\w+%)')
@@ -165,7 +167,7 @@ class RunConfig:
     record_blacklist: Optional[list[str]] = None  # default: DEFAULT_BLACKLIST
     record_whitelist: Optional[list[str]] = None
     # variable map
-    var_map: Optional[dict[str, str]] = None
+    var_map: Optional[VarMapType] = None
     # variable map file path
     var_map_path: Optional[PathType] = None
     # callback for each chunk generated in stream mode of the response
@@ -365,12 +367,15 @@ class HandyPrompt(ABC):
     def eval(
         self: PromptType, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
         '''
-        Evaluate the prompt with the given run_config. 
+        Evaluate the prompt with the given run_config. var_map is for convenience.
         A new prompt object is returned.
         '''
         new_run_config = self.eval_run_config(run_config)
+        if var_map:
+            new_run_config.var_map = var_map
         new_data = self._eval_data(new_run_config)
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
@@ -421,10 +426,11 @@ class HandyPrompt(ABC):
     
     def run(
         self: PromptType, 
-        client: OpenAIClient = None, 
+        client: Optional[OpenAIClient] = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
-        evaled_prompt, stream = self._prepare_run(run_config, kwargs)
+        evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         if client:
             new_prompt = self._run_with_client(client, evaled_prompt, stream)
         else:
@@ -445,10 +451,11 @@ class HandyPrompt(ABC):
     
     async def arun(
         self: PromptType, 
-        client: OpenAIClient = None, 
+        client: Optional[OpenAIClient] = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
-        evaled_prompt, stream = self._prepare_run(run_config, kwargs)
+        evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         if client:
             new_prompt = await self._arun_with_client(client, evaled_prompt, stream)
         else:
@@ -471,9 +478,9 @@ class HandyPrompt(ABC):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         return output_path
     
-    def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
+    def _prepare_run(self: PromptType, run_config: RunConfig, var_map: Optional[Dict], kwargs: dict):
         # evaluate the prompt with the given run_config
-        evaled_prompt = self.eval(run_config=run_config, **kwargs)
+        evaled_prompt = self.eval(run_config=run_config, var_map=var_map, **kwargs)
         evaled_run_config = evaled_prompt.run_config
         evaled_request = evaled_prompt.request
         
