@@ -31,7 +31,7 @@ from dataclasses import dataclass, asdict, fields, replace
 
 import yaml
 import frontmatter
-from mergedeep import merge, Strategy
+from mergedeep import merge as merge_dict, Strategy
 from dotenv import load_dotenv
 
 from .prompt_converter import PromptConverter
@@ -288,7 +288,7 @@ class RunConfig:
                 if field.name == 'var_map':
                     # merge the two var_map dicts in place
                     target_vm = getattr(new_run_config, field.name)
-                    merge(target_vm, v, strategy=Strategy.REPLACE)
+                    merge_dict(target_vm, v, strategy=Strategy.REPLACE)
                 else:
                     setattr(new_run_config, field.name, v)
         return new_run_config
@@ -381,7 +381,7 @@ class HandyPrompt(ABC):
         new_run_config = self.eval_run_config(run_config)
         if var_map:
             # merge var_map instead of replacing as a whole
-            merge(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
+            merge_dict(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
         new_data = self._eval_data(new_run_config)
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
@@ -539,10 +539,10 @@ class HandyPrompt(ABC):
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, RunConfig]]:
         if inplace:
-            merge(self.request, other.request, strategy=Strategy.ADDITIVE)
+            merge_dict(self.request, other.request, strategy=Strategy.ADDITIVE)
             self.run_config.merge(other.run_config, inplace=True)
         else:
-            merged_request = merge({}, self.request, other.request, strategy=Strategy.ADDITIVE)
+            merged_request = merge_dict({}, self.request, other.request, strategy=Strategy.ADDITIVE)
             merged_run_config = self.run_config.merge(other.run_config)
             return merged_request, merged_run_config
     
@@ -571,13 +571,13 @@ class HandyPrompt(ABC):
     def _parse_var_map(self, run_config: RunConfig):
         var_map = {}
         if run_config.var_map_path:
-            var_map = merge(
+            var_map = merge_dict(
                 var_map, 
                 load_var_map(run_config.var_map_path), 
                 strategy=Strategy.REPLACE
             )
         if run_config.var_map:
-            var_map = merge(
+            var_map = merge_dict(
                 var_map, 
                 run_config.var_map, 
                 strategy=Strategy.REPLACE
