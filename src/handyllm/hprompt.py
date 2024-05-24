@@ -24,7 +24,7 @@ import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Callable, Optional, Union, TypeVar
+from typing import Any, Awaitable, Callable, Dict, Optional, Union, TypeVar
 from enum import auto
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, asdict, fields, replace
@@ -48,6 +48,12 @@ if sys.version_info >= (3, 9):
     PathType = Union[str, os.PathLike[str]]
 else:
     PathType = Union[str, os.PathLike]
+
+SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
+SyncHandlerCompletions = Callable[[str], Any]
+AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]]
+AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
+OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
@@ -163,7 +169,7 @@ class RunConfig:
     # variable map file path
     var_map_path: Optional[PathType] = None
     # callback for each chunk generated in stream mode of the response
-    on_chunk: Optional[Callable] = None
+    on_chunk: Optional[OnChunkType] = None
     # output the result to a file or a file descriptor
     output_path: Optional[PathType] = None
     output_fd: Optional[io.IOBase] = None
