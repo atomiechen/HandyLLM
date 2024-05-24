@@ -286,9 +286,10 @@ class RunConfig:
             v = getattr(other, field.name)
             if v is not None:
                 if field.name == 'var_map':
+                    if new_run_config.var_map is None:
+                        new_run_config.var_map = {}
                     # merge the two var_map dicts in place
-                    target_vm = getattr(new_run_config, field.name)
-                    merge_dict(target_vm, v, strategy=Strategy.REPLACE)
+                    merge_dict(new_run_config.var_map, v, strategy=Strategy.REPLACE)
                 else:
                     setattr(new_run_config, field.name, v)
         return new_run_config
@@ -380,6 +381,8 @@ class HandyPrompt(ABC):
         '''
         new_run_config = self.eval_run_config(run_config)
         if var_map:
+            if new_run_config.var_map is None:
+                new_run_config.var_map = {}
             # merge var_map instead of replacing as a whole
             merge_dict(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
         new_data = self._eval_data(new_run_config)
