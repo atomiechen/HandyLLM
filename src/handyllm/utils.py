@@ -123,3 +123,9 @@ async def astream_to_fd(response, fd: io.IOBase):
 async def astream_to_file(response, file_path):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
+
+def VM(**kwargs):
+    # transform kwargs to a variable map dict
+    # change each key to a % wrapped string
+    transformed_vm = {f'%{key}%': value for key, value in kwargs.items()}
+    return transformed_vm

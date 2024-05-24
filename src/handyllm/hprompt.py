@@ -15,22 +15,21 @@ __all__ = [
     "CredentialType",
 ]
 
+import inspect
 import json
 import re
 import copy
 import io
-import os
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Union, TypeVar
-from enum import auto
+from typing import Dict, Optional, Union, TypeVar
 from abc import abstractmethod, ABC
-from dataclasses import dataclass, asdict, fields, replace
+from dataclasses import replace
 
 import yaml
 import frontmatter
-from mergedeep import merge, Strategy
+from mergedeep import merge as merge_dict, Strategy
 from dotenv import load_dotenv
 
 from .prompt_converter import PromptConverter
@@ -39,19 +38,17 @@ from .utils import (
     astream_chat_all, astream_completions, 
     stream_chat_all, stream_completions, 
 )
-from ._str_enum import AutoStrEnum
+from .run_config import RunConfig, RecordRequestMode, PathType, VarMapType, CredentialType
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
-if sys.version_info >= (3, 9):
-    PathType = Union[str, os.PathLike[str]]
-else:
-    PathType = Union[str, os.PathLike]
+
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 p_var_map = re.compile(r'(%\w+%)')
 
+DEFAULT_CONFIG = RunConfig()
 DEFAULT_BLACKLIST = (
     "api_key", "organization", "api_base", "api_type", "api_version", 
     "endpoint_manager", "endpoint", "engine", "deployment_id", 
@@ -136,146 +133,6 @@ def load_var_map(path: PathType) -> dict[str, str]:
         substitute_map[key] = value.strip()
     return substitute_map
 
-class RecordRequestMode(AutoStrEnum):
-    BLACKLIST = auto()  # record all request arguments except specified ones
-    WHITELIST = auto()  # record only specified request arguments
-    NONE = auto()  # record no request arguments
-    ALL = auto()  # record all request arguments
-
-
-class CredentialType(AutoStrEnum):
-    # load environment variables from the credential file
-    ENV = auto()
-    # load the content of the file as request arguments
-    JSON = auto()
-    YAML = auto()
-
-
-@dataclass
-class RunConfig:
-    # record request arguments
-    record_request: Optional[RecordRequestMode] = None  # default: RecordRequestMode.BLACKLIST
-    record_blacklist: Optional[list[str]] = None  # default: DEFAULT_BLACKLIST
-    record_whitelist: Optional[list[str]] = None
-    # variable map
-    var_map: Optional[dict[str, str]] = None
-    # variable map file path
-    var_map_path: Optional[PathType] = None
-    # output the result to a file or a file descriptor
-    output_path: Optional[PathType] = None
-    output_fd: Optional[io.IOBase] = None
-    # output the evaluated prompt to a file or a file descriptor
-    output_evaled_prompt_path: Optional[PathType] = None
-    output_evaled_prompt_fd: Optional[io.IOBase] = None
-    # credential file path
-    credential_path: Optional[PathType] = None
-    # credential type: env, json, yaml
-    # if env, load environment variables from the credential file
-    # if json or yaml, load the content of the file as request arguments
-    credential_type: Optional[CredentialType] = None  # default: guess from the file extension
-    
-    # verbose output to stderr
-    verbose: Optional[bool] = None  # default: False
-    
-    def __setattr__(self, name: str, value: object):
-        if name == "record_request":
-            # validate record_request value
-            if isinstance(value, str):
-                if value not in RecordRequestMode:
-                    raise ValueError(f"unsupported record_request value: {value}")
-            elif isinstance(value, RecordRequestMode):
-                value = value.value
-            elif value is None:  # this field is optional
-                pass
-            else:
-                raise ValueError(f"unsupported record_request value: {value}")
-        elif name == "credential_type":
-            # validate credential_type value
-            if isinstance(value, str):
-                if value == 'yml':
-                    value = CredentialType.YAML.value
-                elif value not in CredentialType:
-                    raise ValueError(f"unsupported credential_type value: {value}")
-            elif isinstance(value, CredentialType):
-                value = value.value
-            elif value is None:  # this field is optional
-                pass
-            else:
-                raise ValueError(f"unsupported credential_type value: {value}")
-        super().__setattr__(name, value)
-    
-    def __len__(self):
-        return len([f for f in fields(self) if getattr(self, f.name) is not None])
-    
-    @classmethod
-    def from_dict(cls, obj: dict, base_path: Optional[PathType] = None):
-        input_kwargs = {}
-        for field in fields(cls):
-            if field.name in obj:
-                input_kwargs[field.name] = obj[field.name]
-        # add base_path to path fields and convert to resolved path
-        if base_path:
-            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
-                if path_field in input_kwargs:
-                    org_path = input_kwargs[path_field]
-                    new_path = str(Path(base_path, org_path).resolve())
-                    # retain trailing slash
-                    if org_path.endswith(('/')):
-                        new_path += '/'
-                    input_kwargs[path_field] = new_path
-        return cls(**input_kwargs)
-    
-    def pretty_print(self, file=sys.stderr):
-        print("RunConfig:", file=file)
-        for field in fields(self):
-            value = getattr(self, field.name)
-            if value is not None:
-                print(f"  {field.name}: {value}", file=file)
-    
-    def to_dict(self, retain_fd=False, base_path: Optional[PathType] = None) -> dict:
-        # record and remove file descriptors
-        tmp_output_fd = self.output_fd
-        tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
-        self.output_fd = None
-        self.output_evaled_prompt_fd = None
-        # convert to dict
-        obj = asdict(self, dict_factory=lambda x: { k: v for k, v in x if v is not None })
-        # restore file descriptors
-        self.output_fd = tmp_output_fd
-        self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
-        if retain_fd:
-            # keep file descriptors
-            obj["output_fd"] = self.output_fd
-            obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
-        # convert path to relative path
-        if base_path:
-            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
-                if path_field in obj:
-                    org_path = obj[path_field]
-                    try:
-                        new_path = str(Path(org_path).relative_to(base_path))
-                        obj[path_field] = new_path
-                    except ValueError:
-                        # org_path is not under base_path, keep the original path
-                        pass
-        return obj
-
-    def merge(self, other: RunConfig, inplace=False) -> RunConfig:
-        # merge the RunConfig object with another RunConfig object
-        # return a new RunConfig object if inplace is False
-        if not inplace:
-            new_run_config = replace(self)
-        else:
-            new_run_config = self
-        for field in fields(new_run_config):
-            v = getattr(other, field.name)
-            if v is not None:
-                setattr(new_run_config, field.name, v)
-        return new_run_config
-
-
-DEFAULT_CONFIG = RunConfig()
-
 
 class HandyPrompt(ABC):
     
@@ -328,7 +185,7 @@ class HandyPrompt(ABC):
         # need to filter the request
         front_data = cls._filter_request(request, run_config)
         if run_config:
-            front_data['meta'] = run_config.to_dict(retain_fd=False, base_path=base_path)
+            front_data['meta'] = run_config.to_dict(retain_object=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
         return frontmatter.dumps(post, handler).strip() + "\n\n"
     
@@ -352,12 +209,18 @@ class HandyPrompt(ABC):
     def eval(
         self: PromptType, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
         '''
-        Evaluate the prompt with the given run_config. 
+        Evaluate the prompt with the given run_config. var_map is for convenience.
         A new prompt object is returned.
         '''
         new_run_config = self.eval_run_config(run_config)
+        if var_map:
+            if new_run_config.var_map is None:
+                new_run_config.var_map = {}
+            # merge var_map instead of replacing as a whole
+            merge_dict(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
         new_data = self._eval_data(new_run_config)
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
@@ -408,10 +271,11 @@ class HandyPrompt(ABC):
     
     def run(
         self: PromptType, 
-        client: OpenAIClient = None, 
+        client: Optional[OpenAIClient] = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
-        evaled_prompt, stream = self._prepare_run(run_config, kwargs)
+        evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         if client:
             new_prompt = self._run_with_client(client, evaled_prompt, stream)
         else:
@@ -432,10 +296,11 @@ class HandyPrompt(ABC):
     
     async def arun(
         self: PromptType, 
-        client: OpenAIClient = None, 
+        client: Optional[OpenAIClient] = None, 
         run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
-        evaled_prompt, stream = self._prepare_run(run_config, kwargs)
+        evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         if client:
             new_prompt = await self._arun_with_client(client, evaled_prompt, stream)
         else:
@@ -458,9 +323,9 @@ class HandyPrompt(ABC):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         return output_path
     
-    def _prepare_run(self: PromptType, run_config: RunConfig, kwargs: dict):
+    def _prepare_run(self: PromptType, run_config: RunConfig, var_map: Optional[Dict], kwargs: dict):
         # evaluate the prompt with the given run_config
-        evaled_prompt = self.eval(run_config=run_config, **kwargs)
+        evaled_prompt = self.eval(run_config=run_config, var_map=var_map, **kwargs)
         evaled_run_config = evaled_prompt.run_config
         evaled_request = evaled_prompt.request
         
@@ -513,10 +378,10 @@ class HandyPrompt(ABC):
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, RunConfig]]:
         if inplace:
-            merge(self.request, other.request, strategy=Strategy.ADDITIVE)
+            merge_dict(self.request, other.request, strategy=Strategy.ADDITIVE)
             self.run_config.merge(other.run_config, inplace=True)
         else:
-            merged_request = merge({}, self.request, other.request, strategy=Strategy.ADDITIVE)
+            merged_request = merge_dict({}, self.request, other.request, strategy=Strategy.ADDITIVE)
             merged_run_config = self.run_config.merge(other.run_config)
             return merged_request, merged_run_config
     
@@ -545,13 +410,13 @@ class HandyPrompt(ABC):
     def _parse_var_map(self, run_config: RunConfig):
         var_map = {}
         if run_config.var_map_path:
-            var_map = merge(
+            var_map = merge_dict(
                 var_map, 
                 load_var_map(run_config.var_map_path), 
                 strategy=Strategy.REPLACE
             )
         if run_config.var_map:
-            var_map = merge(
+            var_map = merge_dict(
                 var_map, 
                 run_config.var_map, 
                 strategy=Strategy.REPLACE
@@ -590,6 +455,23 @@ class ChatPrompt(HandyPrompt):
         return converter.msgs_replace_variables(
             self.messages, var_map, inplace=False)
     
+    @staticmethod
+    def _wrap_gen_chat(response, run_config: RunConfig):
+        for role, content, tool_call in stream_chat_all(response):
+            if run_config.on_chunk:
+                run_config.on_chunk(role, content, tool_call)
+            yield role, content, tool_call
+    
+    @staticmethod
+    async def _awrap_gen_chat(response, run_config: RunConfig):
+        async for role, content, tool_call in astream_chat_all(response):
+            if run_config.on_chunk:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(role, content, tool_call)
+                else:
+                    run_config.on_chunk(role, content, tool_call)
+            yield role, content, tool_call
+
     @classmethod
     def _run_with_client(
         cls, 
@@ -609,15 +491,23 @@ class ChatPrompt(HandyPrompt):
                 # dump frontmatter, no base_path
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
                 # stream response to a file descriptor
-                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), run_config.output_fd)
+                role, content, tool_calls = converter.stream_msgs2raw(
+                    cls._wrap_gen_chat(response, run_config), 
+                    run_config.output_fd
+                    )
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     # dump frontmatter
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response), fout)
+                    role, content, tool_calls = converter.stream_msgs2raw(
+                        cls._wrap_gen_chat(response, run_config), 
+                        fout
+                        )
             else:
-                role, content, tool_calls = converter.stream_msgs2raw(stream_chat_all(response))
+                role, content, tool_calls = converter.stream_msgs2raw(
+                    cls._wrap_gen_chat(response, run_config)
+                    )
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -646,14 +536,22 @@ class ChatPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), run_config.output_fd)
+                role, content, tool_calls = await converter.astream_msgs2raw(
+                    cls._awrap_gen_chat(response, run_config), 
+                    run_config.output_fd
+                    )
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response), fout)
+                    role, content, tool_calls = await converter.astream_msgs2raw(
+                        cls._awrap_gen_chat(response, run_config), 
+                        fout
+                        )
             else:
-                role, content, tool_calls = await converter.astream_msgs2raw(astream_chat_all(response))
+                role, content, tool_calls = await converter.astream_msgs2raw(
+                    cls._awrap_gen_chat(response, run_config)
+                    )
         else:
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
@@ -730,10 +628,12 @@ class CompletionsPrompt(HandyPrompt):
         return new_prompt
     
     @staticmethod
-    def _stream_completions_proc(response, fd: Optional[io.IOBase] = None) -> str:
+    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         for text in stream_completions(response):
+            if run_config.on_chunk:
+                run_config.on_chunk(text)
             if fd:
                 fd.write(text)
             content += text
@@ -757,14 +657,14 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = cls._stream_completions_proc(response, run_config.output_fd)
+                content = cls._stream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
+                    fout.write(cls._dumps_frontmatter(new_request, run_config, run_config, base_path))
                     content = cls._stream_completions_proc(response, fout)
             else:
-                content = cls._stream_completions_proc(response)
+                content = cls._stream_completions_proc(response, run_config)
         else:
             content = response['choices'][0]['text']
         return CompletionsPrompt(
@@ -772,10 +672,15 @@ class CompletionsPrompt(HandyPrompt):
             )
 
     @staticmethod
-    async def _astream_completions_proc(response, fd: Optional[io.IOBase] = None) -> str:
+    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
         # stream response to fd
         content = ""
         async for text in astream_completions(response):
+            if run_config.on_chunk:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(text)
+                else:
+                    run_config.on_chunk(text)
             if fd:
                 fd.write(text)
             content += text
@@ -799,14 +704,14 @@ class CompletionsPrompt(HandyPrompt):
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = await cls._astream_completions_proc(response, run_config.output_fd)
+                content = await cls._astream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
                 with open(run_config.output_path, 'w', encoding='utf-8') as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = await cls._astream_completions_proc(response, fout)
+                    content = await cls._astream_completions_proc(response, run_config, fout)
             else:
-                content = await cls._astream_completions_proc(response)
+                content = await cls._astream_completions_proc(response, run_config)
         else:
             content = response['choices'][0]['text']
         return CompletionsPrompt(
