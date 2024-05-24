@@ -235,7 +235,7 @@ class RunConfig:
             if value is not None:
                 print(f"  {field.name}: {value}", file=file)
     
-    def to_dict(self, retain_fd=False, base_path: Optional[PathType] = None) -> dict:
+    def to_dict(self, retain_object=False, base_path: Optional[PathType] = None) -> dict:
         # record and remove file descriptors
         tmp_output_fd = self.output_fd
         tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
@@ -249,7 +249,7 @@ class RunConfig:
         self.output_fd = tmp_output_fd
         self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
         self.on_chunk = tmp_on_chunk
-        if retain_fd:
+        if retain_object:
             # keep file descriptors
             obj["output_fd"] = self.output_fd
             obj["output_evaled_prompt_fd"] = self.output_evaled_prompt_fd
@@ -335,7 +335,7 @@ class HandyPrompt(ABC):
         # need to filter the request
         front_data = cls._filter_request(request, run_config)
         if run_config:
-            front_data['meta'] = run_config.to_dict(retain_fd=False, base_path=base_path)
+            front_data['meta'] = run_config.to_dict(retain_object=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
         return frontmatter.dumps(post, handler).strip() + "\n\n"
     
