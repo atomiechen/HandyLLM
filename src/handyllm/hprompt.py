@@ -282,10 +282,15 @@ class RunConfig:
             new_run_config = replace(self)
         else:
             new_run_config = self
-        for field in fields(new_run_config):
+        for field in fields(RunConfig):
             v = getattr(other, field.name)
             if v is not None:
-                setattr(new_run_config, field.name, v)
+                if field.name == 'var_map':
+                    # merge the two var_map dicts in place
+                    target_vm = getattr(new_run_config, field.name)
+                    merge(target_vm, v, strategy=Strategy.REPLACE)
+                else:
+                    setattr(new_run_config, field.name, v)
         return new_run_config
 
 
@@ -375,7 +380,8 @@ class HandyPrompt(ABC):
         '''
         new_run_config = self.eval_run_config(run_config)
         if var_map:
-            new_run_config.var_map = var_map
+            # merge var_map instead of replacing as a whole
+            merge(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
         new_data = self._eval_data(new_run_config)
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
