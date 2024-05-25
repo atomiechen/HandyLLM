@@ -10,7 +10,7 @@ from .prompt_converter import PromptConverter
 
 
 def get_request_url(request_url, api_type, api_version, engine):
-    if api_type and api_type.lower() in API_TYPES_AZURE:
+    if api_type and api_type in API_TYPES_AZURE:
         if api_version is None:
             raise Exception("api_version is required for Azure OpenAI API")
         if engine is None:

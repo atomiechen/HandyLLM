@@ -146,7 +146,7 @@ class OpenAIClient:
         return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or API_BASE_OPENAI
     
     def _infer_api_type(self, api_type=None):
-        return api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or API_TYPE_OPENAI
+        return (api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or API_TYPE_OPENAI).lower()
 
     def _infer_api_version(self, api_version=None):
         return api_version or self.api_version or os.environ.get('OPENAI_API_VERSION')
@@ -191,7 +191,7 @@ class OpenAIClient:
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
         # if using Azure and engine not provided, try to get it from model parameter
-        if api_type and api_type.lower() in API_TYPES_AZURE:
+        if api_type and api_type in API_TYPES_AZURE:
             if not engine:
                 # keep or consume model parameter
                 keep_model = kwargs.pop('keep_model', False)
@@ -310,7 +310,7 @@ class OpenAIClient:
     @api
     def images_generations(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        if api_type and api_type.lower() in API_TYPES_AZURE and api_version in [
+        if api_type and api_type in API_TYPES_AZURE and api_version in [
             "2023-06-01-preview",
             "2023-07-01-preview",
             "2023-08-01-preview",
