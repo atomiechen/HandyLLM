@@ -5,12 +5,12 @@ from urllib.parse import quote_plus
 import time
 import inspect
 
-from ._constants import _API_TYPES_AZURE
+from ._constants import API_TYPES_AZURE
 from .prompt_converter import PromptConverter
 
 
 def get_request_url(request_url, api_type, api_version, engine):
-    if api_type and api_type.lower() in _API_TYPES_AZURE:
+    if api_type and api_type.lower() in API_TYPES_AZURE:
         if api_version is None:
             raise Exception("api_version is required for Azure OpenAI API")
         if engine is None:
