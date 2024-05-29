@@ -29,6 +29,7 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/atomiechen/HandyLLM"
 "Bug Tracker" = "https://github.com/atomiechen/HandyLLM/issues"
+Changelog = "https://github.com/atomiechen/HandyLLM/blob/master/CHANGELOG.md"
 
 [project.scripts]
 handyllm = "handyllm.__main__:cli"
