@@ -26,6 +26,7 @@ from datetime import datetime
 from typing import Dict, Optional, Union, TypeVar
 from abc import abstractmethod, ABC
 from dataclasses import replace
+from contextlib import contextmanager
 
 import yaml
 import frontmatter
@@ -428,6 +429,26 @@ class HandyPrompt(ABC):
             )
         return var_map
 
+    @staticmethod
+    @contextmanager
+    def open_output_path_fd(run_config: RunConfig):
+        print(f"#DEBUG {run_config.output_path_buffering=}")
+        if run_config.output_path_buffering is None or run_config.output_path_buffering == -1:
+            # default buffering
+            with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                yield fout
+        elif run_config.output_path_buffering == 0:
+            # no buffering
+            with open(run_config.output_path, 'wb', buffering=0) as f_binary:
+                yield io.TextIOWrapper(f_binary, encoding='utf-8', write_through=True)
+        elif isinstance(run_config.output_path_buffering, int) and run_config.output_path_buffering >= 1:
+            # 1 for line buffering, >= 2 for buffer size
+            with open(run_config.output_path, 'w', encoding='utf-8', buffering=run_config.output_path_buffering) as fout:
+                fout.reconfigure(write_through=True)
+                yield fout
+        else:
+            raise ValueError(f"unsupported output_path_buffering value: {run_config.output_path_buffering}")
+
 
 class ChatPrompt(HandyPrompt):
         
@@ -502,7 +523,7 @@ class ChatPrompt(HandyPrompt):
                     )
             elif run_config.output_path:
                 # stream response to a file
-                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                with cls.open_output_path_fd(run_config) as fout:
                     # dump frontmatter
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
                     role, content, tool_calls = converter.stream_msgs2raw(
@@ -547,7 +568,7 @@ class ChatPrompt(HandyPrompt):
                     )
             elif run_config.output_path:
                 # stream response to a file
-                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                with cls.open_output_path_fd(run_config) as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
                     role, content, tool_calls = await converter.astream_msgs2raw(
                         cls._awrap_gen_chat(response, run_config), 
@@ -665,7 +686,7 @@ class CompletionsPrompt(HandyPrompt):
                 content = cls._stream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
-                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                with cls.open_output_path_fd(run_config) as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, run_config, base_path))
                     content = cls._stream_completions_proc(response, fout)
             else:
@@ -712,7 +733,7 @@ class CompletionsPrompt(HandyPrompt):
                 content = await cls._astream_completions_proc(response, run_config, run_config.output_fd)
             elif run_config.output_path:
                 # stream response to a file
-                with open(run_config.output_path, 'w', encoding='utf-8') as fout:
+                with cls.open_output_path_fd(run_config) as fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
                     content = await cls._astream_completions_proc(response, run_config, fout)
             else:
