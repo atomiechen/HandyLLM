@@ -1,5 +1,7 @@
 import argparse
 import sys
+import os
+import io
 
 
 def get_version():
@@ -44,7 +46,12 @@ def hprompt_command(args):
     else:
         # check if prompt has output_path set
         if not prompt.run_config.output_path:
-            run_config.output_fd = sys.stderr
+            # run_config.output_fd = sys.stderr
+            # write to stderr without buffering
+            run_config.output_fd = io.TextIOWrapper(
+                os.fdopen(sys.stderr.fileno(), 'wb', buffering=0), 
+                write_through=True
+            )
     if args.verbose:
         run_config.verbose = True
         print(f"Input paths: {args.path}", file=sys.stderr)
