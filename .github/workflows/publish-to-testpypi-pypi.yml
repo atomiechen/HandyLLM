@@ -15,6 +15,15 @@ on:
         type: boolean
         default: true
         description: Publish to GitHub Release
+      use_changelog:
+        type: boolean
+        default: true
+        description: Extract release notes from CHANGELOG.md
+      changelog_file:
+        type: string
+        default: CHANGELOG.md
+        description: Path to changelog file
+        required: false
       release_tag:
         type: string
         description: Tag to package (empty for latest tag)
@@ -27,6 +36,8 @@ jobs:
       publish_testpypi: ${{ inputs.publish_testpypi }}
       publish_pypi: ${{ inputs.publish_pypi }}
       publish_gh_release: ${{ inputs.publish_gh_release }}
+      use_changelog: ${{ inputs.use_changelog }}
+      changelog_file: ${{ inputs.changelog_file }}
       release_tag: ${{ inputs.release_tag }}
     secrets:
       TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
