@@ -281,7 +281,7 @@ class HandyPrompt(ABC):
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
                 new_prompt = self._run_with_client(client, evaled_prompt, stream)
-        self._post_check_output(stream, run_config, new_prompt)
+        self._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
     @classmethod
@@ -306,7 +306,7 @@ class HandyPrompt(ABC):
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
                 new_prompt = await self._arun_with_client(client, evaled_prompt, stream)
-        self._post_check_output(stream, run_config, new_prompt)
+        self._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
     def _prepare_output_path(
