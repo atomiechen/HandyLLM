@@ -160,7 +160,7 @@ class HandyPrompt(ABC):
     
     def __repr__(self) -> str:
         return "{}({}, {}, {})".format(
-            self.__class__.__name__,
+            type(self).__name__,
             repr(self.data),
             repr(self.request),
             repr(self.run_config)
@@ -225,7 +225,7 @@ class HandyPrompt(ABC):
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
         evaled_request.update(kwargs)
-        return self.__class__(
+        return type(self)(
             new_data,
             evaled_request,
             new_run_config,
