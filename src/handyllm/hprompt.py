@@ -192,7 +192,7 @@ class HandyPrompt(ABC):
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
-        return self._dumps_frontmatter(self.request, self.run_config, base_path) + serialized_data
+        return type(self)._dumps_frontmatter(self.request, self.run_config, base_path) + serialized_data
     
     def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
         text = self.dumps(base_path=base_path)
@@ -238,15 +238,16 @@ class HandyPrompt(ABC):
         # merge runtime run_config with the original run_config
         run_config = self.run_config.merge(run_config)
         
+        cls = type(self)
         start_time = datetime.now()
         if run_config.output_path:
-            run_config.output_path = self._prepare_output_path(
-                run_config.output_path, start_time, self.TEMPLATE_OUTPUT_FILENAME
+            run_config.output_path = cls._prepare_output_path(
+                run_config.output_path, start_time, cls.TEMPLATE_OUTPUT_FILENAME
             )
         if run_config.output_evaled_prompt_path:
-            run_config.output_evaled_prompt_path = self._prepare_output_path(
+            run_config.output_evaled_prompt_path = cls._prepare_output_path(
                 run_config.output_evaled_prompt_path, start_time, 
-                self.TEMPLATE_OUTPUT_EVAL_FILENAME
+                cls.TEMPLATE_OUTPUT_EVAL_FILENAME
             )
         
         if run_config.credential_path:
@@ -276,12 +277,13 @@ class HandyPrompt(ABC):
         var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
         if client:
-            new_prompt = self._run_with_client(client, evaled_prompt, stream)
+            new_prompt = cls._run_with_client(client, evaled_prompt, stream)
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
-                new_prompt = self._run_with_client(client, evaled_prompt, stream)
-        self._post_check_output(stream, evaled_prompt.run_config, new_prompt)
+                new_prompt = cls._run_with_client(client, evaled_prompt, stream)
+        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
     @classmethod
@@ -301,16 +303,18 @@ class HandyPrompt(ABC):
         var_map: Optional[VarMapType] = None,
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
         if client:
-            new_prompt = await self._arun_with_client(client, evaled_prompt, stream)
+            new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                new_prompt = await self._arun_with_client(client, evaled_prompt, stream)
-        self._post_check_output(stream, evaled_prompt.run_config, new_prompt)
+                new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
+        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
+    @staticmethod
     def _prepare_output_path(
-        self, output_path: PathType, start_time: datetime, template_filename: str
+        output_path: PathType, start_time: datetime, template_filename: str
         ) -> str:
         output_path = str(output_path).strip()
         p = Path(output_path)
@@ -366,7 +370,8 @@ class HandyPrompt(ABC):
         
         return evaled_prompt, stream
     
-    def _post_check_output(self: PromptType, stream: bool, run_config: RunConfig, new_prompt: PromptType):
+    @staticmethod
+    def _post_check_output(stream: bool, run_config: RunConfig, new_prompt: PromptType):
         if not stream:
             # if stream is True, the response is already streamed to 
             # a file or a file descriptor
