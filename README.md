@@ -1,5 +1,8 @@
 <div align="middle">
   <img src="https://raw.githubusercontent.com/atomiechen/HandyLLM/main/assets/banner.svg" />
+  <p>
+    🌟 <b>Support us!</b> <small>If you find HandyLLM useful, please consider <a href="https://github.com/atomiechen/HandyLLM">starring it</a> to help it spread and improve</small> 🌟
+  </p>
 </div><br>
 
 # HandyLLM
@@ -10,7 +13,7 @@ A handy toolkit for using LLM, with both [***development support***](https://pyp
 
 
 
-## 🌟 Why HandyLLM?
+## 🙌 Why HandyLLM?
 
 📃 **Handy Prompt**: self-containing prompt in a human-friendly mark-up format `.hprompt`. 
 

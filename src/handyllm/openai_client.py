@@ -9,7 +9,7 @@ import asyncio
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
-from ._constants import _API_BASE_OPENAI, _API_TYPE_OPENAI, _API_TYPES_AZURE, TYPE_API_TYPES
+from ._constants import API_BASE_OPENAI, API_TYPE_OPENAI, API_TYPES_AZURE, TYPE_API_TYPES
 
 
 def api(func):
@@ -143,10 +143,10 @@ class OpenAIClient:
         return organization or self.organization or os.environ.get('OPENAI_ORGANIZATION') or os.environ.get('OPENAI_ORG_ID')
     
     def _infer_api_base(self, api_base=None):
-        return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or _API_BASE_OPENAI
+        return api_base or self.api_base or os.environ.get('OPENAI_API_BASE') or API_BASE_OPENAI
     
     def _infer_api_type(self, api_type=None):
-        return api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or _API_TYPE_OPENAI
+        return (api_type or self.api_type or os.environ.get('OPENAI_API_TYPE') or API_TYPE_OPENAI).lower()
 
     def _infer_api_version(self, api_version=None):
         return api_version or self.api_version or os.environ.get('OPENAI_API_VERSION')
@@ -191,7 +191,7 @@ class OpenAIClient:
         deployment_id = kwargs.pop('deployment_id', None)
         engine = kwargs.pop('engine', deployment_id)
         # if using Azure and engine not provided, try to get it from model parameter
-        if api_type and api_type.lower() in _API_TYPES_AZURE:
+        if api_type and api_type in API_TYPES_AZURE:
             if not engine:
                 # keep or consume model parameter
                 keep_model = kwargs.pop('keep_model', False)
@@ -310,7 +310,7 @@ class OpenAIClient:
     @api
     def images_generations(self, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        if api_type and api_type.lower() in _API_TYPES_AZURE and api_version in [
+        if api_type and api_type in API_TYPES_AZURE and api_version in [
             "2023-06-01-preview",
             "2023-07-01-preview",
             "2023-08-01-preview",

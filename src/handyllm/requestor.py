@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     import requests
     import httpx
 
-from ._constants import _API_TYPES_AZURE
+from ._constants import API_TYPES_AZURE
 
 
 module_logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class Requestor:
         self.json_data = None
         self.data = None
         self.params = {}
-        if api_type in _API_TYPES_AZURE:
+        if api_type in API_TYPES_AZURE:
             self.headers['api-key'] = api_key
         else:
             self.headers['Authorization'] = 'Bearer ' + api_key
