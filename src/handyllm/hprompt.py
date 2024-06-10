@@ -432,7 +432,6 @@ class HandyPrompt(ABC):
     @staticmethod
     @contextmanager
     def open_output_path_fd(run_config: RunConfig):
-        print(f"#DEBUG {run_config.output_path_buffering=}")
         if run_config.output_path_buffering is None or run_config.output_path_buffering == -1:
             # default buffering
             with open(run_config.output_path, 'w', encoding='utf-8') as fout:
