@@ -55,7 +55,7 @@ class RunConfig:
     on_chunk: Optional[OnChunkType] = None
     # output the response to a file
     output_path: Optional[PathType] = None
-    # buffering for opening the output file: -1 for system default, 
+    # buffering for opening the output file in stream mode: -1 for system default, 
     # 0 for unbuffered, 1 for line buffered, any other positive value for buffer size
     output_path_buffering: Optional[int] = None
     # output the response to a file descriptor
