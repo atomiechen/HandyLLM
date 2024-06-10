@@ -74,7 +74,7 @@ def exception2err_msg(exception: Exception):
     err_msg = f"Exception: {type(exception).__module__}.{type(exception).__name__}"
     err_msg += f"\nDetailed info: {repr(exception)}"
     if exception.args:
-        print(f"\nException arguments: {exception.args}")
+        err_msg += f"\nException arguments: {exception.args}"
     return err_msg
 
 def _chat_log_response_final(logger, log_marks, kwargs, messages, start_time, role, content, err_msg=None):
