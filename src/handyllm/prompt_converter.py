@@ -1,6 +1,6 @@
 import io
 import re
-from typing import Optional, Tuple
+from typing import MutableMapping, MutableSequence, Optional, Sequence, Tuple
 import yaml
 
 
@@ -90,7 +90,7 @@ class PromptConverter:
             if tool_calls:
                 extra_properties['type'] = 'tool_calls'
                 content = yaml.dump(tool_calls, allow_unicode=True)
-            elif isinstance(content, list):
+            elif isinstance(content, Sequence):
                 extra_properties['type'] = 'content_array'
                 content = yaml.dump(content, allow_unicode=True)
             if extra_properties:
@@ -176,46 +176,37 @@ class PromptConverter:
             fout.write(raw_prompt)
     
     @classmethod
-    def msgs_replace_variables(cls, msgs, variable_map: dict, inplace=False):
+    def msgs_replace_variables(cls, msgs, variable_map: MutableMapping, inplace=False):
         # replace every variable in messages content
         if inplace:
             for message in msgs:
-                if not message.get('content'):
-                    continue
-                if type(message['content']) == list: # list of dict
-                    for content_item in message['content']:
-                        cls._dict_content_replace_variables(content_item, variable_map)
-                elif type(message['content']) == str:
-                    for var, value in variable_map.items():
-                        if message.get('content') and var in message['content']:
-                            message['content'] = message['content'].replace(var, value)
+                content = message.get('content')
+                if content:
+                    message['content'] = cls._replace_deep(content, variable_map)
             return msgs
         else:
             new_msgs = []
             for message in msgs:
                 new_message = message.copy()
-                if not new_message.get('content'):
-                    new_msgs.append(new_message)
-                    continue
-                if type(new_message['content']) == list: # list of dict
-                    for content_item in new_message['content']:
-                        cls._dict_content_replace_variables(content_item, variable_map)
-                elif type(new_message['content']) == str:
-                    for var, value in variable_map.items():
-                        if var in new_message['content']:
-                            new_message['content'] = new_message['content'].replace(var, value)
                 new_msgs.append(new_message)
+                content = new_message.get('content')
+                if content:
+                    new_message['content'] = cls._replace_deep(content, variable_map)
             return new_msgs
     
     @classmethod
-    def _dict_content_replace_variables(cls, content: dict, variable_map: dict):
-        for c_k in content.keys():
-            if type(content[c_k]) == str:
-                for var, value in variable_map.items():
-                    if var in content[c_k]:
-                        content[c_k] = content[c_k].replace(var, value)
-            elif type(content[c_k]) == dict:
-                cls._dict_content_replace_variables(content[c_k], variable_map)
+    def _replace_deep(cls, content, variable_map: MutableMapping):
+        if isinstance(content, str):
+            for var, value in variable_map.items():
+                if var in content:
+                    content = content.replace(var, value)
+        elif isinstance(content, MutableMapping):
+            for key, value in content.items():
+                content[key] = cls._replace_deep(value, variable_map)
+        elif isinstance(content, MutableSequence):
+            for idx, value in enumerate(content):
+                content[idx] = cls._replace_deep(value, variable_map)
+        return content
     
     raw2chat = raw2msgs
     rawfile2chat = rawfile2msgs
