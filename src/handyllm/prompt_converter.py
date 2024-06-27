@@ -175,24 +175,47 @@ class PromptConverter:
         with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
             fout.write(raw_prompt)
     
-    @staticmethod
-    def msgs_replace_variables(msgs, variable_map: dict, inplace=False):
+    @classmethod
+    def msgs_replace_variables(cls, msgs, variable_map: dict, inplace=False):
         # replace every variable in messages content
         if inplace:
             for message in msgs:
-                for var, value in variable_map.items():
-                    if message.get('content') and var in message['content']:
-                        message['content'] = message['content'].replace(var, value)
+                if not message.get('content'):
+                    continue
+                if type(message['content']) == list: # list of dict
+                    for content_item in message['content']:
+                        cls._dict_content_replace_variables(content_item, variable_map)
+                elif type(message['content']) == str:
+                    for var, value in variable_map.items():
+                        if message.get('content') and var in message['content']:
+                            message['content'] = message['content'].replace(var, value)
             return msgs
         else:
             new_msgs = []
             for message in msgs:
                 new_message = message.copy()
-                for var, value in variable_map.items():
-                    if new_message.get('content') and var in new_message['content']:
-                        new_message['content'] = new_message['content'].replace(var, value)
+                if not new_message.get('content'):
+                    new_msgs.append(new_message)
+                    continue
+                if type(new_message['content']) == list: # list of dict
+                    for content_item in new_message['content']:
+                        cls._dict_content_replace_variables(content_item, variable_map)
+                elif type(new_message['content']) == str:
+                    for var, value in variable_map.items():
+                        if var in new_message['content']:
+                            new_message['content'] = new_message['content'].replace(var, value)
                 new_msgs.append(new_message)
             return new_msgs
+    
+    @classmethod
+    def _dict_content_replace_variables(cls, content: dict, variable_map: dict):
+        for c_k in content.keys():
+            if type(content[c_k]) == str:
+                for var, value in variable_map.items():
+                    if var in content[c_k]:
+                        content[c_k] = content[c_k].replace(var, value)
+            elif type(content[c_k]) == dict:
+                cls._dict_content_replace_variables(content[c_k], variable_map)
     
     raw2chat = raw2msgs
     rawfile2chat = rawfile2msgs
