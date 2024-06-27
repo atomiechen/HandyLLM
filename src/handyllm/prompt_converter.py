@@ -89,10 +89,10 @@ class PromptConverter:
             extra_properties = {key: message[key] for key in message if key not in ['role', 'content', 'tool_calls']}
             if tool_calls:
                 extra_properties['type'] = 'tool_calls'
-                content = yaml.dump(tool_calls)
+                content = yaml.dump(tool_calls, allow_unicode=True)
             elif isinstance(content, list):
                 extra_properties['type'] = 'content_array'
-                content = yaml.dump(content)
+                content = yaml.dump(content, allow_unicode=True)
             if extra_properties:
                 extra = " {" + " ".join([f'{key}="{extra_properties[key]}"' for key in extra_properties]) + "}"
             else:
@@ -129,7 +129,7 @@ class PromptConverter:
                 content += text
         if tool_calls and fd:
             # dump tool calls
-            fd.write(yaml.dump(tool_calls))
+            fd.write(yaml.dump(tool_calls, allow_unicode=True))
         if not tool_calls:
             # should return None if no tool calls
             tool_calls = None
@@ -163,7 +163,7 @@ class PromptConverter:
                 content += text
         if tool_calls and fd:
             # dump tool calls
-            fd.write(yaml.dump(tool_calls))
+            fd.write(yaml.dump(tool_calls, allow_unicode=True))
         if not tool_calls:
             # should return None if no tool calls
             tool_calls = None
