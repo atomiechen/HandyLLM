@@ -102,7 +102,7 @@ class PromptConverter:
         return raw_prompt
 
     @staticmethod
-    def stream_msgs2raw(gen_sync, fd: Optional[io.IOBase] = None) -> Tuple[str, str]:
+    def stream_msgs2raw(gen_sync, fd: Optional[io.IOBase] = None) -> Tuple[str, str, Optional[list]]:
         # stream response to fd
         role = ""
         content = ""
@@ -136,7 +136,7 @@ class PromptConverter:
         return role, content, tool_calls
 
     @staticmethod
-    async def astream_msgs2raw(gen_async, fd: Optional[io.IOBase] = None) -> Tuple[str, str]:
+    async def astream_msgs2raw(gen_async, fd: Optional[io.IOBase] = None) -> Tuple[str, str, Optional[list]]:
         # stream response to fd
         role = ""
         content = ""
