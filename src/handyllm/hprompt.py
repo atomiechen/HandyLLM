@@ -143,7 +143,9 @@ class HandyPrompt(ABC):
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
     
     def __init__(
-        self, data: Union[str, list], request: Optional[MutableMapping] = None, 
+        self, 
+        data: Union[str, list], 
+        request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
         response: Optional[Any] = None,
@@ -460,7 +462,10 @@ class HandyPrompt(ABC):
 class ChatPrompt(HandyPrompt):
         
     def __init__(
-        self, messages: list, request: MutableMapping, meta: Union[MutableMapping, RunConfig], 
+        self, 
+        messages: list, 
+        request: Optional[MutableMapping] = None, 
+        meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
         response: Optional[Any] = None,
         ):
@@ -643,7 +648,10 @@ class ChatPrompt(HandyPrompt):
 class CompletionsPrompt(HandyPrompt):
     
     def __init__(
-        self, prompt: str, request: MutableMapping, meta: Union[MutableMapping, RunConfig], 
+        self, 
+        prompt: str, 
+        request: Optional[MutableMapping] = None, 
+        meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
         response: Optional[Any] = None,
         ):
