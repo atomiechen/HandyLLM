@@ -758,32 +758,21 @@ class CompletionsPrompt(HandyPrompt):
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
-        if isinstance(other, str):
-            return CompletionsPrompt(
-                self.prompt + other,
-                copy.deepcopy(self.request),
-                replace(self.run_config),
-                self.base_path
-            )
-        elif isinstance(other, CompletionsPrompt):
-            # merge two CompletionsPrompt objects
-            merged_request, merged_run_config = self._merge_non_data(other)
-            return CompletionsPrompt(
-                self.prompt + other.prompt, merged_request, merged_run_config,
-                self.base_path
-            )
-        else:
-            raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
+        new_prompt = copy.deepcopy(self)
+        new_prompt += other
+        return new_prompt
     
     def __iadd__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
         if isinstance(other, str):
-            self.prompt += other
+            self.add_text(other)
         elif isinstance(other, CompletionsPrompt):
             # merge two CompletionsPrompt objects
-            self.prompt += other.prompt
+            self.add_text(other.prompt)
             self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
         return self
 
+    def add_text(self, text: str):
+        self.prompt += text
