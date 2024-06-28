@@ -355,7 +355,7 @@ class HandyPrompt(ABC):
         return var_map
 
     @abstractmethod
-    def __add__(self: HandyPrompt, other: Union[str, HandyPrompt]) -> HandyPrompt:
+    def __add__(self: PromptType, other) -> PromptType:
         ...
 
     @staticmethod
@@ -436,7 +436,7 @@ class ChatPrompt(HandyPrompt):
     def _run_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: ChatPrompt,
+        evaled_prompt: HandyPrompt,
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
@@ -483,7 +483,7 @@ class ChatPrompt(HandyPrompt):
     async def _arun_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: ChatPrompt,
+        evaled_prompt: HandyPrompt,
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
@@ -598,7 +598,7 @@ class CompletionsPrompt(HandyPrompt):
     def _run_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: CompletionsPrompt,
+        evaled_prompt: HandyPrompt,
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
@@ -647,7 +647,7 @@ class CompletionsPrompt(HandyPrompt):
     async def _arun_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: CompletionsPrompt,
+        evaled_prompt: HandyPrompt,
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
