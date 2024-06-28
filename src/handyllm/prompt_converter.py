@@ -1,6 +1,5 @@
-import io
 import re
-from typing import MutableMapping, MutableSequence, Optional, Sequence, Tuple
+from typing import IO, MutableMapping, MutableSequence, Optional, Tuple
 import yaml
 
 
@@ -102,7 +101,7 @@ class PromptConverter:
         return raw_prompt
 
     @staticmethod
-    def stream_msgs2raw(gen_sync, fd: Optional[io.IOBase] = None) -> Tuple[str, str, Optional[list]]:
+    def stream_msgs2raw(gen_sync, fd: Optional[IO[str]] = None) -> Tuple[str, str, Optional[list]]:
         # stream response to fd
         role = ""
         content = ""
@@ -136,7 +135,7 @@ class PromptConverter:
         return role, content, tool_calls
 
     @staticmethod
-    async def astream_msgs2raw(gen_async, fd: Optional[io.IOBase] = None) -> Tuple[str, str, Optional[list]]:
+    async def astream_msgs2raw(gen_async, fd: Optional[IO[str]] = None) -> Tuple[str, str, Optional[list]]:
         # stream response to fd
         role = ""
         content = ""
