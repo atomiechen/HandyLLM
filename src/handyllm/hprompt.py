@@ -57,86 +57,6 @@ DEFAULT_BLACKLIST = (
 )
 
 
-def loads(
-    text: str, 
-    encoding: str = "utf-8",
-    base_path: Optional[PathType] = None
-) -> HandyPrompt:
-    if handler.detect(text):
-        metadata, content = frontmatter.parse(text, encoding, handler)
-        meta = metadata.pop("meta", None)
-        if not isinstance(meta, dict):
-            meta = {}
-        request = metadata
-    else:
-        content = text
-        request = {}
-        meta = {}
-    api: str = meta.get("api", "")
-    if api:
-        api = api.lower()
-        if api.startswith("completion"):
-            api = "completions"
-        else:
-            api = "chat"
-    else:
-        if converter.detect(content):
-            api = "chat"
-        else:
-            api = "completions"
-    if api == "completions":
-        return CompletionsPrompt(content, request, meta, base_path)
-    else:
-        messages = converter.raw2msgs(content)
-        return ChatPrompt(messages, request, meta, base_path)
-
-def load(
-    fd: IO[str], 
-    encoding: str = "utf-8",
-    base_path: Optional[PathType] = None
-) -> HandyPrompt:
-    text = fd.read()
-    return loads(text, encoding, base_path=base_path)
-
-def load_from(
-    path: PathType,
-    encoding: str = "utf-8"
-) -> HandyPrompt:
-    with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding, base_path=Path(path).parent.resolve())
-
-def dumps(
-    prompt: HandyPrompt, 
-    base_path: Optional[PathType] = None
-) -> str:
-    return prompt.dumps(base_path)
-
-def dump(
-    prompt: HandyPrompt, 
-    fd: IO[str], 
-    base_path: Optional[PathType] = None
-) -> None:
-    return prompt.dump(fd, base_path)
-
-def dump_to(
-    prompt: HandyPrompt, 
-    path: PathType
-) -> None:
-    return prompt.dump_to(path)
-
-def load_var_map(path: PathType) -> dict[str, str]:
-    # read all content that needs to be replaced in the prompt from a text file
-    with open(path, 'r', encoding='utf-8') as fin:
-        content = fin.read()
-    substitute_map = {}
-    blocks = p_var_map.split(content)
-    for idx in range(1, len(blocks), 2):
-        key = blocks[idx]
-        value = blocks[idx+1]
-        substitute_map[key] = value.strip()
-    return substitute_map
-
-
 class HandyPrompt(ABC):
     
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
@@ -776,3 +696,87 @@ class CompletionsPrompt(HandyPrompt):
 
     def add_text(self, text: str):
         self.prompt += text
+
+
+def loads(
+    text: str, 
+    encoding: str = "utf-8",
+    base_path: Optional[PathType] = None,
+    cls: type[PromptType] = HandyPrompt,
+) -> PromptType:
+    if handler.detect(text):
+        metadata, data = frontmatter.parse(text, encoding, handler)
+        meta = metadata.pop("meta", None)
+        if not isinstance(meta, dict):
+            meta = {}
+        request = metadata
+    else:
+        data = text
+        request = {}
+        meta = {}
+    if cls == HandyPrompt:
+        # get specific prompt class
+        api: str = meta.get("api", "")
+        if api:
+            api = api.lower()
+            if api.startswith("chat"):
+                cls = cast(type[PromptType], ChatPrompt)
+            else:
+                cls = cast(type[PromptType], CompletionsPrompt)
+        else:
+            if converter.detect(data):
+                cls = cast(type[PromptType], ChatPrompt)
+            else:
+                cls = cast(type[PromptType], CompletionsPrompt)
+    if cls == ChatPrompt:
+        data = converter.raw2msgs(data)
+    return cls(data, request, meta, base_path)
+
+
+def load(
+    fd: IO[str], 
+    encoding: str = "utf-8",
+    base_path: Optional[PathType] = None,
+    cls: type[PromptType] = HandyPrompt,
+) -> PromptType:
+    text = fd.read()
+    return loads(text, encoding, base_path=base_path, cls=cls)
+
+def load_from(
+    path: PathType,
+    encoding: str = "utf-8",
+    cls: type[PromptType] = HandyPrompt,
+) -> PromptType:
+    with open(path, "r", encoding=encoding) as fd:
+        return load(fd, encoding, base_path=Path(path).parent.resolve(), cls=cls)
+
+def dumps(
+    prompt: HandyPrompt, 
+    base_path: Optional[PathType] = None
+) -> str:
+    return prompt.dumps(base_path)
+
+def dump(
+    prompt: HandyPrompt, 
+    fd: IO[str], 
+    base_path: Optional[PathType] = None
+) -> None:
+    return prompt.dump(fd, base_path)
+
+def dump_to(
+    prompt: HandyPrompt, 
+    path: PathType
+) -> None:
+    return prompt.dump_to(path)
+
+def load_var_map(path: PathType) -> dict[str, str]:
+    # read all content that needs to be replaced in the prompt from a text file
+    with open(path, 'r', encoding='utf-8') as fin:
+        content = fin.read()
+    substitute_map = {}
+    blocks = p_var_map.split(content)
+    for idx in range(1, len(blocks), 2):
+        key = blocks[idx]
+        value = blocks[idx+1]
+        substitute_map[key] = value.strip()
+    return substitute_map
