@@ -384,10 +384,11 @@ class HandyPrompt(ABC):
                 new_prompt.dump_to(run_config.output_path)
         return new_prompt
 
-    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[MutableMapping, RunConfig]]:
+    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> tuple[MutableMapping, RunConfig]:
         if inplace:
             merge_dict(self.request, other.request, strategy=Strategy.ADDITIVE)
             self.run_config.merge(other.run_config, inplace=True)
+            return self.request, self.run_config
         else:
             merged_request = merge_dict({}, self.request, other.request, strategy=Strategy.ADDITIVE)
             merged_run_config = self.run_config.merge(other.run_config)
