@@ -432,6 +432,10 @@ class HandyPrompt(ABC):
             )
         return var_map
 
+    @abstractmethod
+    def __add__(self: HandyPrompt, other: Union[str, HandyPrompt]) -> HandyPrompt:
+        ...
+
     @staticmethod
     @contextmanager
     def open_output_path_fd(run_config: RunConfig):
