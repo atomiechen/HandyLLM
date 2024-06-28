@@ -90,7 +90,7 @@ class PromptConverter:
             if tool_calls:
                 extra_properties['type'] = 'tool_calls'
                 content = yaml.dump(tool_calls, allow_unicode=True)
-            elif isinstance(content, Sequence):
+            elif isinstance(content, MutableSequence):
                 extra_properties['type'] = 'content_array'
                 content = yaml.dump(content, allow_unicode=True)
             if extra_properties:
