@@ -595,7 +595,7 @@ class ChatPrompt(HandyPrompt):
             response=response
         )
 
-    def __add__(self, other: Union[str, list, ChatPrompt]):
+    def __add__(self: ChatPrompt, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
             return ChatPrompt(
@@ -621,7 +621,7 @@ class ChatPrompt(HandyPrompt):
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
     
-    def __iadd__(self, other: Union[str, list, ChatPrompt]):
+    def __iadd__(self: ChatPrompt, other: Union[str, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
             self.messages.append({"role": "user", "content": other})
@@ -755,7 +755,7 @@ class CompletionsPrompt(HandyPrompt):
             content, new_request, run_config, base_path, response=response
             )
     
-    def __add__(self, other: Union[str, CompletionsPrompt]):
+    def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
         if isinstance(other, str):
             return CompletionsPrompt(
@@ -774,7 +774,7 @@ class CompletionsPrompt(HandyPrompt):
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'CompletionsPrompt' and '{type(other)}'")
     
-    def __iadd__(self, other: Union[str, CompletionsPrompt]):
+    def __iadd__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
         if isinstance(other, str):
             self.prompt += other
