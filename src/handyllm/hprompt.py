@@ -606,42 +606,32 @@ class ChatPrompt(HandyPrompt):
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list, dict or another ChatPrompt
-        if isinstance(other, str):
-            return self + [{"role": "user", "content": other}]
-        elif isinstance(other, dict):
-            return self + [other]
-        elif isinstance(other, list):
-            return ChatPrompt(
-                self.messages + other,
-                copy.deepcopy(self.request),
-                replace(self.run_config),
-                self.base_path
-            )
-        elif isinstance(other, ChatPrompt):
-            # merge two ChatPrompt objects
-            merged_request, merged_run_config = self._merge_non_data(other)
-            return ChatPrompt(
-                self.messages + other.messages, merged_request, merged_run_config, 
-                self.base_path
-            )
-        else:
-            raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
+        new_prompt = copy.deepcopy(self)
+        new_prompt += other
+        return new_prompt
     
     def __iadd__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
-        # support concatenation with string, list or another ChatPrompt
+        # support concatenation with string, list, dict or another ChatPrompt
         if isinstance(other, str):
-            self.messages.append({"role": "user", "content": other})
+            self.add_message(content=other)
         elif isinstance(other, dict):
             self.messages.append(other)
         elif isinstance(other, list):
-            self.messages += other
+            for item in other:
+                self.messages.append(item)
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
-            self.messages += other.messages
+            self += other.messages
             self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
         return self
+    
+    def add_message(self, role: str = "user", content: Optional[str] = None, tool_calls: Optional[list] = None):
+        msg = {"role": role, "content": content}
+        if tool_calls is not None:
+            msg["tool_calls"] = tool_calls
+        self.messages.append(msg)
 
 
 class CompletionsPrompt(HandyPrompt):
