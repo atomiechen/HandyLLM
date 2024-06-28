@@ -208,7 +208,7 @@ class HandyPrompt(ABC):
             self.dump(fd, base_path=Path(path).parent.resolve())
     
     @abstractmethod
-    def _eval_data(self: PromptType, run_config: RunConfig) -> Union[str, list]:
+    def _eval_data(self, run_config: RunConfig) -> Union[str, list]:
         ...
     
     def eval(
@@ -237,7 +237,7 @@ class HandyPrompt(ABC):
         )
     
     def eval_run_config(
-        self: PromptType, 
+        self, 
         run_config: RunConfig, 
         ) -> RunConfig:
         # merge runtime run_config with the original run_config
@@ -332,7 +332,7 @@ class HandyPrompt(ABC):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         return output_path
     
-    def _prepare_run(self: PromptType, run_config: RunConfig, var_map: Optional[MutableMapping], kwargs: MutableMapping):
+    def _prepare_run(self, run_config: RunConfig, var_map: Optional[MutableMapping], kwargs: MutableMapping):
         # evaluate the prompt with the given run_config
         evaled_prompt = self.eval(run_config=run_config, var_map=var_map, **kwargs)
         evaled_run_config = evaled_prompt.run_config
@@ -376,7 +376,7 @@ class HandyPrompt(ABC):
         return evaled_prompt, stream
     
     @staticmethod
-    def _post_check_output(stream: bool, run_config: RunConfig, new_prompt: PromptType):
+    def _post_check_output(stream: bool, run_config: RunConfig, new_prompt: HandyPrompt):
         if not stream:
             # if stream is True, the response is already streamed to 
             # a file or a file descriptor
@@ -516,7 +516,7 @@ class ChatPrompt(HandyPrompt):
     def _run_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: PromptType,
+        evaled_prompt: ChatPrompt,
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
@@ -563,7 +563,7 @@ class ChatPrompt(HandyPrompt):
     async def _arun_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: PromptType,
+        evaled_prompt: ChatPrompt,
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
@@ -678,7 +678,7 @@ class CompletionsPrompt(HandyPrompt):
     def _run_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: PromptType,
+        evaled_prompt: CompletionsPrompt,
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
@@ -727,7 +727,7 @@ class CompletionsPrompt(HandyPrompt):
     async def _arun_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt: PromptType,
+        evaled_prompt: CompletionsPrompt,
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
