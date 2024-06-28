@@ -604,15 +604,12 @@ class ChatPrompt(HandyPrompt):
             response=response
         )
 
-    def __add__(self: ChatPrompt, other: Union[str, list, ChatPrompt]):
-        # support concatenation with string, list or another ChatPrompt
+    def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
+        # support concatenation with string, list, dict or another ChatPrompt
         if isinstance(other, str):
-            return ChatPrompt(
-                self.messages + [{"role": "user", "content": other}],
-                copy.deepcopy(self.request),
-                replace(self.run_config),
-                self.base_path
-            )
+            return self + [{"role": "user", "content": other}]
+        elif isinstance(other, dict):
+            return self + [other]
         elif isinstance(other, list):
             return ChatPrompt(
                 self.messages + other,
@@ -630,10 +627,12 @@ class ChatPrompt(HandyPrompt):
         else:
             raise TypeError(f"unsupported operand type(s) for +: 'ChatPrompt' and '{type(other)}'")
     
-    def __iadd__(self: ChatPrompt, other: Union[str, list, ChatPrompt]):
+    def __iadd__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list or another ChatPrompt
         if isinstance(other, str):
             self.messages.append({"role": "user", "content": other})
+        elif isinstance(other, dict):
+            self.messages.append(other)
         elif isinstance(other, list):
             self.messages += other
         elif isinstance(other, ChatPrompt):
