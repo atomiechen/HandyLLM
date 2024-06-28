@@ -6,6 +6,7 @@ from typing import Union
 from .openai_client import OpenAIClient, ClientMode
 from .requestor import Requestor
 from . import utils
+from ._constants import TYPE_API_TYPES
 
 
 class _ModuleClient(OpenAIClient):
@@ -84,7 +85,7 @@ class _OpenAIClientProxy:
     # set this to your API type;
     # or environment variable OPENAI_API_TYPE will be used;
     # can be None (roll back to default).
-    api_type: Union[str, None] = None
+    api_type: Union[TYPE_API_TYPES, None] = None
 
     # set this to your API base;
     # or environment variable OPENAI_API_BASE will be used.

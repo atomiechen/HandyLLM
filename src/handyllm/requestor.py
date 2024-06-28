@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Union, TYPE_CHECKING
+from typing import Callable, Optional, Union, cast
 import asyncio
 import logging
 import json
 import time
-if TYPE_CHECKING:
-    import requests
-    import httpx
+import requests
+import httpx
 
 from ._constants import API_TYPES_AZURE
 
@@ -124,7 +123,8 @@ class Requestor:
             message = response.json()
         except:
             message = response.text
-        err_msg = f"API error ({self.url} {response.status_code} {response.reason}) - {message}"
+        reason = response.reason if isinstance(response, requests.Response) else response.reason_phrase
+        err_msg = f"API error ({self.url} {response.status_code} {reason}) - {message}"
         return Exception(err_msg)
 
     def call(self):
@@ -164,7 +164,7 @@ class Requestor:
             raise e
 
     def _call_raw(self) -> requests.Response:
-        import requests
+        self._sync_client = cast(requests.Session, self._sync_client)
         response = self._sync_client.request(
             self.method,
             self.url,
@@ -209,6 +209,7 @@ class Requestor:
                 raise e
 
     def poll(self, url, timeout_ddl=None, params=None) -> requests.Response:
+        self._sync_client = cast(requests.Session, self._sync_client)
         self._check_timeout(timeout_ddl)
         headers= { "api-key": self.api_key, "Content-Type": "application/json" }
         response = self._sync_client.request('get', url, headers=headers, params=params)
@@ -241,7 +242,7 @@ class Requestor:
             else:
                 if self.azure_poll:
                     poll_url = raw_response.headers['operation-location']
-                    response = await self.apoll(poll_url, timeout_ddl=timeout_ddl).json()
+                    response = (await self.apoll(poll_url, timeout_ddl=timeout_ddl)).json()
                     response = response.get('result', response)
                 elif self.raw:
                     response = raw_response.content
@@ -257,7 +258,7 @@ class Requestor:
             raise e
 
     async def _acall_raw(self):
-        import httpx
+        self._async_client = cast(httpx.AsyncClient, self._async_client)
         request = self._async_client.build_request(
             self.method,
             self.url,
@@ -307,6 +308,7 @@ class Requestor:
             await raw_response.aclose()
 
     async def apoll(self, url, timeout_ddl=None, params=None) -> httpx.Response:
+        self._async_client = cast(httpx.AsyncClient, self._async_client)
         self._check_timeout(timeout_ddl)
         headers= { "api-key": self.api_key, "Content-Type": "application/json" }
         response = await self._async_client.request('get', url, headers=headers, params=params)
@@ -318,17 +320,17 @@ class Requestor:
         self._check_image_error(response)
         return response
     
-    def set_sync_client(self, client: requests.Session):
+    def set_sync_client(self, client: Optional[requests.Session]):
         self._sync_client = client
     
-    def set_async_client(self, client: httpx.AsyncClient):
+    def set_async_client(self, client: Optional[httpx.AsyncClient]):
         self._async_client = client
     
-    def set_prepare_callback(self, func: callable):
+    def set_prepare_callback(self, func: Callable):
         self._prepare_callback = func
     
-    def set_response_callback(self, func: callable):
+    def set_response_callback(self, func: Callable):
         self._response_callback = func
 
-    def set_exception_callback(self, func: callable):
+    def set_exception_callback(self, func: Callable):
         self._exception_callback = func

@@ -4,7 +4,7 @@ from enum import Enum, EnumMeta
 class StrEnumMeta(EnumMeta):
     def __contains__(cls, item):
         if isinstance(item, str):
-            return item in iter(cls)
+            return item in iter(cls) # type: ignore
         return super().__contains__(item)
 
 

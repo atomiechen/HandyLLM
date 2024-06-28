@@ -23,7 +23,7 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional, Union, TypeVar
+from typing import IO, Any, MutableMapping, Optional, Union, TypeVar, cast
 from abc import abstractmethod, ABC
 from dataclasses import replace
 from contextlib import contextmanager
@@ -39,7 +39,7 @@ from .utils import (
     astream_chat_all, astream_completions, 
     stream_chat_all, stream_completions, 
 )
-from .run_config import RunConfig, RecordRequestMode, PathType, VarMapType, CredentialType
+from .run_config import RunConfig, RecordRequestMode, PathType, SyncHandlerCompletions, VarMapType, CredentialType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -64,7 +64,9 @@ def loads(
 ) -> HandyPrompt:
     if handler.detect(text):
         metadata, content = frontmatter.parse(text, encoding, handler)
-        meta = metadata.pop("meta", None) or {}
+        meta = metadata.pop("meta", None)
+        if not isinstance(meta, dict):
+            meta = {}
         request = metadata
     else:
         content = text
@@ -89,7 +91,7 @@ def loads(
         return ChatPrompt(messages, request, meta, base_path)
 
 def load(
-    fd: io.IOBase, 
+    fd: IO[str], 
     encoding: str = "utf-8",
     base_path: Optional[PathType] = None
 ) -> HandyPrompt:
@@ -111,7 +113,7 @@ def dumps(
 
 def dump(
     prompt: HandyPrompt, 
-    fd: io.IOBase, 
+    fd: IO[str], 
     base_path: Optional[PathType] = None
 ) -> None:
     return prompt.dump(fd, base_path)
@@ -141,10 +143,10 @@ class HandyPrompt(ABC):
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
     
     def __init__(
-        self, data: Union[str, list], request: Optional[dict] = None, 
-        meta: Optional[Union[dict, RunConfig]] = None, 
+        self, data: Union[str, list], request: Optional[MutableMapping] = None, 
+        meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[dict] = None,
+        response: Optional[Any] = None,
         ):
         self.data = data
         self.request = request or {}
@@ -179,7 +181,7 @@ class HandyPrompt(ABC):
         return str(data)
     
     @classmethod
-    def _dumps_frontmatter(cls, request: dict, run_config: RunConfig, base_path: Optional[PathType] = None) -> str:
+    def _dumps_frontmatter(cls, request: MutableMapping, run_config: RunConfig, base_path: Optional[PathType] = None) -> str:
         # dump frontmatter
         if not run_config and not request:
             return ""
@@ -195,7 +197,7 @@ class HandyPrompt(ABC):
         base_path = base_path or self.base_path
         return type(self)._dumps_frontmatter(self.request, self.run_config, base_path) + serialized_data
     
-    def dump(self, fd: io.IOBase, base_path: Optional[PathType] = None) -> None:
+    def dump(self, fd: IO[str], base_path: Optional[PathType] = None) -> None:
         text = self.dumps(base_path=base_path)
         fd.write(text)
     
@@ -256,7 +258,7 @@ class HandyPrompt(ABC):
                 # guess the credential type from the file extension
                 p = Path(run_config.credential_path)
                 if p.suffix:
-                    run_config.credential_type = p.suffix[1:]
+                    run_config.credential_type = p.suffix[1:] # type: ignore
                 else:
                     run_config.credential_type = CredentialType.ENV
         return run_config
@@ -328,7 +330,7 @@ class HandyPrompt(ABC):
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         return output_path
     
-    def _prepare_run(self: PromptType, run_config: RunConfig, var_map: Optional[Dict], kwargs: dict):
+    def _prepare_run(self: PromptType, run_config: RunConfig, var_map: Optional[MutableMapping], kwargs: MutableMapping):
         # evaluate the prompt with the given run_config
         evaled_prompt = self.eval(run_config=run_config, var_map=var_map, **kwargs)
         evaled_run_config = evaled_prompt.run_config
@@ -382,7 +384,7 @@ class HandyPrompt(ABC):
                 new_prompt.dump_to(run_config.output_path)
         return new_prompt
 
-    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[dict, RunConfig]]:
+    def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> Union[None, tuple[MutableMapping, RunConfig]]:
         if inplace:
             merge_dict(self.request, other.request, strategy=Strategy.ADDITIVE)
             self.run_config.merge(other.run_config, inplace=True)
@@ -393,9 +395,9 @@ class HandyPrompt(ABC):
     
     @staticmethod
     def _filter_request(
-        request: dict, 
+        request: MutableMapping, 
         run_config: RunConfig,
-        ) -> dict:
+        ) -> MutableMapping:
         if run_config.record_request == RecordRequestMode.WHITELIST:
             if run_config.record_whitelist:
                 request = {key: value for key, value in request.items() if key in run_config.record_whitelist}
@@ -432,6 +434,7 @@ class HandyPrompt(ABC):
     @staticmethod
     @contextmanager
     def open_output_path_fd(run_config: RunConfig):
+        run_config.output_path = cast(PathType, run_config.output_path)
         if run_config.output_path_buffering is None or run_config.output_path_buffering == -1:
             # default buffering
             with open(run_config.output_path, 'w', encoding='utf-8') as fout:
@@ -452,9 +455,9 @@ class HandyPrompt(ABC):
 class ChatPrompt(HandyPrompt):
         
     def __init__(
-        self, messages: list, request: dict, meta: Union[dict, RunConfig], 
+        self, messages: list, request: MutableMapping, meta: Union[MutableMapping, RunConfig], 
         base_path: Optional[PathType] = None,
-        response: Optional[dict] = None,
+        response: Optional[Any] = None,
         ):
         super().__init__(messages, request, meta, base_path, response)
     
@@ -484,6 +487,7 @@ class ChatPrompt(HandyPrompt):
     def _wrap_gen_chat(response, run_config: RunConfig):
         for role, content, tool_call in stream_chat_all(response):
             if run_config.on_chunk:
+                run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                 run_config.on_chunk(role, content, tool_call)
             yield role, content, tool_call
     
@@ -494,6 +498,7 @@ class ChatPrompt(HandyPrompt):
                 if inspect.iscoroutinefunction(run_config.on_chunk):
                     await run_config.on_chunk(role, content, tool_call)
                 else:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                     run_config.on_chunk(role, content, tool_call)
             yield role, content, tool_call
 
@@ -534,6 +539,7 @@ class ChatPrompt(HandyPrompt):
                     cls._wrap_gen_chat(response, run_config)
                     )
         else:
+            response = cast(Any, response)
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -578,6 +584,7 @@ class ChatPrompt(HandyPrompt):
                     cls._awrap_gen_chat(response, run_config)
                     )
         else:
+            response = cast(Any, response)
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -631,9 +638,9 @@ class ChatPrompt(HandyPrompt):
 class CompletionsPrompt(HandyPrompt):
     
     def __init__(
-        self, prompt: str, request: dict, meta: Union[dict, RunConfig], 
-        base_path: PathType = None,
-        response: Optional[dict] = None,
+        self, prompt: str, request: MutableMapping, meta: Union[MutableMapping, RunConfig], 
+        base_path: Optional[PathType] = None,
+        response: Optional[Any] = None,
         ):
         super().__init__(prompt, request, meta, base_path, response)
     
@@ -653,11 +660,12 @@ class CompletionsPrompt(HandyPrompt):
         return new_prompt
     
     @staticmethod
-    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
+    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
         # stream response to fd
         content = ""
         for text in stream_completions(response):
             if run_config.on_chunk:
+                run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
                 run_config.on_chunk(text)
             if fd:
                 fd.write(text)
@@ -686,18 +694,19 @@ class CompletionsPrompt(HandyPrompt):
             elif run_config.output_path:
                 # stream response to a file
                 with cls.open_output_path_fd(run_config) as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, run_config, base_path))
-                    content = cls._stream_completions_proc(response, fout)
+                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
+                    content = cls._stream_completions_proc(response, run_config, fout)
             else:
                 content = cls._stream_completions_proc(response, run_config)
         else:
+            response = cast(Any, response)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
             )
 
     @staticmethod
-    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[io.IOBase] = None) -> str:
+    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
         # stream response to fd
         content = ""
         async for text in astream_completions(response):
@@ -705,6 +714,7 @@ class CompletionsPrompt(HandyPrompt):
                 if inspect.iscoroutinefunction(run_config.on_chunk):
                     await run_config.on_chunk(text)
                 else:
+                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
                     run_config.on_chunk(text)
             if fd:
                 fd.write(text)
@@ -738,6 +748,7 @@ class CompletionsPrompt(HandyPrompt):
             else:
                 content = await cls._astream_completions_proc(response, run_config)
         else:
+            response = cast(Any, response)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
