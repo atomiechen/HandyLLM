@@ -65,17 +65,17 @@ class EndpointManager(MutableSequence):
     def __len__(self) -> int:
         return len(self._endpoints)
 
-    def __getitem__(self, idx: int) -> Endpoint:
+    def __getitem__(self, idx):
         return self._endpoints[idx]
 
-    def __setitem__(self, idx: int, endpoint: Endpoint):
+    def __setitem__(self, idx, endpoint):
         self._endpoints[idx] = endpoint
 
-    def __delitem__(self, idx: int):
+    def __delitem__(self, idx):
         del self._endpoints[idx]
 
-    def insert(self, idx: int, endpoint: Endpoint):
-        self._endpoints.insert(idx, endpoint)
+    def insert(self, index: int, value: Endpoint):
+        self._endpoints.insert(index, value)
 
     def add_endpoint_by_info(self, **kwargs):
         endpoint = Endpoint(**kwargs)

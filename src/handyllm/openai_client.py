@@ -156,10 +156,12 @@ class OpenAIClient:
             return model_engine_map
         if self.model_engine_map:
             return self.model_engine_map
+        json_str = os.environ.get('MODEL_ENGINE_MAP')
+        if not json_str:
+            return None
         try:
-            json_str = os.environ.get('MODEL_ENGINE_MAP')
             return json.loads(json_str)
-        except:
+        except json.JSONDecodeError:
             return None
 
     def _consume_kwargs(self, kwargs):

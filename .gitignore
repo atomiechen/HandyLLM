@@ -31,3 +31,7 @@ temp*
 *.flac
 *.aac
 
+# test output
+.coverage*
+.pytest_cache
+htmlcov

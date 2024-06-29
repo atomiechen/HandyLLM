@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HandyLLM"
-version = "0.8.1"
+version = "0.8.2"
 authors = [
   { name="Atomie CHEN", email="atomic_cwh@163.com" },
 ]
@@ -33,3 +33,8 @@ Changelog = "https://github.com/atomiechen/HandyLLM/blob/master/CHANGELOG.md"
 
 [project.scripts]
 handyllm = "handyllm.__main__:cli"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--ignore=examples"
+]

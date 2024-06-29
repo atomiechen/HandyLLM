@@ -1,29 +1,15 @@
 from __future__ import annotations
 import sys
 import os
-import io
 from enum import auto
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, Optional, Union
+from typing import IO, Any, Awaitable, Callable, Dict, Mapping, MutableMapping, Optional, Union
 from dataclasses import dataclass, asdict, fields, replace
 
 from mergedeep import merge as merge_dict, Strategy
 
 from ._str_enum import AutoStrEnum
-
-
-if sys.version_info >= (3, 9):
-    PathType = Union[str, os.PathLike[str]]
-else:
-    PathType = Union[str, os.PathLike]
-
-VarMapType = Dict[str, str]
-
-SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
-SyncHandlerCompletions = Callable[[str], Any]
-AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]]
-AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
-OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
+from ._types import PathType, VarMapType, OnChunkType
 
 
 class RecordRequestMode(AutoStrEnum):
@@ -59,10 +45,10 @@ class RunConfig:
     # 0 for unbuffered, 1 for line buffered, any other positive value for buffer size
     output_path_buffering: Optional[int] = None
     # output the response to a file descriptor
-    output_fd: Optional[io.IOBase] = None
+    output_fd: Optional[IO[str]] = None
     # output the evaluated prompt to a file or a file descriptor
     output_evaled_prompt_path: Optional[PathType] = None
-    output_evaled_prompt_fd: Optional[io.IOBase] = None
+    output_evaled_prompt_fd: Optional[IO[str]] = None
     # credential file path
     credential_path: Optional[PathType] = None
     # credential type: env, json, yaml
@@ -104,7 +90,7 @@ class RunConfig:
         return len([f for f in fields(self) if getattr(self, f.name) is not None])
     
     @classmethod
-    def from_dict(cls, obj: dict, base_path: Optional[PathType] = None):
+    def from_dict(cls, obj: Mapping, base_path: Optional[PathType] = None):
         input_kwargs = {}
         for field in fields(cls):
             if field.name in obj:
