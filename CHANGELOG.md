@@ -5,6 +5,45 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.8.2] - 2024-06-30
+
+### Added
+
+- `hprompt`: load methods now support `cls` parameter for prompt type specification
+- `ChatPrompt` and `CompletionsPrompt` support optional request and meta
+- `ChatPrompt` :
+  - supports add dict
+  - add `add_message(...)` method
+- `CompletionsPrompt`:
+  - add `add_text(...)` method
+- `PromptConverter`: `yaml.dump` uses `allow_unicode=True` option
+- move all type definitions to `_types.py`
+- support for package development:
+  - add `requirement.txt` for development
+  - add `scripts/test.sh` for running tests
+  - add test scripts in `tests` folder
+
+### Fixed
+
+- `HandyPrompt.eval(...)` should not make directories for output paths
+- `CompletionsPrompt._run_with_client(...)`: misplaced `run_config` param
+- `PromptConverter`
+  - fix variable replacement for `content_array` message
+  - fix wrong return type of `stream_msgs2raw` and `astream_msgs2raw`
+- `requestor`:
+  - `httpx.Response` should use `reason_phrase` to get error reason
+  - `acall()` fix missing brackets for await
+  - `_call_raw()` and `_acall_raw()` intercept and raise new exception without original one
+  - `_acall_raw()`: read the response first to prevent `httpx.ResponseNotRead` before getting error message
+- `_utils.exception2err_msg(...)` should append error message instead of printing
+- change `io.IOBase` to `IO[str]` for file descriptors (e.g. `RunConfig.output_fd`)
+- fix other type hints
+
+### Changed
+
+- move all old files in `tests` folder to `examples` folder
+
+
 ## [0.8.1] - 2024-06-10
 
 ### Fixed
