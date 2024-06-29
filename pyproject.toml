@@ -33,3 +33,8 @@ Changelog = "https://github.com/atomiechen/HandyLLM/blob/master/CHANGELOG.md"
 
 [project.scripts]
 handyllm = "handyllm.__main__:cli"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--ignore=examples"
+]
