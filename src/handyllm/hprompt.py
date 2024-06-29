@@ -39,7 +39,8 @@ from .utils import (
     astream_chat_all, astream_completions, 
     stream_chat_all, stream_completions, 
 )
-from .run_config import RunConfig, RecordRequestMode, PathType, SyncHandlerCompletions, VarMapType, CredentialType, SyncHandlerChat
+from .run_config import RunConfig, RecordRequestMode, CredentialType
+from ._types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')

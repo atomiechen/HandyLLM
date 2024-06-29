@@ -1,5 +1,6 @@
 import re
 from typing import IO, MutableMapping, MutableSequence, Optional, Tuple
+from ._types import PathType
 import yaml
 
 
@@ -22,7 +23,7 @@ class PromptConverter:
             return True
         return False
 
-    def read_substitute_content(self, path: str):
+    def read_substitute_content(self, path: PathType):
         # 从文本文件读取所有prompt中需要替换的内容
         with open(path, 'r', encoding='utf-8') as fin:
             content = fin.read()
@@ -71,7 +72,7 @@ class PromptConverter:
         
         return msgs
     
-    def rawfile2msgs(self, raw_prompt_path: str):
+    def rawfile2msgs(self, raw_prompt_path: PathType):
         with open(raw_prompt_path, 'r', encoding='utf-8') as fin:
             raw_prompt = fin.read()
         
@@ -169,7 +170,7 @@ class PromptConverter:
         return role, content, tool_calls
     
     @classmethod
-    def msgs2rawfile(cls, msgs, raw_prompt_path: str):
+    def msgs2rawfile(cls, msgs, raw_prompt_path: PathType):
         raw_prompt = cls.msgs2raw(msgs)
         with open(raw_prompt_path, 'w', encoding='utf-8') as fout:
             fout.write(raw_prompt)

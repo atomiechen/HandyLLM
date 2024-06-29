@@ -9,20 +9,7 @@ from dataclasses import dataclass, asdict, fields, replace
 from mergedeep import merge as merge_dict, Strategy
 
 from ._str_enum import AutoStrEnum
-
-
-if sys.version_info >= (3, 9):
-    PathType = Union[str, os.PathLike[str]]
-else:
-    PathType = Union[str, os.PathLike]
-
-VarMapType = MutableMapping[str, str]
-
-SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
-SyncHandlerCompletions = Callable[[str], Any]
-AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]]
-AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
-OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
+from ._types import PathType, VarMapType, OnChunkType
 
 
 class RecordRequestMode(AutoStrEnum):
