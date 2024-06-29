@@ -1,0 +1,9 @@
+---
+model: gpt-4o
+meta:
+  var_map_path: var_map.txt
+---
+
+$user$
+Tell me a joke.
+%extras%
