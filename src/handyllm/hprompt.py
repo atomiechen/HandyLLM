@@ -124,7 +124,9 @@ class HandyPrompt(ABC):
         text = self.dumps(base_path=base_path)
         fd.write(text)
     
-    def dump_to(self, path: PathType) -> None:
+    def dump_to(self, path: PathType, mkdir: bool = False) -> None:
+        if mkdir:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as fd:
             self.dump(fd, base_path=Path(path).parent.resolve())
     
@@ -249,8 +251,6 @@ class HandyPrompt(ABC):
             output_path = Path(output_path, template_filename)
         # format output_path with the current time
         output_path = start_time.strftime(str(output_path))
-        # create the parent directory if it does not exist
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         return output_path
     
     def _prepare_run(self, run_config: RunConfig, var_map: Optional[MutableMapping], kwargs: MutableMapping):
@@ -275,7 +275,7 @@ class HandyPrompt(ABC):
         if evaled_run_config.output_evaled_prompt_fd:
             evaled_prompt.dump(evaled_run_config.output_evaled_prompt_fd)
         elif evaled_run_config.output_evaled_prompt_path:
-            evaled_prompt.dump_to(evaled_run_config.output_evaled_prompt_path)
+            evaled_prompt.dump_to(evaled_run_config.output_evaled_prompt_path, mkdir=True)
         
         # load the credential file
         if evaled_run_config.credential_path:
@@ -304,7 +304,7 @@ class HandyPrompt(ABC):
             if run_config.output_fd:
                 new_prompt.dump(run_config.output_fd)
             elif run_config.output_path:
-                new_prompt.dump_to(run_config.output_path)
+                new_prompt.dump_to(run_config.output_path, mkdir=True)
         return new_prompt
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> tuple[MutableMapping, RunConfig]:
@@ -363,6 +363,8 @@ class HandyPrompt(ABC):
     @contextmanager
     def open_output_path_fd(run_config: RunConfig):
         run_config.output_path = cast(PathType, run_config.output_path)
+        # create the parent directory if it does not exist
+        Path(run_config.output_path).parent.mkdir(parents=True, exist_ok=True)
         if run_config.output_path_buffering is None or run_config.output_path_buffering == -1:
             # default buffering
             with open(run_config.output_path, 'w', encoding='utf-8') as fout:
@@ -766,9 +768,10 @@ def dump(
 
 def dump_to(
     prompt: HandyPrompt, 
-    path: PathType
+    path: PathType, 
+    mkdir: bool = False, 
 ) -> None:
-    return prompt.dump_to(path)
+    return prompt.dump_to(path, mkdir=mkdir)
 
 def load_var_map(path: PathType) -> dict[str, str]:
     # read all content that needs to be replaced in the prompt from a text file
