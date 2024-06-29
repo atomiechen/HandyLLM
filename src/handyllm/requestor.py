@@ -278,6 +278,9 @@ class Requestor:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             module_logger.error(e, exc_info=True)
+            # read the response body first to prevent httpx.ResponseNotRead exception
+            # ref: https://github.com/encode/httpx/discussions/1856#discussioncomment-1316674
+            await response.aread()
             # raise a new exception
             raise self._make_wrapped_exception(response) from None
         return response
