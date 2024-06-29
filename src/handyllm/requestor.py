@@ -180,7 +180,8 @@ class Requestor:
             response.raise_for_status()
         except requests.HTTPError as e:
             module_logger.error(e, exc_info=True)
-            raise self._make_wrapped_exception(response)
+            # raise a new exception
+            raise self._make_wrapped_exception(response) from None
         return response
 
     def _gen_stream_response(self, raw_response: requests.Response, prepare_ret):
@@ -277,7 +278,8 @@ class Requestor:
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
             module_logger.error(e, exc_info=True)
-            raise self._make_wrapped_exception(response)
+            # raise a new exception
+            raise self._make_wrapped_exception(response) from None
         return response
 
     async def _agen_stream_response(self, raw_response: httpx.Response, prepare_ret):
