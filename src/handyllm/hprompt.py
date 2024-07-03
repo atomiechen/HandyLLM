@@ -23,9 +23,8 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, MutableMapping, Optional, Union, TypeVar, cast
+from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
-from dataclasses import replace
 from contextlib import contextmanager
 
 import yaml
@@ -723,14 +722,14 @@ def loads(
         if api:
             api = api.lower()
             if api.startswith("chat"):
-                cls = cast(type[PromptType], ChatPrompt)
+                cls = cast(Type[PromptType], ChatPrompt)
             else:
-                cls = cast(type[PromptType], CompletionsPrompt)
+                cls = cast(Type[PromptType], CompletionsPrompt)
         else:
             if converter.detect(data):
-                cls = cast(type[PromptType], ChatPrompt)
+                cls = cast(Type[PromptType], ChatPrompt)
             else:
-                cls = cast(type[PromptType], CompletionsPrompt)
+                cls = cast(Type[PromptType], CompletionsPrompt)
     if cls == ChatPrompt:
         data = converter.raw2msgs(data)
     return cls(data, request, meta, base_path)
