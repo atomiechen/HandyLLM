@@ -1,15 +1,18 @@
 from __future__ import annotations
-from typing import Optional, Union
+from typing import Mapping, Optional, Union
 import os
 import json
 import time
 from enum import Enum, auto
 import asyncio
 
+import yaml
+
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from ._constants import API_BASE_OPENAI, API_TYPE_OPENAI, API_TYPES_AZURE, TYPE_API_TYPES
+from ._types import PathType
 
 
 def api(func):
@@ -67,6 +70,7 @@ class OpenAIClient:
         api_version: Union[str, None] = None,
         model_engine_map: Union[dict, None] = None,
         endpoint_manager: Optional[EndpointManager] = None,
+        load_path: Optional[PathType] = None,
         ) -> None:
         self._sync_client = None
         self._async_client = None
@@ -97,6 +101,42 @@ class OpenAIClient:
         self.api_version = api_version
         self.model_engine_map = model_engine_map
         self.endpoint_manager = endpoint_manager
+        
+        if load_path:
+            self.load_from(load_path, override=False)
+    
+    def load_from(self, path: PathType, encoding="utf-8", override=False):
+        with open(path, "r", encoding=encoding) as fin:
+            obj = yaml.safe_load(fin)
+        if obj:
+            self.load_from_obj(obj, override=override)
+    
+    def load_from_obj(self, obj: Mapping, override=False):
+        if not isinstance(obj, Mapping):
+           raise ValueError("obj must be a mapping (dict, etc.)") 
+        api_base = obj.get("api_base", None)
+        api_key = obj.get("api_key", None)
+        organization = obj.get("organization", None)
+        api_type = obj.get("api_type", None)
+        api_version = obj.get("api_version", None)
+        model_engine_map = obj.get("model_engine_map", None)
+        item = obj.get("endpoint_manager", obj.get("endpoints", None))
+        if api_base and (override or not self.api_base):
+            self.api_base = api_base
+        if api_key and (override or not self.api_key):
+            self.api_key = api_key
+        if organization and (override or not self.organization):
+            self.organization = organization
+        if api_type and (override or not self.api_type):
+            self.api_type = api_type
+        if api_version and (override or not self.api_version):
+            self.api_version = api_version
+        if model_engine_map and (override or not self.model_engine_map):
+            self.model_engine_map = model_engine_map
+        if item and (override or not self.endpoint_manager):
+            if self.endpoint_manager is None:
+                self.endpoint_manager = EndpointManager()
+            self.endpoint_manager.load_from_list(item, override=override)
     
     def __enter__(self):
         return self
