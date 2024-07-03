@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Union
+from typing import Optional, Union
 import os
 import json
 import time
@@ -53,6 +53,9 @@ class OpenAIClient:
     # can be None.
     model_engine_map: Union[dict, None]
     
+    # set this to your endpoint manager
+    endpoint_manager: Optional[EndpointManager] = None
+    
     def __init__(
         self, 
         mode: Union[str, ClientMode] = ClientMode.SYNC,
@@ -63,6 +66,7 @@ class OpenAIClient:
         api_type: Union[TYPE_API_TYPES, None] = None,
         api_version: Union[str, None] = None,
         model_engine_map: Union[dict, None] = None,
+        endpoint_manager: Optional[EndpointManager] = None,
         ) -> None:
         self._sync_client = None
         self._async_client = None
@@ -92,6 +96,7 @@ class OpenAIClient:
         self.api_type = api_type
         self.api_version = api_version
         self.model_engine_map = model_engine_map
+        self.endpoint_manager = endpoint_manager
     
     def __enter__(self):
         return self
@@ -168,12 +173,13 @@ class OpenAIClient:
         api_key = organization = api_base = api_type = api_version = engine = model_engine_map = dest_url = None
 
         # read API info from endpoint_manager
-        endpoint_manager = kwargs.pop('endpoint_manager', None)
-        if endpoint_manager is not None:
+        endpoint_manager = kwargs.pop('endpoint_manager', self.endpoint_manager)
+        if endpoint_manager is not None and not kwargs.get('__endpoint_manager_used__', False):
             if not isinstance(endpoint_manager, EndpointManager):
                 raise Exception("endpoint_manager must be an instance of EndpointManager")
             # get_next_endpoint() will be called once for each request
             api_key, organization, api_base, api_type, api_version, model_engine_map, dest_url = endpoint_manager.get_next_endpoint().get_api_info()
+            kwargs['__endpoint_manager_used__'] = True
 
         # read API info from endpoint (override API info from endpoint_manager)
         endpoint = kwargs.pop('endpoint', None)
