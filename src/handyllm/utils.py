@@ -1,4 +1,4 @@
-from typing import IO
+from typing import IO, Optional, cast
 from urllib.parse import urlparse
 import os
 import time
@@ -31,11 +31,12 @@ def stream_chat_all(response):
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
-                role = message['role']
-            content = message.get('content')
-            tool_calls = message.get('tool_calls')
+                role = cast(str, message['role'])
+            content = cast(Optional[str], message.get('content'))
+            tool_calls = cast(Optional[list], message.get('tool_calls'))
             if tool_calls:
                 for chunk in tool_calls:
+                    chunk = cast(dict, chunk)
                     if chunk['index'] == tool_call.get('index'):
                         tool_call['function']['arguments'] += chunk['function']['arguments']
                     else:
@@ -53,7 +54,8 @@ def stream_chat_all(response):
 
 def stream_chat_with_role(response):
     for role, text, _ in stream_chat_all(response):
-        yield role, text
+        if text:
+            yield role, text
 
 def stream_chat(response):
     for _, text in stream_chat_with_role(response):
@@ -73,11 +75,12 @@ async def astream_chat_all(response):
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
-                role = message['role']
-            content = message.get('content')
+                role = cast(str, message['role'])
+            content = cast(Optional[str], message.get('content'))
             tool_calls = message.get('tool_calls')
             if tool_calls:
                 for chunk in tool_calls:
+                    chunk = cast(dict, chunk)
                     if chunk['index'] == tool_call.get('index'):
                         tool_call['function']['arguments'] += chunk['function']['arguments']
                     else:
@@ -95,7 +98,8 @@ async def astream_chat_all(response):
 
 async def astream_chat_with_role(response):
     async for role, text, _ in astream_chat_all(response):
-        yield role, text
+        if text:
+            yield role, text
 
 async def astream_chat(response):
     async for _, text in astream_chat_with_role(response):
