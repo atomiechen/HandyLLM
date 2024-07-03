@@ -1,5 +1,9 @@
 from threading import Lock
 from collections.abc import MutableSequence
+from typing import Optional
+import yaml
+
+from ._types import PathType
 
 
 class Endpoint:
@@ -53,10 +57,12 @@ class Endpoint:
 
 class EndpointManager(MutableSequence):
 
-    def __init__(self):
+    def __init__(self, load_path: Optional[PathType] = None):
         self._lock = Lock()
         self._last_idx_endpoint = 0
         self._endpoints = []
+        if load_path is not None:
+            self.load_from(load_path)
 
     def clear(self):
         self._last_idx_endpoint = 0
@@ -89,4 +95,14 @@ class EndpointManager(MutableSequence):
             else:
                 self._last_idx_endpoint += 1
             return endpoint
+
+    def load_from(self, path: PathType, encoding="utf-8", override=False):
+        with open(path, "r", encoding=encoding) as fin:
+            endpoints = yaml.safe_load(fin)
+        if isinstance(endpoints, dict):
+            endpoints = endpoints.get("endpoints", [])
+        if override:
+            self.clear()
+        for ep in endpoints:
+            self.add_endpoint_by_info(**ep)
 
