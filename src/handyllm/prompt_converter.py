@@ -1,6 +1,6 @@
 import re
 from typing import IO, MutableMapping, MutableSequence, Optional, Tuple
-from ._types import PathType
+from .types import PathType
 import yaml
 
 

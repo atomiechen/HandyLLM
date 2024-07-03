@@ -3,7 +3,7 @@ from collections.abc import MutableSequence
 from typing import Iterable, Mapping, Optional, Union
 import yaml
 
-from ._types import PathType
+from .types import PathType
 from ._utils import isiterable
 
 

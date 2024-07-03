@@ -12,7 +12,7 @@ from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import Requestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from ._constants import API_BASE_OPENAI, API_TYPE_OPENAI, API_TYPES_AZURE, TYPE_API_TYPES
-from ._types import PathType
+from .types import PathType
 
 
 def api(func):
