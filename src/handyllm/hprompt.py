@@ -53,7 +53,7 @@ DEFAULT_CONFIG = RunConfig()
 DEFAULT_BLACKLIST = (
     "api_key", "organization", "api_base", "api_type", "api_version", 
     "endpoint_manager", "endpoint", "engine", "deployment_id", 
-    "model_engine_map", "dest_url", 
+    "model_engine_map", "dest_url", "endpoints"
 )
 
 
