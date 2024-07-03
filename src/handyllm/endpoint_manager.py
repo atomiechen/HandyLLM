@@ -1,9 +1,10 @@
 from threading import Lock
 from collections.abc import MutableSequence
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional, Union
 import yaml
 
 from ._types import PathType
+from ._utils import isiterable
 
 
 class Endpoint:
@@ -98,11 +99,18 @@ class EndpointManager(MutableSequence):
                 self._last_idx_endpoint += 1
             return endpoint
 
-    def load_from_list(self, obj: Iterable, override=False):
+    def load_from_list(self, obj: Iterable[Union[Mapping, Endpoint]], override=False):
+        if not isiterable(obj):
+            raise ValueError("obj must be an iterable (list, tuple, etc.)")
         if override:
             self.clear()
         for ep in obj:
-            self.add_endpoint_by_info(**ep)
+            if isinstance(ep, Endpoint):
+                self.append(ep)
+            elif isinstance(ep, Mapping):
+                self.add_endpoint_by_info(**ep)
+            else:
+                raise ValueError(f"Unsupported type {type(ep)}")
 
     def load_from(self, path: PathType, encoding="utf-8", override=False):
         with open(path, "r", encoding=encoding) as fin:
