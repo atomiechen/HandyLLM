@@ -258,7 +258,8 @@ class OpenAIClient:
     def _make_requestor(self, request_url, **kwargs) -> Requestor:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         url = join_url(api_base, request_url)
-        requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **kwargs)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('_')}
+        requestor = Requestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **filtered_kwargs)
         requestor.set_sync_client(self._sync_client)
         requestor.set_async_client(self._async_client)
         return requestor
