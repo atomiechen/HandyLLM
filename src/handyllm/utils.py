@@ -1,4 +1,4 @@
-from typing import IO, Optional, cast
+from typing import IO, AsyncIterable, Iterable, Optional, cast
 from urllib.parse import urlparse
 import os
 import time
@@ -24,7 +24,7 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def stream_chat_all(response):
+def stream_chat_all(response: Iterable):
     role = ''
     tool_call = {}
     for data in response:
@@ -52,23 +52,23 @@ def stream_chat_all(response):
         # yield the last tool call
         yield role, None, tool_call
 
-def stream_chat_with_role(response):
+def stream_chat_with_role(response: Iterable):
     for role, text, _ in stream_chat_all(response):
         if text:
             yield role, text
 
-def stream_chat(response):
+def stream_chat(response: Iterable):
     for _, text in stream_chat_with_role(response):
         yield text
 
-def stream_completions(response):
+def stream_completions(response: Iterable):
     for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-async def astream_chat_all(response):
+async def astream_chat_all(response: AsyncIterable):
     role = ''
     tool_call = {}
     async for data in response:
@@ -96,35 +96,35 @@ async def astream_chat_all(response):
         # yield the last tool call
         yield role, None, tool_call
 
-async def astream_chat_with_role(response):
+async def astream_chat_with_role(response: AsyncIterable):
     async for role, text, _ in astream_chat_all(response):
         if text:
             yield role, text
 
-async def astream_chat(response):
+async def astream_chat(response: AsyncIterable):
     async for _, text in astream_chat_with_role(response):
         yield text
 
-async def astream_completions(response):
+async def astream_completions(response: AsyncIterable):
     async for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-def stream_to_fd(response, fd: IO):
+def stream_to_fd(response: Iterable, fd: IO):
     for data in response:
         fd.write(data)
 
-def stream_to_file(response, file_path):
+def stream_to_file(response: Iterable, file_path):
     with open(file_path, 'wb') as f:
         stream_to_fd(response, f)
 
-async def astream_to_fd(response, fd: IO):
+async def astream_to_fd(response: AsyncIterable, fd: IO):
     async for data in response:
         fd.write(data)
 
-async def astream_to_file(response, file_path):
+async def astream_to_file(response: AsyncIterable, file_path):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
 
