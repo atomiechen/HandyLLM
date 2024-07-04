@@ -156,14 +156,23 @@ class Requestor:
         return Exception(err_msg)
 
     def stream(self) -> Iterable:
+        '''
+        Request in stream mode.
+        '''
         self._change_stream_mode(True)
         return cast(Iterable, self.call())
 
     def run(self) -> Union[dict, bytes]:
+        '''
+        Request in non-stream mode.
+        '''
         self._change_stream_mode(False)
         return cast(Union[dict, bytes], self.call())
 
     def call(self):
+        '''
+        Execute the request. Stream or non-stream mode depends on the stream parameter.
+        '''
         if self._sync_client is None:
             raise Exception("Sync request client is not set")
 
@@ -259,14 +268,23 @@ class Requestor:
         return response
 
     async def astream(self) -> AsyncIterable:
+        '''
+        Request in stream mode asynchronously.
+        '''
         self._change_stream_mode(True)
         return cast(AsyncIterable, await self.acall())
 
     async def arun(self) -> Union[dict, bytes]:
+        '''
+        Request in non-stream mode asynchronously.
+        '''
         self._change_stream_mode(False)
         return cast(Union[dict, bytes], await self.acall())
 
     async def acall(self):
+        '''
+        Execute the request asynchronously. Stream or non-stream mode depends on the stream parameter.
+        '''
         if self._async_client is None:
             raise Exception("Async request client is not set")
 
