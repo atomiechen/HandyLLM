@@ -53,7 +53,7 @@ def example1(client: OpenAIClient):
             presence_penalty=0.0,
             timeout=10,
             endpoint_manager=endpoint_manager
-            ).call()
+            ).run()
         print(response['choices'][0]['message']['content'])
     except Exception as e:
         print(e)
@@ -70,7 +70,7 @@ def example2(client: OpenAIClient):
             timeout=10,
             max_tokens=256,
             endpoint=endpoint2
-        ).call()
+        ).run()
         print(response['choices'][0]['message']['content'])
     except Exception as e:
         print(e)
