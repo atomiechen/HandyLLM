@@ -3,6 +3,8 @@ from urllib.parse import urlparse
 import os
 import time
 
+from .types import PathType
+
 
 def get_filename_from_url(download_url):
     # Parse the URL.
@@ -24,7 +26,7 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def stream_chat_all(response: Iterable):
+def stream_chat_all(response: Iterable[dict]):
     role = ''
     tool_call = {}
     for data in response:
@@ -52,23 +54,23 @@ def stream_chat_all(response: Iterable):
         # yield the last tool call
         yield role, None, tool_call
 
-def stream_chat_with_role(response: Iterable):
+def stream_chat_with_role(response: Iterable[dict]):
     for role, text, _ in stream_chat_all(response):
         if text:
             yield role, text
 
-def stream_chat(response: Iterable):
+def stream_chat(response: Iterable[dict]):
     for _, text in stream_chat_with_role(response):
         yield text
 
-def stream_completions(response: Iterable):
+def stream_completions(response: Iterable[dict]):
     for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-async def astream_chat_all(response: AsyncIterable):
+async def astream_chat_all(response: AsyncIterable[dict]):
     role = ''
     tool_call = {}
     async for data in response:
@@ -96,35 +98,35 @@ async def astream_chat_all(response: AsyncIterable):
         # yield the last tool call
         yield role, None, tool_call
 
-async def astream_chat_with_role(response: AsyncIterable):
+async def astream_chat_with_role(response: AsyncIterable[dict]):
     async for role, text, _ in astream_chat_all(response):
         if text:
             yield role, text
 
-async def astream_chat(response: AsyncIterable):
+async def astream_chat(response: AsyncIterable[dict]):
     async for _, text in astream_chat_with_role(response):
         yield text
 
-async def astream_completions(response: AsyncIterable):
+async def astream_completions(response: AsyncIterable[dict]):
     async for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-def stream_to_fd(response: Iterable, fd: IO):
+def stream_to_fd(response: Iterable[bytes], fd: IO):
     for data in response:
         fd.write(data)
 
-def stream_to_file(response: Iterable, file_path):
+def stream_to_file(response: Iterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         stream_to_fd(response, f)
 
-async def astream_to_fd(response: AsyncIterable, fd: IO):
+async def astream_to_fd(response: AsyncIterable[bytes], fd: IO):
     async for data in response:
         fd.write(data)
 
-async def astream_to_file(response: AsyncIterable, file_path):
+async def astream_to_file(response: AsyncIterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
 
