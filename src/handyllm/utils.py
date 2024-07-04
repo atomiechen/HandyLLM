@@ -1,7 +1,9 @@
-from typing import IO
+from typing import IO, AsyncIterable, Iterable, Optional, cast
 from urllib.parse import urlparse
 import os
 import time
+
+from .types import PathType
 
 
 def get_filename_from_url(download_url):
@@ -24,18 +26,19 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def stream_chat_all(response):
+def stream_chat_all(response: Iterable[dict]):
     role = ''
     tool_call = {}
     for data in response:
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
-                role = message['role']
-            content = message.get('content')
-            tool_calls = message.get('tool_calls')
+                role = cast(str, message['role'])
+            content = cast(Optional[str], message.get('content'))
+            tool_calls = cast(Optional[list], message.get('tool_calls'))
             if tool_calls:
                 for chunk in tool_calls:
+                    chunk = cast(dict, chunk)
                     if chunk['index'] == tool_call.get('index'):
                         tool_call['function']['arguments'] += chunk['function']['arguments']
                     else:
@@ -51,33 +54,35 @@ def stream_chat_all(response):
         # yield the last tool call
         yield role, None, tool_call
 
-def stream_chat_with_role(response):
+def stream_chat_with_role(response: Iterable[dict]):
     for role, text, _ in stream_chat_all(response):
-        yield role, text
+        if text:
+            yield role, text
 
-def stream_chat(response):
+def stream_chat(response: Iterable[dict]):
     for _, text in stream_chat_with_role(response):
         yield text
 
-def stream_completions(response):
+def stream_completions(response: Iterable[dict]):
     for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-async def astream_chat_all(response):
+async def astream_chat_all(response: AsyncIterable[dict]):
     role = ''
     tool_call = {}
     async for data in response:
         try:
             message = data['choices'][0]['delta']
             if 'role' in message:
-                role = message['role']
-            content = message.get('content')
+                role = cast(str, message['role'])
+            content = cast(Optional[str], message.get('content'))
             tool_calls = message.get('tool_calls')
             if tool_calls:
                 for chunk in tool_calls:
+                    chunk = cast(dict, chunk)
                     if chunk['index'] == tool_call.get('index'):
                         tool_call['function']['arguments'] += chunk['function']['arguments']
                     else:
@@ -93,34 +98,35 @@ async def astream_chat_all(response):
         # yield the last tool call
         yield role, None, tool_call
 
-async def astream_chat_with_role(response):
+async def astream_chat_with_role(response: AsyncIterable[dict]):
     async for role, text, _ in astream_chat_all(response):
-        yield role, text
+        if text:
+            yield role, text
 
-async def astream_chat(response):
+async def astream_chat(response: AsyncIterable[dict]):
     async for _, text in astream_chat_with_role(response):
         yield text
 
-async def astream_completions(response):
+async def astream_completions(response: AsyncIterable[dict]):
     async for data in response:
         try:
             yield data['choices'][0]['text']
         except (KeyError, IndexError):
             pass
 
-def stream_to_fd(response, fd: IO):
+def stream_to_fd(response: Iterable[bytes], fd: IO):
     for data in response:
         fd.write(data)
 
-def stream_to_file(response, file_path):
+def stream_to_file(response: Iterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         stream_to_fd(response, f)
 
-async def astream_to_fd(response, fd: IO):
+async def astream_to_fd(response: AsyncIterable[bytes], fd: IO):
     async for data in response:
         fd.write(data)
 
-async def astream_to_file(response, file_path):
+async def astream_to_file(response: AsyncIterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
 

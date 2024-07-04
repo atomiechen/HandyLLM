@@ -1,5 +1,11 @@
 from __future__ import annotations
-from typing import Callable, Optional, Union, cast
+__all__ = [
+    'Requestor',
+    'DictRequestor',
+    'BinRequestor',
+]
+
+from typing import AsyncIterable, Callable, Iterable, Optional, Union, cast
 import asyncio
 import logging
 import json
@@ -58,8 +64,8 @@ class Requestor:
         self.chunk_size = chunk_size
         self.dest_url = dest_url
 
-        self.stream = kwargs.get('stream', False)
-        if self.stream and azure_poll:
+        self._stream = cast(bool, kwargs.get('stream', False))
+        if self._stream and azure_poll:
             raise Exception("Cannot use 'azure_poll' in stream mode.")
 
         self.headers = {}
@@ -80,8 +86,30 @@ class Requestor:
                 self.json_data = kwargs
             else:  ## if files is not None, let httpx handle the content type
                 self.data = kwargs
-        if method == 'get' and self.stream:
-            self.params['stream'] = 'true'
+        self._change_stream_mode(self._stream)
+
+    def _change_stream_mode(self, stream: bool):
+        self._stream = stream
+        if stream:
+            if self.method == 'post':
+                if self.files is None:
+                    dict_data = self.json_data
+                else:
+                    dict_data = self.data
+                assert isinstance(dict_data, dict)
+                dict_data['stream'] = True
+            elif self.method == 'get':
+                self.params['stream'] = 'true'
+        else:
+            if self.method == 'post':
+                if self.files is None:
+                    dict_data = self.json_data
+                else:
+                    dict_data = self.data
+                assert isinstance(dict_data, dict)
+                dict_data.pop('stream', None)
+            elif self.method == 'get':
+                self.params.pop('stream', None)
     
     def _log_request(self):
         ## log request info
@@ -127,7 +155,24 @@ class Requestor:
         err_msg = f"API error ({self.url} {response.status_code} {reason}) - {message}"
         return Exception(err_msg)
 
+    def stream(self) -> Iterable:
+        '''
+        Request in stream mode.
+        '''
+        self._change_stream_mode(True)
+        return cast(Iterable, self.call())
+
+    def run(self) -> Union[dict, bytes]:
+        '''
+        Request in non-stream mode.
+        '''
+        self._change_stream_mode(False)
+        return cast(Union[dict, bytes], self.call())
+
     def call(self):
+        '''
+        Execute the request. Stream or non-stream mode depends on the stream parameter.
+        '''
         if self._sync_client is None:
             raise Exception("Sync request client is not set")
 
@@ -140,7 +185,7 @@ class Requestor:
         try:
             raw_response = self._call_raw()
 
-            if self.stream:
+            if self._stream:
                 if self.raw:
                     response = self._gen_stream_bin_response(raw_response, prepare_ret)
                 else:
@@ -173,7 +218,7 @@ class Requestor:
             json=self.json_data,
             files=self.files,
             params=self.params,
-            stream=self.stream,
+            stream=self._stream,
             timeout=self.timeout,
             )
         try:
@@ -222,7 +267,24 @@ class Requestor:
         self._check_image_error(response)
         return response
 
+    async def astream(self) -> AsyncIterable:
+        '''
+        Request in stream mode asynchronously.
+        '''
+        self._change_stream_mode(True)
+        return cast(AsyncIterable, await self.acall())
+
+    async def arun(self) -> Union[dict, bytes]:
+        '''
+        Request in non-stream mode asynchronously.
+        '''
+        self._change_stream_mode(False)
+        return cast(Union[dict, bytes], await self.acall())
+
     async def acall(self):
+        '''
+        Execute the request asynchronously. Stream or non-stream mode depends on the stream parameter.
+        '''
         if self._async_client is None:
             raise Exception("Async request client is not set")
 
@@ -235,7 +297,7 @@ class Requestor:
         try:
             raw_response = await self._acall_raw()
 
-            if self.stream:
+            if self._stream:
                 if self.raw:
                     response = self._agen_stream_bin_response(raw_response, prepare_ret)
                 else:
@@ -272,7 +334,7 @@ class Requestor:
         )
         response = await self._async_client.send(
             request=request,
-            stream=self.stream,
+            stream=self._stream,
         )
         try:
             response.raise_for_status()
@@ -339,3 +401,52 @@ class Requestor:
 
     def set_exception_callback(self, func: Callable):
         self._exception_callback = func
+
+
+class DictRequestor(Requestor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.raw = False
+    
+    def call(self) -> Union[dict, Iterable[dict]]:
+        return cast(Union[dict, Iterable[dict]], super().call())
+    
+    async def acall(self) -> Union[dict, AsyncIterable[dict]]:
+        return cast(Union[dict, AsyncIterable[dict]], await super().acall())
+    
+    def run(self) -> dict:
+        return cast(dict, super().run())
+    
+    async def arun(self) -> dict:
+        return cast(dict, await super().arun())
+    
+    def stream(self) -> Iterable[dict]:
+        return super().stream()
+    
+    async def astream(self) -> AsyncIterable[dict]:
+        return await super().astream()
+
+
+class BinRequestor(Requestor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.raw = True
+    
+    def call(self) -> Union[bytes, Iterable[bytes]]:
+        return cast(Union[bytes, Iterable[bytes]], super().call())
+    
+    async def acall(self) -> Union[bytes, AsyncIterable[bytes]]:
+        return cast(Union[bytes, AsyncIterable[bytes]], await super().acall())
+
+    def run(self) -> bytes:
+        return cast(bytes, super().run())
+    
+    async def arun(self) -> bytes:
+        return cast(bytes, await super().arun())
+    
+    def stream(self) -> Iterable[bytes]:
+        return super().stream()
+    
+    async def astream(self) -> AsyncIterable[bytes]:
+        return await super().astream()
+

@@ -39,7 +39,7 @@ from .utils import (
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType
-from ._types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
+from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -53,7 +53,7 @@ DEFAULT_CONFIG = RunConfig()
 DEFAULT_BLACKLIST = (
     "api_key", "organization", "api_base", "api_type", "api_version", 
     "endpoint_manager", "endpoint", "engine", "deployment_id", 
-    "model_engine_map", "dest_url", 
+    "model_engine_map", "dest_url", "endpoints"
 )
 
 
@@ -443,12 +443,13 @@ class ChatPrompt(HandyPrompt):
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        response = client.chat(
+        requestor = client.chat(
             messages=evaled_prompt.data,
             **new_request
-            ).call()
+        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
+            response = requestor.stream()
             if run_config.output_fd:
                 # dump frontmatter, no base_path
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
@@ -471,7 +472,7 @@ class ChatPrompt(HandyPrompt):
                     cls._wrap_gen_chat(response, run_config)
                     )
         else:
-            response = cast(Any, response)
+            response = requestor.run()
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -490,12 +491,13 @@ class ChatPrompt(HandyPrompt):
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        response = await client.chat(
+        requestor = client.chat(
             messages=evaled_prompt.data,
             **new_request
-            ).acall()
+        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
+            response = await requestor.astream()
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
@@ -516,7 +518,7 @@ class ChatPrompt(HandyPrompt):
                     cls._awrap_gen_chat(response, run_config)
                     )
         else:
-            response = cast(Any, response)
+            response = await requestor.arun()
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -605,12 +607,13 @@ class CompletionsPrompt(HandyPrompt):
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        response = client.completions(
+        requestor = client.completions(
             prompt=evaled_prompt.data,
             **new_request
-            ).call()
+        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
+            response = requestor.stream()
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
@@ -623,7 +626,7 @@ class CompletionsPrompt(HandyPrompt):
             else:
                 content = cls._stream_completions_proc(response, run_config)
         else:
-            response = cast(Any, response)
+            response = requestor.run()
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
@@ -654,12 +657,13 @@ class CompletionsPrompt(HandyPrompt):
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        response = await client.completions(
+        requestor = client.completions(
             prompt=evaled_prompt.data,
             **new_request
-            ).acall()
+        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
+            response = await requestor.astream()
             if run_config.output_fd:
                 # stream response to a file descriptor
                 run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
@@ -672,7 +676,7 @@ class CompletionsPrompt(HandyPrompt):
             else:
                 content = await cls._astream_completions_proc(response, run_config)
         else:
-            response = cast(Any, response)
+            response = await requestor.arun()
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response

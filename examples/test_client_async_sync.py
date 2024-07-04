@@ -44,11 +44,12 @@ def test_sync():
         api_key=os.getenv("AZURE_OPENAI_KEY"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
         ) as client:
-        response = client.chat(**kwargs).call()
         if kwargs.get('stream', False):
+            response = client.chat(**kwargs).stream()
             for text in stream_chat(response):
                 print(text, end='')
         else:
+            response = client.chat(**kwargs).run()
             print(response['choices'][0]['message']['content'])
 
 async def test_async():
@@ -58,11 +59,12 @@ async def test_async():
         client.api_base = os.getenv("AZURE_OPENAI_ENDPOINT")
         client.api_key = os.getenv("AZURE_OPENAI_KEY")
         client.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
-        response = await client.chat(**kwargs).acall()
         if kwargs.get('stream', False):
+            response = await client.chat(**kwargs).astream()
             async for text in astream_chat(response):
                 print(text, end='')
         else:
+            response = await client.chat(**kwargs).arun()
             print(response['choices'][0]['message']['content'])
 
 async def test_both():
@@ -73,18 +75,20 @@ async def test_both():
         client.api_key = os.getenv("AZURE_OPENAI_KEY")
         client.api_version = os.getenv("AZURE_OPENAI_API_VERSION")
         # async call
-        response1 = await client.chat(**kwargs).acall()
         if kwargs.get('stream', False):
+            response1 = await client.chat(**kwargs).astream()
             async for text in astream_chat(response1):
                 print(text, end='')
         else:
+            response1 = await client.chat(**kwargs).arun()
             print(response1['choices'][0]['message']['content'])
         # sync call
-        response2 = client.chat(**kwargs).call()
         if kwargs.get('stream', False):
+            response2 = client.chat(**kwargs).stream()
             for text in stream_chat(response2):
                 print(text, end='')
         else:
+            response2 = client.chat(**kwargs).run()
             print(response2['choices'][0]['message']['content'])
 
 

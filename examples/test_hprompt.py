@@ -6,7 +6,7 @@ from handyllm import hprompt
 cur_dir = Path(__file__).parent
 
 # load hprompt
-prompt: hprompt.ChatPrompt = hprompt.load_from(cur_dir / './assets/magic.hprompt')
+prompt = hprompt.load_from(cur_dir / './assets/magic.hprompt', cls=hprompt.ChatPrompt)
 print(prompt.data)
 print(prompt)
 print(repr(prompt))
@@ -21,7 +21,7 @@ result_prompt.dump_to(cur_dir / './assets/tmp_out.hprompt')
 # chain result hprompt
 prompt += result_prompt
 # chain another hprompt
-prompt += hprompt.load_from(cur_dir / './assets/magic.hprompt')
+prompt += hprompt.load_from(cur_dir / './assets/magic.hprompt', cls=hprompt.ChatPrompt)
 # create a new run config
 run_config = hprompt.RunConfig()
 run_config.record_request = hprompt.RecordRequestMode.NONE  # record no request args

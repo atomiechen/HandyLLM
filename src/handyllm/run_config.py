@@ -9,7 +9,7 @@ from dataclasses import dataclass, asdict, fields, replace
 from mergedeep import merge as merge_dict, Strategy
 
 from ._str_enum import AutoStrEnum
-from ._types import PathType, VarMapType, OnChunkType
+from .types import PathType, VarMapType, OnChunkType
 
 
 class RecordRequestMode(AutoStrEnum):
