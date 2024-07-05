@@ -210,10 +210,13 @@ class OpenAIClient:
             return None
 
     def _consume_kwargs(self, kwargs):
-        api_key = organization = api_base = api_type = api_version = engine = model_engine_map = dest_url = None
+        api_key = organization = api_base = api_type = api_version = engine = model_engine_map = dest_url = endpoint_manager = None
 
         # read API info from endpoint_manager
-        endpoint_manager = kwargs.pop('endpoint_manager', self.endpoint_manager)
+        endpoints = kwargs.pop('endpoints', None)
+        if endpoints:
+            endpoint_manager = EndpointManager(endpoints=endpoints)
+        endpoint_manager = kwargs.pop('endpoint_manager', endpoint_manager) or self.endpoint_manager
         if endpoint_manager is not None and not kwargs.get('__endpoint_manager_used__', False):
             if not isinstance(endpoint_manager, EndpointManager):
                 raise Exception("endpoint_manager must be an instance of EndpointManager")
