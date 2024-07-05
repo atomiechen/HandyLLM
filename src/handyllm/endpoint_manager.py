@@ -103,7 +103,7 @@ class EndpointManager(MutableSequence):
 
     def load_from_list(self, obj: Iterable[Union[Mapping, Endpoint]], override=False):
         if not isiterable(obj):
-            raise ValueError("obj must be an iterable (list, tuple, etc.)")
+            raise ValueError("obj must be a non-str iterable (list, tuple, etc.)")
         if override:
             self.clear()
         for ep in obj:
