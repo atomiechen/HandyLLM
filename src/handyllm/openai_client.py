@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Mapping, Optional, Union
+from typing import Iterable, Mapping, Optional, Union
 import os
 import json
 import time
@@ -70,6 +70,7 @@ class OpenAIClient:
         api_version: Union[str, None] = None,
         model_engine_map: Union[dict, None] = None,
         endpoint_manager: Optional[EndpointManager] = None,
+        endpoints: Optional[Iterable] = None,
         load_path: Optional[PathType] = None,
         ) -> None:
         self._sync_client = None
@@ -101,8 +102,11 @@ class OpenAIClient:
         self.api_version = api_version
         self.model_engine_map = model_engine_map
         
-        if endpoint_manager and not isinstance(endpoint_manager, EndpointManager):
-            raise ValueError("endpoint_manager must be an instance of EndpointManager")
+        if endpoint_manager:
+            if not isinstance(endpoint_manager, EndpointManager):
+                raise ValueError("endpoint_manager must be an instance of EndpointManager")
+        elif endpoints:
+            endpoint_manager = EndpointManager(endpoints=endpoints)
         self.endpoint_manager = endpoint_manager
         
         if load_path:
