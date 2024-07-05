@@ -39,7 +39,7 @@ from .utils import (
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType
-from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
+from .types import PathType, SyncHandlerCompletions, VarMapFileFormat, VarMapType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -776,10 +776,20 @@ def dump_to(
 ) -> None:
     return prompt.dump_to(path, mkdir=mkdir)
 
-def load_var_map(path: PathType) -> dict[str, str]:
-    # read all content that needs to be replaced in the prompt from a text file
-    with open(path, 'r', encoding='utf-8') as fin:
+def load_var_map(path: PathType, format: Optional[VarMapFileFormat] = None) -> dict[str, str]:
+    '''
+    Read all content that needs to be replaced in the prompt from a text file.
+    '''
+    parse_yaml = False
+    if format:
+        if format not in ('json', 'yaml', 'text'):
+            raise ValueError(f"unsupported var_map file format: {format}")
+        parse_yaml = format in ('json', 'yaml')
+    else:
         if Path(path).suffix[1:].lower() in ('json', 'yaml', 'yml'):
+            parse_yaml = True
+    with open(path, 'r', encoding='utf-8') as fin:
+        if parse_yaml:
             return yaml.safe_load(fin)
         content = fin.read()
     substitute_map = {}

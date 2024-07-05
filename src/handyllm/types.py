@@ -1,5 +1,5 @@
 import sys
-from typing import Any, Awaitable, Callable, Dict, MutableMapping, Optional, Union
+from typing import Any, Awaitable, Callable, Dict, Literal, MutableMapping, Optional, Union
 from os import PathLike
 
 
@@ -9,6 +9,7 @@ else:
     PathType = Union[str, PathLike]
 
 VarMapType = MutableMapping[str, str]
+VarMapFileFormat = Literal["json", "yaml", "text"]
 
 SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
 SyncHandlerCompletions = Callable[[str], Any]
