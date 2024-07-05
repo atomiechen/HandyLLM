@@ -38,8 +38,8 @@ from .utils import (
     astream_chat_all, astream_completions, 
     stream_chat_all, stream_completions, 
 )
-from .run_config import RunConfig, RecordRequestMode, CredentialType
-from .types import PathType, SyncHandlerCompletions, VarMapFileFormat, VarMapType, SyncHandlerChat
+from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
+from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -185,6 +185,18 @@ class HandyPrompt(ABC):
                     run_config.credential_type = p.suffix[1:] # type: ignore
                 else:
                     run_config.credential_type = CredentialType.ENV
+        
+        if run_config.var_map_path:
+            if not run_config.var_map_file_format:
+                # guess the var_map file format from the file extension
+                suffix = Path(run_config.var_map_path).suffix[1:]
+                if suffix == 'yml':
+                    suffix = 'yaml'
+                if suffix in VarMapFileFormat:
+                    run_config.var_map_file_format = suffix # type: ignore
+                else:
+                    run_config.var_map_file_format = VarMapFileFormat.TEXT
+        
         return run_config
     
     @classmethod
@@ -341,9 +353,10 @@ class HandyPrompt(ABC):
     def _parse_var_map(self, run_config: RunConfig):
         var_map = {}
         if run_config.var_map_path:
+            assert run_config.var_map_file_format is not None
             var_map = merge_dict(
                 var_map, 
-                load_var_map(run_config.var_map_path), 
+                load_var_map(run_config.var_map_path, run_config.var_map_file_format), 
                 strategy=Strategy.REPLACE
             )
         if run_config.var_map:
@@ -776,20 +789,12 @@ def dump_to(
 ) -> None:
     return prompt.dump_to(path, mkdir=mkdir)
 
-def load_var_map(path: PathType, format: Optional[VarMapFileFormat] = None) -> dict[str, str]:
+def load_var_map(path: PathType, format: VarMapFileFormat = VarMapFileFormat.TEXT) -> dict[str, str]:
     '''
     Read all content that needs to be replaced in the prompt from a text file.
     '''
-    parse_yaml = False
-    if format:
-        if format not in ('json', 'yaml', 'text'):
-            raise ValueError(f"unsupported var_map file format: {format}")
-        parse_yaml = format in ('json', 'yaml')
-    else:
-        if Path(path).suffix[1:].lower() in ('json', 'yaml', 'yml'):
-            parse_yaml = True
     with open(path, 'r', encoding='utf-8') as fin:
-        if parse_yaml:
+        if format in (VarMapFileFormat.JSON, VarMapFileFormat.YAML):
             return yaml.safe_load(fin)
         content = fin.read()
     substitute_map = {}
