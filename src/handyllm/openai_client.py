@@ -100,6 +100,9 @@ class OpenAIClient:
         self.api_type = api_type
         self.api_version = api_version
         self.model_engine_map = model_engine_map
+        
+        if endpoint_manager and not isinstance(endpoint_manager, EndpointManager):
+            raise ValueError("endpoint_manager must be an instance of EndpointManager")
         self.endpoint_manager = endpoint_manager
         
         if load_path:
