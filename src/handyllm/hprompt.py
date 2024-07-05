@@ -779,6 +779,8 @@ def dump_to(
 def load_var_map(path: PathType) -> dict[str, str]:
     # read all content that needs to be replaced in the prompt from a text file
     with open(path, 'r', encoding='utf-8') as fin:
+        if Path(path).suffix[1:].lower() in ('json', 'yaml', 'yml'):
+            return yaml.safe_load(fin)
         content = fin.read()
     substitute_map = {}
     blocks = p_var_map.split(content)
