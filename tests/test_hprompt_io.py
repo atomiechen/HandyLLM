@@ -53,7 +53,7 @@ def test_var_map():
     assert 'We are having dinner now.' in raw
     
     evaled_prompt = prompt.eval(run_config=RC(
-        var_map_path=str(tests_dir / 'assets' / 'var_map.yml')
+        var_map_path=tests_dir / 'assets' / 'var_map.yml'
     ))
     raw = evaled_prompt.dumps()
     assert r'%extras%' not in raw
