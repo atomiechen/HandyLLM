@@ -91,6 +91,8 @@ class EndpointManager(MutableSequence):
         self.append(endpoint)
 
     def get_next_endpoint(self) -> Endpoint:
+        if len(self._endpoints) == 0:
+            raise ValueError("No endpoint available")
         with self._lock:
             endpoint = self._endpoints[self._last_idx_endpoint]
             if self._last_idx_endpoint == len(self._endpoints) - 1:
