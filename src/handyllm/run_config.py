@@ -82,9 +82,7 @@ class RunConfig:
         elif name == "credential_type":
             # validate credential_type value
             if isinstance(value, str):
-                if value == 'yml':
-                    value = CredentialType.YAML.value
-                elif value not in CredentialType:
+                if value not in CredentialType:
                     raise ValueError(f"unsupported credential_type value: {value}")
             elif isinstance(value, CredentialType):
                 value = value.value

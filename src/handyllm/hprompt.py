@@ -180,9 +180,11 @@ class HandyPrompt(ABC):
         if run_config.credential_path:
             if not run_config.credential_type:
                 # guess the credential type from the file extension
-                p = Path(run_config.credential_path)
-                if p.suffix:
-                    run_config.credential_type = p.suffix[1:] # type: ignore
+                suffix = Path(run_config.credential_path).suffix[1:]
+                if suffix == 'yml':
+                    suffix = 'yaml'
+                if suffix in CredentialType:
+                    run_config.credential_type = suffix # type: ignore
                 else:
                     run_config.credential_type = CredentialType.ENV
         
