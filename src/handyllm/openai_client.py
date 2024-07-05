@@ -225,7 +225,7 @@ class OpenAIClient:
         endpoint = kwargs.pop('endpoint', None)
         if endpoint is not None:
             if not isinstance(endpoint, Endpoint):
-                raise Exception("endpoint must be an instance of Endpoint")
+                endpoint = Endpoint(**endpoint)
             api_key, organization, api_base, api_type, api_version, model_engine_map, dest_url = endpoint.get_api_info()
 
         # read API info from kwargs, class variables, and environment variables
