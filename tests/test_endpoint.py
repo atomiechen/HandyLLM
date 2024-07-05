@@ -1,5 +1,6 @@
 from pathlib import Path
 from handyllm import OpenAIClient, EndpointManager, Endpoint
+import pytest
 
 
 TEST_ROOT = Path(__file__).parent
@@ -78,4 +79,17 @@ def test_endpoint_param():
         # always use the first in the endpoints, because each time a new temporary EndpointManager is created
         assert client.chat(messages=[], endpoints=endpoints).api_key == test_key1
         assert client.chat(messages=[], endpoints=endpoints).api_key == test_key1
+
+def test_endpoint_manager_exception():
+    with pytest.raises(ValueError) as excinfo:
+        # empty endpoint_manager
+        with OpenAIClient(endpoint_manager=EndpointManager()) as client:
+            client.chat(messages=[])
+    assert "No endpoint available" in str(excinfo.value)
+    with pytest.raises(ValueError) as excinfo:
+        EndpointManager(endpoints=[1,2,3])
+    assert "Unsupported type" in str(excinfo.value)
+    with pytest.raises(ValueError) as excinfo:
+        EndpointManager(endpoints="asdf")
+    assert "non-str iterable" in str(excinfo.value)
 
