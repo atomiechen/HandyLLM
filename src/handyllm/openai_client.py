@@ -120,7 +120,7 @@ class OpenAIClient:
         api_type = obj.get("api_type", None)
         api_version = obj.get("api_version", None)
         model_engine_map = obj.get("model_engine_map", None)
-        item = obj.get("endpoint_manager", obj.get("endpoints", None))
+        item = obj.get("endpoints", None)
         if api_base and (override or not self.api_base):
             self.api_base = api_base
         if api_key and (override or not self.api_key):

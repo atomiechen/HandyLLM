@@ -116,7 +116,7 @@ class EndpointManager(MutableSequence):
         with open(path, "r", encoding=encoding) as fin:
             obj = yaml.safe_load(fin)
         if isinstance(obj, Mapping):
-            obj = obj.get("endpoint_manager", obj.get("endpoints", None))
+            obj = obj.get("endpoints", None)
         if obj:
             self.load_from_list(obj, override=override)
 
