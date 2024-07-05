@@ -47,6 +47,11 @@ PromptType = TypeVar('PromptType', bound='HandyPrompt')
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
+# add multi representer for Path, for YAML serialization
+class MySafeDumper(yaml.SafeDumper):
+    pass
+MySafeDumper.add_multi_representer(Path, lambda dumper, data: dumper.represent_str(str(data)))
+
 p_var_map = re.compile(r'(%\w+%)')
 
 DEFAULT_CONFIG = RunConfig()
@@ -112,7 +117,7 @@ class HandyPrompt(ABC):
         if run_config:
             front_data['meta'] = run_config.to_dict(retain_object=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
-        return frontmatter.dumps(post, handler).strip() + "\n\n"
+        return frontmatter.dumps(post, handler, Dumper=MySafeDumper).strip() + "\n\n"
     
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
