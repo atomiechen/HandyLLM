@@ -1,3 +1,4 @@
+import base64
 from typing import IO, AsyncIterable, Iterable, Optional, cast
 from urllib.parse import urlparse
 import os
@@ -135,3 +136,8 @@ def VM(**kwargs):
     # change each key to a % wrapped string
     transformed_vm = {f'%{key}%': value for key, value in kwargs.items()}
     return transformed_vm
+
+def encode_image(image_path: PathType):
+  with open(image_path, "rb") as image_file:
+    return base64.b64encode(image_file.read()).decode('utf-8')
+

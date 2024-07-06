@@ -1,3 +1,8 @@
+__all__ = [
+    "Endpoint",
+    "EndpointManager",
+]
+
 from threading import Lock
 from collections.abc import MutableSequence
 from typing import Iterable, Mapping, Optional, Union
@@ -91,6 +96,8 @@ class EndpointManager(MutableSequence):
         self.append(endpoint)
 
     def get_next_endpoint(self) -> Endpoint:
+        if len(self._endpoints) == 0:
+            raise ValueError("No endpoint available")
         with self._lock:
             endpoint = self._endpoints[self._last_idx_endpoint]
             if self._last_idx_endpoint == len(self._endpoints) - 1:
@@ -101,7 +108,7 @@ class EndpointManager(MutableSequence):
 
     def load_from_list(self, obj: Iterable[Union[Mapping, Endpoint]], override=False):
         if not isiterable(obj):
-            raise ValueError("obj must be an iterable (list, tuple, etc.)")
+            raise ValueError("obj must be a non-str iterable (list, tuple, etc.)")
         if override:
             self.clear()
         for ep in obj:
@@ -116,7 +123,7 @@ class EndpointManager(MutableSequence):
         with open(path, "r", encoding=encoding) as fin:
             obj = yaml.safe_load(fin)
         if isinstance(obj, Mapping):
-            obj = obj.get("endpoint_manager", obj.get("endpoints", None))
+            obj = obj.get("endpoints", None)
         if obj:
             self.load_from_list(obj, override=override)
 

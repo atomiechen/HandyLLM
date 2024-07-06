@@ -22,6 +22,8 @@ import copy
 import io
 import sys
 from pathlib import Path
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
@@ -35,10 +37,10 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, 
+    astream_chat_all, astream_completions, encode_image, 
     stream_chat_all, stream_completions, 
 )
-from .run_config import RunConfig, RecordRequestMode, CredentialType
+from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
 
 
@@ -47,6 +49,11 @@ PromptType = TypeVar('PromptType', bound='HandyPrompt')
 
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
+# add multi representer for Path, for YAML serialization
+class MySafeDumper(yaml.SafeDumper):
+    pass
+MySafeDumper.add_multi_representer(Path, lambda dumper, data: dumper.represent_str(str(data)))
+
 p_var_map = re.compile(r'(%\w+%)')
 
 DEFAULT_CONFIG = RunConfig()
@@ -112,7 +119,7 @@ class HandyPrompt(ABC):
         if run_config:
             front_data['meta'] = run_config.to_dict(retain_object=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
-        return frontmatter.dumps(post, handler).strip() + "\n\n"
+        return frontmatter.dumps(post, handler, Dumper=MySafeDumper).strip() + "\n\n"
     
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
@@ -180,11 +187,25 @@ class HandyPrompt(ABC):
         if run_config.credential_path:
             if not run_config.credential_type:
                 # guess the credential type from the file extension
-                p = Path(run_config.credential_path)
-                if p.suffix:
-                    run_config.credential_type = p.suffix[1:] # type: ignore
+                suffix = Path(run_config.credential_path).suffix[1:]
+                if suffix == 'yml':
+                    suffix = 'yaml'
+                if suffix in CredentialType:
+                    run_config.credential_type = suffix # type: ignore
                 else:
                     run_config.credential_type = CredentialType.ENV
+        
+        if run_config.var_map_path:
+            if not run_config.var_map_file_format:
+                # guess the var_map file format from the file extension
+                suffix = Path(run_config.var_map_path).suffix[1:]
+                if suffix == 'yml':
+                    suffix = 'yaml'
+                if suffix in VarMapFileFormat:
+                    run_config.var_map_file_format = suffix # type: ignore
+                else:
+                    run_config.var_map_file_format = VarMapFileFormat.TEXT
+        
         return run_config
     
     @classmethod
@@ -341,9 +362,10 @@ class HandyPrompt(ABC):
     def _parse_var_map(self, run_config: RunConfig):
         var_map = {}
         if run_config.var_map_path:
+            assert run_config.var_map_file_format is not None
             var_map = merge_dict(
                 var_map, 
-                load_var_map(run_config.var_map_path), 
+                load_var_map(run_config.var_map_path, run_config.var_map_file_format), 
                 strategy=Strategy.REPLACE
             )
         if run_config.var_map:
@@ -412,8 +434,29 @@ class ChatPrompt(HandyPrompt):
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
-        return converter.msgs_replace_variables(
+        replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False)
+        # replace local image URLs
+        for msg in replaced:
+            content = msg.get('content')
+            if isinstance(content, list):
+                for item in content:
+                    try:
+                        if item.get('type') == 'image_url':
+                            url = cast(str, item['image_url']['url'])
+                            if url and url.startswith('file://'):
+                                # replace the image URL with the actual image
+                                parsed = urllib.parse.urlparse(url)
+                                local_path = Path(urllib.request.url2pathname(parsed.netloc + parsed.path))
+                                if self.base_path:
+                                    # support relative path
+                                    local_path = self.base_path / local_path
+                                base64_image = encode_image(local_path.resolve())
+                                item['image_url']['url'] = f"data:image/jpeg;base64,{base64_image}"
+                    except (KeyError, TypeError):
+                        pass
+        
+        return replaced
     
     @staticmethod
     def _wrap_gen_chat(response, run_config: RunConfig):
@@ -776,9 +819,13 @@ def dump_to(
 ) -> None:
     return prompt.dump_to(path, mkdir=mkdir)
 
-def load_var_map(path: PathType) -> dict[str, str]:
-    # read all content that needs to be replaced in the prompt from a text file
+def load_var_map(path: PathType, format: VarMapFileFormat = VarMapFileFormat.TEXT) -> dict[str, str]:
+    '''
+    Read all content that needs to be replaced in the prompt from a text file.
+    '''
     with open(path, 'r', encoding='utf-8') as fin:
+        if format in (VarMapFileFormat.JSON, VarMapFileFormat.YAML):
+            return yaml.safe_load(fin)
         content = fin.read()
     substitute_map = {}
     blocks = p_var_map.split(content)

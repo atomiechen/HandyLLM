@@ -27,6 +27,12 @@ class CredentialType(AutoStrEnum):
     YAML = auto()
 
 
+class VarMapFileFormat(AutoStrEnum):
+    JSON = auto()
+    YAML = auto()
+    TEXT = auto()
+
+
 @dataclass
 class RunConfig:
     # record request arguments
@@ -37,6 +43,8 @@ class RunConfig:
     var_map: Optional[VarMapType] = None
     # variable map file path
     var_map_path: Optional[PathType] = None
+    # variable map file type: json, yaml, text
+    var_map_file_format: Optional[VarMapFileFormat] = None  # default: guess from the file extension
     # callback for each chunk generated in stream mode of the response
     on_chunk: Optional[OnChunkType] = None
     # output the response to a file
@@ -74,9 +82,7 @@ class RunConfig:
         elif name == "credential_type":
             # validate credential_type value
             if isinstance(value, str):
-                if value == 'yml':
-                    value = CredentialType.YAML.value
-                elif value not in CredentialType:
+                if value not in CredentialType:
                     raise ValueError(f"unsupported credential_type value: {value}")
             elif isinstance(value, CredentialType):
                 value = value.value
@@ -84,6 +90,17 @@ class RunConfig:
                 pass
             else:
                 raise ValueError(f"unsupported credential_type value: {value}")
+        elif name == "var_map_file_format":
+            # validate var_map_file_format value
+            if isinstance(value, str):
+                if value not in VarMapFileFormat:
+                    raise ValueError(f"unsupported var_map_file_format value: {value}")
+            elif isinstance(value, VarMapFileFormat):
+                value = value.value
+            elif value is None:  # this field is optional
+                pass
+            else:
+                raise ValueError(f"unsupported var_map_file_format value: {value}")
         super().__setattr__(name, value)
     
     def __len__(self):

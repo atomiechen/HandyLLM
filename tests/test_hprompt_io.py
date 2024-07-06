@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from handyllm.hprompt import load_from, dumps, dump_to, dump, ChatPrompt, CompletionsPrompt
+from handyllm.hprompt import (
+    load_from, dumps, dump_to, dump, ChatPrompt, CompletionsPrompt, 
+    RunConfig as RC
+)
 from handyllm.utils import VM
 
 
@@ -29,15 +32,31 @@ def test_load_dump_chat_prompt(tmp_path):
     assert isinstance(prompt, ChatPrompt)
     assert r'%extras%' in dumps(prompt)
     
-    evaled_prompt = prompt.eval(var_map=VM(
-        context="We are having dinner now.",
-    ))
+    evaled_prompt = prompt.eval()
     out_path = tmp_path / 'subdir' /'out.chat.hprompt'
     dump_to(evaled_prompt, out_path, mkdir=True)
     raw = out_path.read_text(encoding="utf-8")
-    assert r'%extras%' not in raw and 'international' in raw
+    assert r'%extras%' not in raw
+    assert 'international' in raw
     
     with open(out_path, 'w', encoding='utf-8') as f:
         dump(evaled_prompt, f)
     assert raw == out_path.read_text(encoding="utf-8")
+
+def test_var_map():
+    prompt_file = tests_dir / 'assets' / 'chat.hprompt'
+    prompt = load_from(prompt_file)
+    evaled_prompt = prompt.eval(var_map=VM(
+        context="We are having dinner now.",
+    ))
+    raw = evaled_prompt.dumps()
+    assert 'We are having dinner now.' in raw
+    
+    evaled_prompt = prompt.eval(run_config=RC(
+        var_map_path=tests_dir / 'assets' / 'var_map.yml'
+    ))
+    raw = evaled_prompt.dumps()
+    assert r'%extras%' not in raw
+    assert 'Substituted text from YAML file.' in raw
+    assert 'international' not in raw
 
