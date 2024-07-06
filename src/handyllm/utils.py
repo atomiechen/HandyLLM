@@ -1,6 +1,28 @@
+__all__ = [
+    'get_filename_from_url',
+    'download_binary',
+    'stream_chat_all',
+    'stream_chat_with_role',
+    'stream_chat',
+    'stream_completions',
+    'astream_chat_all',
+    'astream_chat_with_role',
+    'astream_chat',
+    'astream_completions',
+    'stream_to_fd',
+    'stream_to_file',
+    'astream_to_fd',
+    'astream_to_file',
+    'VM',
+    'encode_image',
+    'local_path_to_base64',
+]
+
 import base64
+from pathlib import Path
 from typing import IO, AsyncIterable, Iterable, Optional, cast
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 import os
 import time
 
@@ -140,4 +162,14 @@ def VM(**kwargs):
 def encode_image(image_path: PathType):
   with open(image_path, "rb") as image_file:
     return base64.b64encode(image_file.read()).decode('utf-8')
+
+def local_path_to_base64(url: str, base_path: Optional[PathType]):
+    # replace the image URL with the actual image
+    parsed = urlparse(url)
+    local_path = Path(url2pathname(parsed.netloc + parsed.path))
+    if base_path:
+        # support relative path
+        local_path = base_path / local_path
+    base64_image = encode_image(local_path.resolve())
+    return f"data:image/jpeg;base64,{base64_image}"
 

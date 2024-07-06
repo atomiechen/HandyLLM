@@ -22,8 +22,6 @@ import copy
 import io
 import sys
 from pathlib import Path
-import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
@@ -37,7 +35,7 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, encode_image, 
+    astream_chat_all, astream_completions, local_path_to_base64, 
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
@@ -446,13 +444,7 @@ class ChatPrompt(HandyPrompt):
                             url = cast(str, item['image_url']['url'])
                             if url and url.startswith('file://'):
                                 # replace the image URL with the actual image
-                                parsed = urllib.parse.urlparse(url)
-                                local_path = Path(urllib.request.url2pathname(parsed.netloc + parsed.path))
-                                if self.base_path:
-                                    # support relative path
-                                    local_path = self.base_path / local_path
-                                base64_image = encode_image(local_path.resolve())
-                                item['image_url']['url'] = f"data:image/jpeg;base64,{base64_image}"
+                                item['image_url']['url'] = local_path_to_base64(url, self.base_path)
                     except (KeyError, TypeError):
                         pass
         
