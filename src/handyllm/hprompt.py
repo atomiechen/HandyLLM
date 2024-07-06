@@ -22,6 +22,8 @@ import copy
 import io
 import sys
 from pathlib import Path
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
@@ -35,7 +37,7 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, 
+    astream_chat_all, astream_completions, encode_image, 
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
@@ -432,8 +434,26 @@ class ChatPrompt(HandyPrompt):
     
     def _eval_data(self, run_config: RunConfig) -> list:
         var_map = self._parse_var_map(run_config)
-        return converter.msgs_replace_variables(
+        replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False)
+        # replace local image URLs
+        for msg in replaced:
+            content = msg.get('content')
+            if isinstance(content, list):
+                for item in content:
+                    try:
+                        if item.get('type') == 'image_url':
+                            url = cast(str, item['image_url']['url'])
+                            if url and url.startswith('file://'):
+                                # replace the image URL with the actual image
+                                parsed = urllib.parse.urlparse(url)
+                                local_path = urllib.request.url2pathname(parsed.netloc + parsed.path)
+                                base64_image = encode_image(local_path)
+                                item['image_url']['url'] = f"data:image/jpeg;base64,{base64_image}"
+                    except (KeyError, TypeError):
+                        pass
+        
+        return replaced
     
     @staticmethod
     def _wrap_gen_chat(response, run_config: RunConfig):
