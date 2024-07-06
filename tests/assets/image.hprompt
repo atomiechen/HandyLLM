@@ -1,0 +1,10 @@
+---
+model: gpt-4o
+---
+
+$user$ {type="content_array"}
+- text: What color is this?
+  type: text
+- image_url:
+    url: file://gray.jpg
+  type: image_url
