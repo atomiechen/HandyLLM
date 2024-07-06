@@ -447,8 +447,11 @@ class ChatPrompt(HandyPrompt):
                             if url and url.startswith('file://'):
                                 # replace the image URL with the actual image
                                 parsed = urllib.parse.urlparse(url)
-                                local_path = urllib.request.url2pathname(parsed.netloc + parsed.path)
-                                base64_image = encode_image(local_path)
+                                local_path = Path(urllib.request.url2pathname(parsed.netloc + parsed.path))
+                                if self.base_path:
+                                    # support relative path
+                                    local_path = self.base_path / local_path
+                                base64_image = encode_image(local_path.resolve())
                                 item['image_url']['url'] = f"data:image/jpeg;base64,{base64_image}"
                     except (KeyError, TypeError):
                         pass
