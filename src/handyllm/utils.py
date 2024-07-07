@@ -89,7 +89,7 @@ def stream_chat(response: Iterable[dict]):
 def stream_completions(response: Iterable[dict]):
     for data in response:
         try:
-            yield data['choices'][0]['text']
+            yield cast(str, data['choices'][0]['text'])
         except (KeyError, IndexError):
             pass
 
@@ -133,7 +133,7 @@ async def astream_chat(response: AsyncIterable[dict]):
 async def astream_completions(response: AsyncIterable[dict]):
     async for data in response:
         try:
-            yield data['choices'][0]['text']
+            yield cast(str, data['choices'][0]['text'])
         except (KeyError, IndexError):
             pass
 
