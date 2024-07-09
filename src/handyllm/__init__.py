@@ -5,3 +5,4 @@ from .endpoint_manager import *
 from .prompt_converter import *
 from .utils import *
 from .types import *
+from .hprompt import *

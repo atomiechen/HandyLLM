@@ -22,8 +22,6 @@ import copy
 import io
 import sys
 from pathlib import Path
-import urllib.parse
-import urllib.request
 from datetime import datetime
 from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
@@ -37,7 +35,7 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, encode_image, 
+    astream_chat_all, astream_completions, local_path_to_base64, 
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
@@ -137,7 +135,7 @@ class HandyPrompt(ABC):
             self.dump(fd, base_path=Path(path).parent.resolve())
     
     @abstractmethod
-    def _eval_data(self, run_config: RunConfig) -> Union[str, list]:
+    def _eval_data(self, var_map: MutableMapping) -> Union[str, list]:
         ...
     
     def eval(
@@ -155,7 +153,12 @@ class HandyPrompt(ABC):
                 new_run_config.var_map = {}
             # merge var_map instead of replacing as a whole
             merge_dict(new_run_config.var_map, var_map, strategy=Strategy.REPLACE)
-        new_data = self._eval_data(new_run_config)
+        var_map = self._parse_var_map(new_run_config)
+        new_data = self._eval_data(var_map)
+        # remove the var_map related config from the new run_config, as it is already applied
+        new_run_config.var_map = None
+        new_run_config.var_map_path = None
+        new_run_config.var_map_file_format = None
         # update the request with the keyword arguments
         evaled_request = copy.deepcopy(self.request)
         evaled_request.update(kwargs)
@@ -432,8 +435,7 @@ class ChatPrompt(HandyPrompt):
     def _serialize_data(self, data) -> str:
         return converter.msgs2raw(data)
     
-    def _eval_data(self, run_config: RunConfig) -> list:
-        var_map = self._parse_var_map(run_config)
+    def _eval_data(self, var_map) -> list:
         replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False)
         # replace local image URLs
@@ -446,13 +448,7 @@ class ChatPrompt(HandyPrompt):
                             url = cast(str, item['image_url']['url'])
                             if url and url.startswith('file://'):
                                 # replace the image URL with the actual image
-                                parsed = urllib.parse.urlparse(url)
-                                local_path = Path(urllib.request.url2pathname(parsed.netloc + parsed.path))
-                                if self.base_path:
-                                    # support relative path
-                                    local_path = self.base_path / local_path
-                                base64_image = encode_image(local_path.resolve())
-                                item['image_url']['url'] = f"data:image/jpeg;base64,{base64_image}"
+                                item['image_url']['url'] = local_path_to_base64(url, self.base_path)
                     except (KeyError, TypeError):
                         pass
         
@@ -621,8 +617,7 @@ class CompletionsPrompt(HandyPrompt):
     def prompt(self, value: str):
         self.data = value
     
-    def _eval_data(self, run_config: RunConfig) -> str:
-        var_map = self._parse_var_map(run_config)
+    def _eval_data(self, var_map) -> str:
         new_prompt = self.prompt
         for key, value in var_map.items():
             new_prompt = new_prompt.replace(key, value)
