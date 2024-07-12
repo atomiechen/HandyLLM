@@ -153,7 +153,7 @@ async def astream_to_file(response: AsyncIterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
 
-def VM(**kwargs):
+def VM(**kwargs: str):
     # transform kwargs to a variable map dict
     # change each key to a % wrapped string
     transformed_vm = {f'%{key}%': value for key, value in kwargs.items()}
