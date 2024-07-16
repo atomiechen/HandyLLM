@@ -30,15 +30,16 @@ def _load_output_files(
     results = []
     for file, handle in zip(files, convert_to):
         with open(file, 'r', encoding='utf-8') as f:
-            # determine the format according to the file suffix
-            if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
-                content = yaml.safe_load(f)
-            elif file.suffix.endswith('.json'):
-                content = json.load(f)
+            if handle is not None:
+                content = handle(f.read())
             else:
-                content = f.read()
-                if handle is not None:
-                    content = handle(content)
+                # determine the format according to the file suffix
+                if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
+                    content = yaml.safe_load(f)
+                elif file.suffix.endswith('.json'):
+                    content = json.load(f)
+                else:
+                    content = f.read()
         results.append(content)
     if len(results) == 1:
         return results[0]
