@@ -18,7 +18,7 @@ def func_multiple():
 
 def test_cache_manager(tmp_path: Path, capsys: CaptureFixture[str]):
     cm = CacheManager(base_dir=tmp_path, enabled=True, save_only=False)
-    wrapped_func = cm.cache(func=func, out="test.txt", return_type=int)
+    wrapped_func = cm.cache(func=func, out="test.txt", convert_to=int)
     out = wrapped_func()
     assert (tmp_path / "test.txt").read_text() == "1"
     assert out == 1
@@ -51,7 +51,7 @@ async def test_cache_manager_async(tmp_path: Path, capsys: CaptureFixture[str]):
 
 def test_multiple_output(tmp_path: Path):
     cm = CacheManager(base_dir=tmp_path)
-    wrapped_func = cm.cache(func=func_multiple, out=["test1.txt", "test2.txt"], return_type=(int, None))
+    wrapped_func = cm.cache(func=func_multiple, out=["test1.txt", "test2.txt"], convert_to=(int, None))
     out = wrapped_func()
     assert (tmp_path / "test1.txt").read_text() == "2"
     assert (tmp_path / "test2.txt").read_text() == "world"

@@ -16,19 +16,19 @@ from .types import PathType, StrHandler
 
 def _load_output_files(
     files: Collection[Path], 
-    return_type: Optional[Union[Collection[Optional[StrHandler]], StrHandler]]
+    convert_to: Optional[Union[Collection[Optional[StrHandler]], StrHandler]]
 ):
     all_files_exist = all(Path(file).exists() for file in files)
     if not all_files_exist:
         return None
-    if return_type is None:
-        return_type = (None,) * len(files)
-    if not isinstance(return_type, Collection):
-        return_type = (return_type,) * len(files)
-    if len(files) != len(return_type):
+    if convert_to is None:
+        convert_to = (None,) * len(files)
+    if not isinstance(convert_to, Collection):
+        convert_to = (convert_to,) * len(files)
+    if len(files) != len(convert_to):
         raise ValueError('The number of files and return types should be the same.')
     results = []
-    for file, handle in zip(files, return_type):
+    for file, handle in zip(files, convert_to):
         with open(file, 'r', encoding='utf-8') as f:
             # determine the format according to the file suffix
             if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
@@ -76,7 +76,7 @@ class CacheManager:
         out: Union[PathType, Iterable[PathType]],
         enabled: Optional[bool] = None,
         save_only: Optional[bool] = None,
-        return_type: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
+        convert_to: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
     ) -> Callable[P, R]:
         '''
         Store the output of the function to the specified file. 
@@ -96,7 +96,7 @@ class CacheManager:
             @wraps(func)
             async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files, return_type)
+                    results = _load_output_files(full_files, convert_to)
                     if results is not None:
                         return cast(R, results)
                 results = await func(*args, **kwargs)
@@ -107,7 +107,7 @@ class CacheManager:
             @wraps(func)
             def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files, return_type)
+                    results = _load_output_files(full_files, convert_to)
                     if results is not None:
                         return cast(R, results)
                 results = func(*args, **kwargs)
