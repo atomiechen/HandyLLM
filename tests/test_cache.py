@@ -19,7 +19,7 @@ def func_multiple():
 
 def test_cache_manager(tmp_path: Path, capsys: CaptureFixture[str]):
     cm = CacheManager(base_dir=tmp_path, enabled=True, save_only=False)
-    wrapped_func = cm.cache(func=func, out="test.txt", convert_to=int)
+    wrapped_func = cm.cache(func=func, out="test.txt", load_method=int)
     out = wrapped_func()
     assert (tmp_path / "test.txt").read_text() == "1"
     assert out == 1
@@ -55,7 +55,7 @@ def test_multiple_output(tmp_path: Path):
     wrapped_func = cm.cache(
         func=func_multiple, 
         out=["test1.txt", "test2.txt", "test3.json"], 
-        convert_to=(int, None, None)
+        load_method=(int, None, None)
     )
     out = wrapped_func()
     assert (tmp_path / "test1.txt").read_text() == "2"
@@ -65,3 +65,25 @@ def test_multiple_output(tmp_path: Path):
 
     out2 = wrapped_func()
     assert out2 == (2, "world", {'a': 1})
+
+def test_custom_load_dump(tmp_path: Path):
+    def load_method(s: str) -> int:
+        s = s.split(": ", 1)[1]
+        return int(s)
+    
+    def dump_method(i: int):
+        return "dumped: " + str(i)
+    
+    cm = CacheManager(base_dir=tmp_path)
+    wrapped_func = cm.cache(
+        func=func, 
+        out="test.txt", 
+        load_method=load_method,
+        dump_method=dump_method
+    )
+    out = wrapped_func()
+    assert (tmp_path / "test.txt").read_text() == "dumped: 1"
+    assert out == 1
+
+    out2 = wrapped_func()
+    assert out2 == 1
