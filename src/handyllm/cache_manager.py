@@ -11,24 +11,24 @@ from typing import Callable, Collection, Iterable, Optional, TypeVar, Union, cas
 from typing_extensions import ParamSpec
 import yaml
 
-from .types import PathType, StrHandler
+from .types import PathType, StrHandler, StringifyHandler
 
 
-def _load_output_files(
+def _load_files(
     files: Collection[Path], 
-    convert_to: Optional[Union[Collection[Optional[StrHandler]], StrHandler]]
+    load_method: Optional[Union[Collection[Optional[StrHandler]], StrHandler]]
 ):
     all_files_exist = all(Path(file).exists() for file in files)
     if not all_files_exist:
         return None
-    if convert_to is None:
-        convert_to = (None,) * len(files)
-    if not isinstance(convert_to, Collection):
-        convert_to = (convert_to,) * len(files)
-    if len(files) != len(convert_to):
-        raise ValueError('The number of files and return types should be the same.')
+    if load_method is None:
+        load_method = (None,) * len(files)
+    if not isinstance(load_method, Collection):
+        load_method = (load_method,) * len(files)
+    if len(files) != len(load_method):
+        raise ValueError('The number of files and load_method should be the same.')
     results = []
-    for file, handle in zip(files, convert_to):
+    for file, handle in zip(files, load_method):
         with open(file, 'r', encoding='utf-8') as f:
             if handle is not None:
                 content = handle(f.read())
@@ -45,21 +45,34 @@ def _load_output_files(
         return results[0]
     return tuple(results)
 
-def _save_output_files(files: list[Path], results):
+def _dump_files(
+    files: list[Path],
+    dump_method: Optional[Union[Collection[Optional[StringifyHandler]], StringifyHandler]],
+    results,
+):
     if not isinstance(results, tuple):
         results = (results,)
     if len(files) != len(results):
         raise ValueError('The number of files and results should be the same.')
-    for file, result in zip(files, results):
+    if dump_method is None:
+        dump_method = (None,) * len(files)
+    if not isinstance(dump_method, Collection):
+        dump_method = (dump_method,) * len(files)
+    if len(files) != len(dump_method):
+        raise ValueError('The number of files and dump_method should be the same.')
+    for file, result, handler in zip(files, results, dump_method):
         file.parent.mkdir(parents=True, exist_ok=True)
         with open(file, 'w', encoding='utf-8') as f:
-            # determine the format according to the file suffix
-            if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
-                yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
-            elif file.suffix.endswith('.json'):
-                json.dump(result, f, ensure_ascii=False, indent=2)
+            if handler is not None:
+                f.write(handler(str(result)))
             else:
-                f.write(str(result))
+                # determine the format according to the file suffix
+                if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
+                    yaml.dump(result, f, default_flow_style=False, allow_unicode=True)
+                elif file.suffix.endswith('.json'):
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                else:
+                    f.write(str(result))
 
 
 P = ParamSpec("P")
@@ -77,7 +90,8 @@ class CacheManager:
         out: Union[PathType, Iterable[PathType]],
         enabled: Optional[bool] = None,
         save_only: Optional[bool] = None,
-        convert_to: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
+        dump_method: Optional[Union[Collection[Optional[StringifyHandler]], StringifyHandler]] = None,
+        load_method: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
     ) -> Callable[P, R]:
         '''
         Store the output of the function to the specified file. 
@@ -97,22 +111,22 @@ class CacheManager:
             @wraps(func)
             async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files, convert_to)
+                    results = _load_files(full_files, load_method)
                     if results is not None:
                         return cast(R, results)
                 results = await func(*args, **kwargs)
-                _save_output_files(full_files, results)
+                _dump_files(full_files, dump_method, results)
                 return cast(R, results)
             return cast(Callable[P, R], async_wrapped_func)
         else:
             @wraps(func)
             def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files, convert_to)
+                    results = _load_files(full_files, load_method)
                     if results is not None:
                         return cast(R, results)
                 results = func(*args, **kwargs)
-                _save_output_files(full_files, results)
+                _dump_files(full_files, dump_method, results)
                 return cast(R, results)
             return cast(Callable[P, R], sync_wrapped_func)
 
