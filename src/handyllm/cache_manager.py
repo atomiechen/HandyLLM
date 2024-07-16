@@ -1,3 +1,7 @@
+__all__ = [
+    'CacheManager'
+]
+
 from functools import wraps
 from inspect import iscoroutinefunction
 import json
