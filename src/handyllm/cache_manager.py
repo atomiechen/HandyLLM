@@ -7,19 +7,28 @@ from inspect import iscoroutinefunction
 import json
 from os import PathLike
 from pathlib import Path
-from typing import Callable, Iterable, Optional, TypeVar, Union, cast
+from typing import Callable, Collection, Iterable, Optional, TypeVar, Union, cast
 from typing_extensions import ParamSpec
 import yaml
 
-from .types import PathType
+from .types import PathType, StrHandler
 
 
-def _load_output_files(files: Iterable[Path]):
+def _load_output_files(
+    files: Collection[Path], 
+    return_type: Optional[Union[Collection[Optional[StrHandler]], StrHandler]]
+):
     all_files_exist = all(Path(file).exists() for file in files)
     if not all_files_exist:
         return None
+    if return_type is None:
+        return_type = (None,) * len(files)
+    if not isinstance(return_type, Collection):
+        return_type = (return_type,) * len(files)
+    if len(files) != len(return_type):
+        raise ValueError('The number of files and return types should be the same.')
     results = []
-    for file in files:
+    for file, handle in zip(files, return_type):
         with open(file, 'r', encoding='utf-8') as f:
             # determine the format according to the file suffix
             if file.suffix.endswith('.yaml') or file.suffix.endswith('.yml'):
@@ -28,6 +37,8 @@ def _load_output_files(files: Iterable[Path]):
                 content = json.load(f)
             else:
                 content = f.read()
+                if handle is not None:
+                    content = handle(content)
         results.append(content)
     if len(results) == 1:
         return results[0]
@@ -47,7 +58,7 @@ def _save_output_files(files: list[Path], results):
             elif file.suffix.endswith('.json'):
                 json.dump(result, f, ensure_ascii=False, indent=2)
             else:
-                f.write(result)
+                f.write(str(result))
 
 
 P = ParamSpec("P")
@@ -65,6 +76,7 @@ class CacheManager:
         out: Union[PathType, Iterable[PathType]],
         enabled: Optional[bool] = None,
         save_only: Optional[bool] = None,
+        return_type: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
     ) -> Callable[P, R]:
         '''
         Store the output of the function to the specified file. 
@@ -84,7 +96,7 @@ class CacheManager:
             @wraps(func)
             async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files)
+                    results = _load_output_files(full_files, return_type)
                     if results is not None:
                         return cast(R, results)
                 results = await func(*args, **kwargs)
@@ -95,7 +107,7 @@ class CacheManager:
             @wraps(func)
             def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not save_only:
-                    results = _load_output_files(full_files)
+                    results = _load_output_files(full_files, return_type)
                     if results is not None:
                         return cast(R, results)
                 results = func(*args, **kwargs)

@@ -16,3 +16,4 @@ AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]
 AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
 OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
 
+StrHandler = Callable[[str], Any]
