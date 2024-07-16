@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from handyllm import CacheManager
 from pytest import CaptureFixture
@@ -14,7 +15,7 @@ async def async_func():
 
 def func_multiple():
     print("In func_multiple")
-    return 2, "world"
+    return 2, "world", {'a': 1}
 
 def test_cache_manager(tmp_path: Path, capsys: CaptureFixture[str]):
     cm = CacheManager(base_dir=tmp_path, enabled=True, save_only=False)
@@ -51,11 +52,16 @@ async def test_cache_manager_async(tmp_path: Path, capsys: CaptureFixture[str]):
 
 def test_multiple_output(tmp_path: Path):
     cm = CacheManager(base_dir=tmp_path)
-    wrapped_func = cm.cache(func=func_multiple, out=["test1.txt", "test2.txt"], convert_to=(int, None))
+    wrapped_func = cm.cache(
+        func=func_multiple, 
+        out=["test1.txt", "test2.txt", "test3.json"], 
+        convert_to=(int, None, None)
+    )
     out = wrapped_func()
     assert (tmp_path / "test1.txt").read_text() == "2"
     assert (tmp_path / "test2.txt").read_text() == "world"
-    assert out == (2, "world")
+    assert (tmp_path / "test3.json").read_text() == json.dumps({'a': 1}, indent=2)
+    assert out == (2, "world", {'a': 1})
 
     out2 = wrapped_func()
-    assert out2 == (2, "world")
+    assert out2 == (2, "world", {'a': 1})
