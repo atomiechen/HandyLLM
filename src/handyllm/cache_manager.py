@@ -79,17 +79,17 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 class CacheManager:
-    def __init__(self, base_dir: PathType, enabled: bool = True, save_only: bool = False):
+    def __init__(self, base_dir: PathType, enabled: bool = True, only_dump: bool = False):
         self.base_dir = base_dir
         self.enabled = enabled
-        self.save_only = save_only
+        self.only_dump = only_dump
 
     def cache(
         self, 
         func: Callable[P, R], 
         out: Union[PathType, Iterable[PathType]],
         enabled: Optional[bool] = None,
-        save_only: Optional[bool] = None,
+        only_dump: Optional[bool] = None,
         dump_method: Optional[Union[Collection[Optional[StringifyHandler]], StringifyHandler]] = None,
         load_method: Optional[Union[Collection[Optional[StrHandler]], StrHandler]] = None,
     ) -> Callable[P, R]:
@@ -100,8 +100,8 @@ class CacheManager:
         '''
         if enabled is None:
             enabled = self.enabled
-        if save_only is None:
-            save_only = self.save_only
+        if only_dump is None:
+            only_dump = self.only_dump
         if not enabled:
             return func
         if isinstance(out, str) or isinstance(out, PathLike):
@@ -110,7 +110,7 @@ class CacheManager:
         if iscoroutinefunction(func):
             @wraps(func)
             async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
-                if not save_only:
+                if not only_dump:
                     results = _load_files(full_files, load_method)
                     if results is not None:
                         return cast(R, results)
@@ -121,7 +121,7 @@ class CacheManager:
         else:
             @wraps(func)
             def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
-                if not save_only:
+                if not only_dump:
                     results = _load_files(full_files, load_method)
                     if results is not None:
                         return cast(R, results)

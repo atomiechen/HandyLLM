@@ -18,7 +18,7 @@ def func_multiple():
     return 2, "world", {'a': 1}
 
 def test_cache_manager(tmp_path: Path, capsys: CaptureFixture[str]):
-    cm = CacheManager(base_dir=tmp_path, enabled=True, save_only=False)
+    cm = CacheManager(base_dir=tmp_path, enabled=True)
     wrapped_func = cm.cache(func=func, out="test.txt", load_method=int)
     out = wrapped_func()
     assert (tmp_path / "test.txt").read_text() == "1"
@@ -35,7 +35,7 @@ def test_cache_manager(tmp_path: Path, capsys: CaptureFixture[str]):
 
 @pytest.mark.asyncio
 async def test_cache_manager_async(tmp_path: Path, capsys: CaptureFixture[str]):
-    cm = CacheManager(base_dir=tmp_path, enabled=True, save_only=False)
+    cm = CacheManager(base_dir=tmp_path, enabled=True)
     wrapped_func = cm.cache(func=async_func, out="test_async.txt")
     out = await wrapped_func()
     assert (tmp_path / "test_async.txt").read_text() == "hello"
