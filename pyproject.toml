@@ -24,6 +24,7 @@ dependencies = [
   "mergedeep",
   "python-dotenv",
   "PyYAML",
+  "typing_extensions",
 ]
 
 [project.urls]
