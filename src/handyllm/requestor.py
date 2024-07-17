@@ -408,11 +408,11 @@ class DictRequestor(Requestor):
         super().__init__(*args, **kwargs)
         self.raw = False
     
-    def call(self) -> Union[dict, Generator[dict]]:
-        return cast(Union[dict, Generator[dict]], super().call())
+    def call(self) -> Union[dict, Generator[dict, None, None]]:
+        return cast(Union[dict, Generator[dict, None, None]], super().call())
     
-    async def acall(self) -> Union[dict, AsyncGenerator[dict]]:
-        return cast(Union[dict, AsyncGenerator[dict]], await super().acall())
+    async def acall(self) -> Union[dict, AsyncGenerator[dict, None]]:
+        return cast(Union[dict, AsyncGenerator[dict, None]], await super().acall())
     
     def fetch(self) -> dict:
         return cast(dict, super().fetch())
@@ -423,7 +423,7 @@ class DictRequestor(Requestor):
     def stream(self) -> Generator[dict, None, None]:
         return super().stream()
     
-    async def astream(self) -> AsyncGenerator[dict]:
+    async def astream(self) -> AsyncGenerator[dict, None]:
         return await super().astream()
 
 
@@ -432,11 +432,11 @@ class BinRequestor(Requestor):
         super().__init__(*args, **kwargs)
         self.raw = True
     
-    def call(self) -> Union[bytes, Generator[bytes]]:
-        return cast(Union[bytes, Generator[bytes]], super().call())
+    def call(self) -> Union[bytes, Generator[bytes, None, None]]:
+        return cast(Union[bytes, Generator[bytes, None, None]], super().call())
     
-    async def acall(self) -> Union[bytes, AsyncGenerator[bytes]]:
-        return cast(Union[bytes, AsyncGenerator[bytes]], await super().acall())
+    async def acall(self) -> Union[bytes, AsyncGenerator[bytes, None]]:
+        return cast(Union[bytes, AsyncGenerator[bytes, None]], await super().acall())
 
     def fetch(self) -> bytes:
         return cast(bytes, super().fetch())
@@ -447,6 +447,6 @@ class BinRequestor(Requestor):
     def stream(self) -> Generator[bytes, None, None]:
         return super().stream()
     
-    async def astream(self) -> AsyncGenerator[bytes]:
+    async def astream(self) -> AsyncGenerator[bytes, None]:
         return await super().astream()
 
