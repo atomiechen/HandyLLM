@@ -263,6 +263,56 @@ class HandyPrompt(ABC):
         cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
+    @classmethod
+    @abstractmethod
+    def _stream_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt,
+    ) -> Generator:
+        ...
+    
+    def stream(
+        self,
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs
+        ) -> Generator:
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        if client:
+            iterable_response = cls._stream_with_client(client, evaled_prompt)
+        else:
+            with OpenAIClient(ClientMode.SYNC) as client:
+                iterable_response = cls._stream_with_client(client, evaled_prompt)
+        return iterable_response
+    
+    @classmethod
+    @abstractmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt,
+    ) -> dict:
+        ...
+    
+    def fetch(
+        self, 
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs
+        ) -> dict:
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        if client:
+            response = cls._fetch_with_client(client, evaled_prompt)
+        else:
+            with OpenAIClient(ClientMode.SYNC) as client:
+                response = cls._fetch_with_client(client, evaled_prompt)
+        return response
+    
     @staticmethod
     def _prepare_output_path(
         output_path: PathType, start_time: datetime, template_filename: str
@@ -566,6 +616,33 @@ class ChatPrompt(HandyPrompt):
             new_request, run_config, base_path,
             response=response
         )
+    
+    @classmethod
+    def _stream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.stream()
+        return cls._wrap_gen_chat(response, run_config)
+    
+    @classmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt
+        ):
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        return response
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list, dict or another ChatPrompt
@@ -719,6 +796,37 @@ class CompletionsPrompt(HandyPrompt):
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
             )
+    
+    @classmethod
+    def _stream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.stream()
+        for text in stream_completions(response):
+            if run_config.on_chunk:
+                run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                run_config.on_chunk(text)
+            yield text
+    
+    @classmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt
+        ):
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        return response
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
