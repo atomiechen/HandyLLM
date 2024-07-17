@@ -49,7 +49,7 @@ def test_sync():
             for text in stream_chat(response):
                 print(text, end='')
         else:
-            response = client.chat(**kwargs).run()
+            response = client.chat(**kwargs).fetch()
             print(response['choices'][0]['message']['content'])
 
 async def test_async():
@@ -64,7 +64,7 @@ async def test_async():
             async for text in astream_chat(response):
                 print(text, end='')
         else:
-            response = await client.chat(**kwargs).arun()
+            response = await client.chat(**kwargs).afetch()
             print(response['choices'][0]['message']['content'])
 
 async def test_both():
@@ -80,7 +80,7 @@ async def test_both():
             async for text in astream_chat(response1):
                 print(text, end='')
         else:
-            response1 = await client.chat(**kwargs).arun()
+            response1 = await client.chat(**kwargs).afetch()
             print(response1['choices'][0]['message']['content'])
         # sync call
         if kwargs.get('stream', False):
@@ -88,7 +88,7 @@ async def test_both():
             for text in stream_chat(response2):
                 print(text, end='')
         else:
-            response2 = client.chat(**kwargs).run()
+            response2 = client.chat(**kwargs).fetch()
             print(response2['choices'][0]['message']['content'])
 
 

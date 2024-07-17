@@ -5,7 +5,7 @@ __all__ = [
     'BinRequestor',
 ]
 
-from typing import AsyncIterable, Callable, Iterable, Optional, Union, cast
+from typing import AsyncGenerator, Callable, Generator, Optional, Union, cast
 import asyncio
 import logging
 import json
@@ -155,16 +155,16 @@ class Requestor:
         err_msg = f"API error ({self.url} {response.status_code} {reason}) - {message}"
         return Exception(err_msg)
 
-    def stream(self) -> Iterable:
+    def stream(self) -> Generator:
         '''
-        Request in stream mode.
+        Request in stream mode, will return a generator.
         '''
         self._change_stream_mode(True)
-        return cast(Iterable, self.call())
+        return cast(Generator, self.call())
 
-    def run(self) -> Union[dict, bytes]:
+    def fetch(self) -> Union[dict, bytes]:
         '''
-        Request in non-stream mode.
+        Request in non-stream mode, will not return until the response is complete.
         '''
         self._change_stream_mode(False)
         return cast(Union[dict, bytes], self.call())
@@ -267,16 +267,16 @@ class Requestor:
         self._check_image_error(response)
         return response
 
-    async def astream(self) -> AsyncIterable:
+    async def astream(self) -> AsyncGenerator:
         '''
-        Request in stream mode asynchronously.
+        Request in stream mode asynchronously, will return an async generator.
         '''
         self._change_stream_mode(True)
-        return cast(AsyncIterable, await self.acall())
+        return cast(AsyncGenerator, await self.acall())
 
-    async def arun(self) -> Union[dict, bytes]:
+    async def afetch(self) -> Union[dict, bytes]:
         '''
-        Request in non-stream mode asynchronously.
+        Request in non-stream mode asynchronously, will not return until the response is complete.
         '''
         self._change_stream_mode(False)
         return cast(Union[dict, bytes], await self.acall())
@@ -408,22 +408,22 @@ class DictRequestor(Requestor):
         super().__init__(*args, **kwargs)
         self.raw = False
     
-    def call(self) -> Union[dict, Iterable[dict]]:
-        return cast(Union[dict, Iterable[dict]], super().call())
+    def call(self) -> Union[dict, Generator[dict]]:
+        return cast(Union[dict, Generator[dict]], super().call())
     
-    async def acall(self) -> Union[dict, AsyncIterable[dict]]:
-        return cast(Union[dict, AsyncIterable[dict]], await super().acall())
+    async def acall(self) -> Union[dict, AsyncGenerator[dict]]:
+        return cast(Union[dict, AsyncGenerator[dict]], await super().acall())
     
-    def run(self) -> dict:
-        return cast(dict, super().run())
+    def fetch(self) -> dict:
+        return cast(dict, super().fetch())
     
-    async def arun(self) -> dict:
-        return cast(dict, await super().arun())
+    async def afetch(self) -> dict:
+        return cast(dict, await super().afetch())
     
-    def stream(self) -> Iterable[dict]:
+    def stream(self) -> Generator[dict, None, None]:
         return super().stream()
     
-    async def astream(self) -> AsyncIterable[dict]:
+    async def astream(self) -> AsyncGenerator[dict]:
         return await super().astream()
 
 
@@ -432,21 +432,21 @@ class BinRequestor(Requestor):
         super().__init__(*args, **kwargs)
         self.raw = True
     
-    def call(self) -> Union[bytes, Iterable[bytes]]:
-        return cast(Union[bytes, Iterable[bytes]], super().call())
+    def call(self) -> Union[bytes, Generator[bytes]]:
+        return cast(Union[bytes, Generator[bytes]], super().call())
     
-    async def acall(self) -> Union[bytes, AsyncIterable[bytes]]:
-        return cast(Union[bytes, AsyncIterable[bytes]], await super().acall())
+    async def acall(self) -> Union[bytes, AsyncGenerator[bytes]]:
+        return cast(Union[bytes, AsyncGenerator[bytes]], await super().acall())
 
-    def run(self) -> bytes:
-        return cast(bytes, super().run())
+    def fetch(self) -> bytes:
+        return cast(bytes, super().fetch())
     
-    async def arun(self) -> bytes:
-        return cast(bytes, await super().arun())
+    async def afetch(self) -> bytes:
+        return cast(bytes, await super().afetch())
     
-    def stream(self) -> Iterable[bytes]:
+    def stream(self) -> Generator[bytes, None, None]:
         return super().stream()
     
-    async def astream(self) -> AsyncIterable[bytes]:
+    async def astream(self) -> AsyncGenerator[bytes]:
         return await super().astream()
 

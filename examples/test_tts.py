@@ -14,7 +14,7 @@ def sync_speech():
             model='tts-1',
             input="Hello, world! oh yes. This is a test. Sync speech no-stream version.",
             voice='alloy',
-        ).run()
+        ).fetch()
         with open('output-sync.mp3', 'wb') as f:
             f.write(response)
 
@@ -34,7 +34,7 @@ async def async_speech():
             model='tts-1',
             input="Hello, world! oh no. This is a test. Async speech no-stream version.",
             voice='alloy',
-        ).arun()
+        ).afetch()
         with open('output-async.mp3', 'wb') as f:
             f.write(response)
 
@@ -61,7 +61,7 @@ def sync_speech_azure():
             model='tts-1',
             input="Hello, world! oh yes. This is a test. Sync speech no-stream version.",
             voice='alloy',
-        ).run()
+        ).fetch()
         with open('output-sync-azure.mp3', 'wb') as f:
             f.write(response)
 

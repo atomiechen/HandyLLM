@@ -31,7 +31,7 @@ def example_chat(client: OpenAIClient):
         frequency_penalty=0.0,
         presence_penalty=0.0,
         timeout=10,
-        ).run()
+        ).fetch()
     print(response['choices'][0]['message']['content'])
 
 
@@ -43,7 +43,7 @@ def example_embeddings(client: OpenAIClient):
         engine="text-embedding-ada-002",
         input="I enjoy walking with my cute dog",
         timeout=10,
-    ).run()
+    ).fetch()
     print(json.dumps(response, indent=2))
 
 
@@ -55,7 +55,7 @@ def example_images_generations(client: OpenAIClient):
         prompt="A panda, synthwave style, digital painting",
         n=1,
         size="256x256",
-    ).run()
+    ).fetch()
     print(json.dumps(response, indent=2))
     download_url = response['data'][0]['url']
     file_path = utils.download_binary(download_url)

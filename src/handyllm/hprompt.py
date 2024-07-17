@@ -23,7 +23,7 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
+from typing import IO, Any, Generator, Iterable, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
 from contextlib import contextmanager
 
@@ -455,7 +455,7 @@ class ChatPrompt(HandyPrompt):
         return replaced
     
     @staticmethod
-    def _wrap_gen_chat(response, run_config: RunConfig):
+    def _wrap_gen_chat(response: Iterable[dict], run_config: RunConfig):
         for role, content, tool_call in stream_chat_all(response):
             if run_config.on_chunk:
                 run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
@@ -511,7 +511,7 @@ class ChatPrompt(HandyPrompt):
                     cls._wrap_gen_chat(response, run_config)
                     )
         else:
-            response = requestor.run()
+            response = requestor.fetch()
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -557,7 +557,7 @@ class ChatPrompt(HandyPrompt):
                     cls._awrap_gen_chat(response, run_config)
                     )
         else:
-            response = await requestor.arun()
+            response = await requestor.afetch()
             role = response['choices'][0]['message']['role']
             content = response['choices'][0]['message'].get('content')
             tool_calls = response['choices'][0]['message'].get('tool_calls')
@@ -664,7 +664,7 @@ class CompletionsPrompt(HandyPrompt):
             else:
                 content = cls._stream_completions_proc(response, run_config)
         else:
-            response = requestor.run()
+            response = requestor.fetch()
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
@@ -714,7 +714,7 @@ class CompletionsPrompt(HandyPrompt):
             else:
                 content = await cls._astream_completions_proc(response, run_config)
         else:
-            response = await requestor.arun()
+            response = await requestor.afetch()
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
