@@ -23,7 +23,7 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, Generator, Iterable, MutableMapping, Optional, Type, Union, TypeVar, cast
+from typing import IO, Any, Generator, Generic, Iterable, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
 from contextlib import contextmanager
 
@@ -43,6 +43,7 @@ from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
+YieldType = TypeVar('YieldType')
 
 
 converter = PromptConverter()
@@ -62,7 +63,7 @@ DEFAULT_BLACKLIST = (
 )
 
 
-class HandyPrompt(ABC):
+class HandyPrompt(ABC, Generic[YieldType]):
     
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
@@ -269,7 +270,7 @@ class HandyPrompt(ABC):
         cls, 
         client: OpenAIClient, 
         evaled_prompt,
-    ) -> Generator:
+    ) -> Generator[YieldType, None, None]:
         ...
     
     def stream(
@@ -278,7 +279,7 @@ class HandyPrompt(ABC):
         run_config: RunConfig = DEFAULT_CONFIG,
         var_map: Optional[VarMapType] = None,
         **kwargs
-        ) -> Generator:
+        ) -> Generator[YieldType, None, None]:
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         if client:
@@ -456,7 +457,7 @@ class HandyPrompt(ABC):
             raise ValueError(f"unsupported output_path_buffering value: {run_config.output_path_buffering}")
 
 
-class ChatPrompt(HandyPrompt):
+class ChatPrompt(HandyPrompt[Tuple[str, Optional[str], dict]]):
         
     def __init__(
         self, 
@@ -674,7 +675,7 @@ class ChatPrompt(HandyPrompt):
         self.messages.append(msg)
 
 
-class CompletionsPrompt(HandyPrompt):
+class CompletionsPrompt(HandyPrompt[str]):
     
     def __init__(
         self, 
