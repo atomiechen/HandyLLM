@@ -108,7 +108,7 @@ class ChatChunkDelta(DictProxy):
 
 
 class ChatChunkChoice(DictProxy):
-    delta: ChatChunkDelta
+    delta: Optional[ChatChunkDelta]
     logprobs: Optional[Logprobs]
     finish_reason: Optional[str]
     index: int
