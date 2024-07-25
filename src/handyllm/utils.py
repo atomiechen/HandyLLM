@@ -96,7 +96,7 @@ def stream_completions(response: Iterable[dict]):
 
 async def astream_chat_all(response: AsyncIterable[dict]):
     role = ''
-    tool_call = {}
+    tool_call = ToolCallDelta()
     async for data in response:
         try:
             message = data['choices'][0]['delta']
@@ -113,7 +113,7 @@ async def astream_chat_all(response: AsyncIterable[dict]):
                         # this is a new tool call, yield the previous one
                         yield role, content, tool_call
                         # reset the tool call
-                        tool_call = chunk
+                        tool_call = ToolCallDelta(chunk)
             elif content:
                 yield role, content, tool_call
         except (KeyError, IndexError):

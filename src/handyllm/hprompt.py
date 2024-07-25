@@ -23,7 +23,7 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, Generator, Generic, Iterable, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
+from typing import IO, Any, AsyncGenerator, AsyncIterable, Generator, Generic, Iterable, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
 from contextlib import contextmanager
 
@@ -281,7 +281,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         run_config: RunConfig = DEFAULT_CONFIG,
         var_map: Optional[VarMapType] = None,
         **kwargs
-        ) -> Generator[YieldType, None, None]:
+        ):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         if client:
@@ -289,6 +289,30 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
                 iterable_response = cls._stream_with_client(client, evaled_prompt)
+        return iterable_response
+    
+    @classmethod
+    @abstractmethod
+    async def _astream_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt,
+    ) -> AsyncGenerator[YieldType, None]:
+        pass
+    
+    async def astream(
+        self,
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs) -> AsyncGenerator[YieldType, None]:
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        if client:
+            iterable_response = await cls._astream_with_client(client, evaled_prompt)
+        else:
+            async with OpenAIClient(ClientMode.ASYNC) as client:
+                iterable_response = await cls._astream_with_client(client, evaled_prompt)
         return iterable_response
     
     @classmethod
@@ -314,6 +338,30 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
                 response = cls._fetch_with_client(client, evaled_prompt)
+        return response
+
+    @classmethod
+    @abstractmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt,
+    ) -> ResponseType:
+        ...
+    
+    async def afetch(
+        self, 
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs):
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        if client:
+            response = await cls._afetch_with_client(client, evaled_prompt)
+        else:
+            async with OpenAIClient(ClientMode.ASYNC) as client:
+                response = await cls._afetch_with_client(client, evaled_prompt)
         return response
     
     @staticmethod
@@ -516,7 +564,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             yield role, content, tool_call
     
     @staticmethod
-    async def _awrap_gen_chat(response, run_config: RunConfig):
+    async def _awrap_gen_chat(response: AsyncIterable[dict], run_config: RunConfig):
         async for role, content, tool_call in astream_chat_all(response):
             if run_config.on_chunk:
                 if inspect.iscoroutinefunction(run_config.on_chunk):
@@ -635,6 +683,20 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         return cls._wrap_gen_chat(response, run_config)
     
     @classmethod
+    async def _astream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.astream()
+        return cls._awrap_gen_chat(response, run_config)
+    
+    @classmethod
     def _fetch_with_client(
         cls, 
         client: OpenAIClient, 
@@ -645,6 +707,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = requestor.fetch()
+        return response
+
+    @classmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt
+        ):
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
         return response
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
@@ -819,6 +894,29 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             yield text
     
     @classmethod
+    async def _astream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.astream()
+        async def agen():
+            async for text in astream_completions(response):
+                if run_config.on_chunk:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(text)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                yield text
+        return agen()
+    
+    @classmethod
     def _fetch_with_client(
         cls, 
         client: OpenAIClient, 
@@ -829,6 +927,19 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = requestor.fetch()
+        return response
+    
+    @classmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt
+        ):
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
         return response
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
