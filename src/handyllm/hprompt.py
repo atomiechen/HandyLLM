@@ -702,12 +702,9 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         client: OpenAIClient, 
         evaled_prompt
         ):
-        requestor = client.chat(
-            messages=evaled_prompt.data,
-            **evaled_prompt.request
-        )
-        response = requestor.fetch()
-        return response
+        result_prompt = cls._run_with_client(client, evaled_prompt, stream=False)
+        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
+        return cast(ChatResponse, result_prompt.response)
 
     @classmethod
     async def _afetch_with_client(
@@ -715,12 +712,9 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         client: OpenAIClient,
         evaled_prompt
         ):
-        requestor = client.chat(
-            messages=evaled_prompt.data,
-            **evaled_prompt.request
-        )
-        response = await requestor.afetch()
-        return response
+        result_prompt = await cls._arun_with_client(client, evaled_prompt, stream=False)
+        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
+        return cast(ChatResponse, result_prompt.response)
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list, dict or another ChatPrompt
@@ -922,12 +916,9 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         client: OpenAIClient, 
         evaled_prompt
         ):
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **evaled_prompt.request
-        )
-        response = requestor.fetch()
-        return response
+        result_prompt = cls._run_with_client(client, evaled_prompt, stream=False)
+        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
+        return cast(CompletionsResponse, result_prompt.response)
     
     @classmethod
     async def _afetch_with_client(
@@ -935,12 +926,9 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         client: OpenAIClient,
         evaled_prompt
         ):
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **evaled_prompt.request
-        )
-        response = await requestor.afetch()
-        return response
+        result_prompt = await cls._arun_with_client(client, evaled_prompt, stream=False)
+        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
+        return cast(CompletionsResponse, result_prompt.response)
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
