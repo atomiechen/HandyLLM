@@ -4,7 +4,7 @@ __all__ = [
     'ClientMode',
 ]
 
-from typing import Iterable, Mapping, Optional, Union
+from typing import Iterable, Mapping, Optional, TypeVar, Union
 import os
 import json
 import time
@@ -14,11 +14,13 @@ import asyncio
 import yaml
 
 from .endpoint_manager import Endpoint, EndpointManager
-from .requestor import BinRequestor, DictRequestor
+from .requestor import Requestor, BinRequestor, DictRequestor, ChatRequestor, CompletionsRequestor
 from ._utils import get_request_url, join_url, _chat_log_response, _chat_log_exception, _completions_log_response, _completions_log_exception
 from ._constants import API_BASE_OPENAI, API_TYPE_OPENAI, API_TYPES_AZURE, TYPE_API_TYPES
 from .types import PathType
 
+
+RequestorType = TypeVar('RequestorType', bound='Requestor')
 
 def api(func):
     func.is_api = True
@@ -270,29 +272,32 @@ class OpenAIClient:
         dest_url = kwargs.pop('dest_url', dest_url)
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
-    def _make_requestor(self, request_url, **kwargs):
+    def _make_requestor(
+        self, 
+        request_url: str, 
+        requestor_cls: type[RequestorType],
+        **kwargs
+        ):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         url = join_url(api_base, request_url)
         filtered_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('_')}
-        requestor = DictRequestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **filtered_kwargs)
+        requestor = requestor_cls(api_type, url, api_key, organization=organization, dest_url=dest_url, **filtered_kwargs)
         requestor.set_sync_client(self._sync_client)
         requestor.set_async_client(self._async_client)
         return requestor
 
+    def _make_dict_requestor(self, request_url, **kwargs):
+        return self._make_requestor(request_url, requestor_cls=DictRequestor, **kwargs)
+
     def _make_bin_requestor(self, request_url, **kwargs):
-        api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        url = join_url(api_base, request_url)
-        filtered_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('_')}
-        requestor = BinRequestor(api_type, url, api_key, organization=organization, dest_url=dest_url, **filtered_kwargs)
-        requestor.set_sync_client(self._sync_client)
-        requestor.set_async_client(self._async_client)
-        return requestor
+        return self._make_requestor(request_url, requestor_cls=BinRequestor, **kwargs)
 
     @api
     def chat(self, messages, logger=None, log_marks=[], **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
             get_request_url('/chat/completions', api_type, api_version, engine), 
+            requestor_cls=ChatRequestor,
             messages=messages, 
             method='post', 
             api_key=api_key,
@@ -319,6 +324,7 @@ class OpenAIClient:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
         requestor = self._make_requestor(
             get_request_url('/completions', api_type, api_version, engine), 
+            requestor_cls=CompletionsRequestor,
             prompt=prompt, 
             method='post', 
             api_key=api_key,
@@ -342,12 +348,12 @@ class OpenAIClient:
 
     @api
     def edits(self, **kwargs):
-        return self._make_requestor('/edits', method='post', **kwargs)
+        return self._make_dict_requestor('/edits', method='post', **kwargs)
 
     @api
     def embeddings(self, **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        return self._make_requestor(
+        return self._make_dict_requestor(
             get_request_url('/embeddings', api_type, api_version, engine), 
             method='post', 
             api_key=api_key,
@@ -361,7 +367,7 @@ class OpenAIClient:
     @api
     def models_list(self, **kwargs):
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        return self._make_requestor(
+        return self._make_dict_requestor(
             get_request_url('/models', api_type, api_version, engine), 
             method='get', 
             api_key=api_key,
@@ -374,11 +380,11 @@ class OpenAIClient:
 
     @api
     def models_retrieve(self, model, **kwargs):
-        return self._make_requestor(f'/models/{model}', method='get', **kwargs)
+        return self._make_dict_requestor(f'/models/{model}', method='get', **kwargs)
 
     @api
     def moderations(self, **kwargs):
-        return self._make_requestor('/moderations', method='post', **kwargs)
+        return self._make_dict_requestor('/moderations', method='post', **kwargs)
 
     @api
     def images_generations(self, **kwargs):
@@ -398,7 +404,7 @@ class OpenAIClient:
             # OpenAI image generation, or Azure image generation DALL-E 3 and newer
             request_url = get_request_url('/images/generations', api_type, api_version, engine)
             azure_poll=False
-        return self._make_requestor(
+        return self._make_dict_requestor(
             request_url, 
             method='post', 
             api_key=api_key,
@@ -415,12 +421,12 @@ class OpenAIClient:
         files = { 'image': image }
         if mask:
             files['mask'] = mask
-        return self._make_requestor('/images/edits', method='post', files=files, **kwargs)
+        return self._make_dict_requestor('/images/edits', method='post', files=files, **kwargs)
 
     @api
     def images_variations(self, image, **kwargs):
         files = { 'image': image }
-        return self._make_requestor('/images/variations', method='post', files=files, **kwargs)
+        return self._make_dict_requestor('/images/variations', method='post', files=files, **kwargs)
 
     @api
     def audio_speech(self, stream=False, chunk_size=1024, **kwargs):
@@ -445,7 +451,7 @@ class OpenAIClient:
     def audio_transcriptions(self, file, **kwargs):
         files = { 'file': file }
         api_key, organization, api_base, api_type, api_version, engine, dest_url = self._consume_kwargs(kwargs)
-        return self._make_requestor(
+        return self._make_dict_requestor(
             get_request_url('/audio/transcriptions', api_type, api_version, engine),
             method='post', 
             api_key=api_key,
@@ -460,50 +466,50 @@ class OpenAIClient:
     @api
     def audio_translations(self, file, **kwargs):
         files = { 'file': file }
-        return self._make_requestor('/audio/translations', method='post', files=files, **kwargs)
+        return self._make_dict_requestor('/audio/translations', method='post', files=files, **kwargs)
 
     @api
     def files_list(self, **kwargs):
-        return self._make_requestor('/files', method='get', **kwargs)
+        return self._make_dict_requestor('/files', method='get', **kwargs)
 
     @api
     def files_upload(self, file, **kwargs):
         files = { 'file': file }
-        return self._make_requestor('/files', method='post', files=files, **kwargs)
+        return self._make_dict_requestor('/files', method='post', files=files, **kwargs)
 
     @api
     def files_delete(self, file_id, **kwargs):
-        return self._make_requestor(f'/files/{file_id}', method='delete', **kwargs)
+        return self._make_dict_requestor(f'/files/{file_id}', method='delete', **kwargs)
 
     @api
     def files_retrieve(self, file_id, **kwargs):
-        return self._make_requestor(f'/files/{file_id}', method='get', **kwargs)
+        return self._make_dict_requestor(f'/files/{file_id}', method='get', **kwargs)
 
     @api
     def files_retrieve_content(self, file_id, **kwargs):
-        return self._make_requestor(f'/files/{file_id}/content', method='get', **kwargs)
+        return self._make_dict_requestor(f'/files/{file_id}/content', method='get', **kwargs)
 
     @api
     def finetunes_create(self, **kwargs):
-        return self._make_requestor('/fine-tunes', method='post', **kwargs)
+        return self._make_dict_requestor('/fine-tunes', method='post', **kwargs)
 
     @api
     def finetunes_list(self, **kwargs):
-        return self._make_requestor('/fine-tunes', method='get', **kwargs)
+        return self._make_dict_requestor('/fine-tunes', method='get', **kwargs)
 
     @api
     def finetunes_retrieve(self, fine_tune_id, **kwargs):
-        return self._make_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
+        return self._make_dict_requestor(f'/fine-tunes/{fine_tune_id}', method='get', **kwargs)
 
     @api
     def finetunes_cancel(self, fine_tune_id, **kwargs):
-        return self._make_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
+        return self._make_dict_requestor(f'/fine-tunes/{fine_tune_id}/cancel', method='post', **kwargs)
 
     @api
     def finetunes_list_events(self, fine_tune_id, **kwargs):
-        return self._make_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
+        return self._make_dict_requestor(f'/fine-tunes/{fine_tune_id}/events', method='get', **kwargs)
 
     @api
     def finetunes_delete_model(self, model, **kwargs):
-        return self._make_requestor(f'/models/{model}', method='delete', **kwargs)
+        return self._make_dict_requestor(f'/models/{model}', method='delete', **kwargs)
 
