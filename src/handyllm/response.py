@@ -94,9 +94,22 @@ class ChatResponse(DictProxy):
     usage: Usage
 
 
+class ToolCallDelta(DictProxy):
+    index: int
+    id: str
+    type: str
+    function: Function
+
+
+class ChatChunkDelta(DictProxy):
+    role: str
+    content: Optional[str]
+    tool_calls: Optional[list[ToolCallDelta]]
+
+
 class ChatChunkChoice(DictProxy):
-    delta: DictProxy
-    logprobs: Optional[DictProxy]
+    delta: ChatChunkDelta
+    logprobs: Optional[Logprobs]
     finish_reason: Optional[str]
     index: int
 
