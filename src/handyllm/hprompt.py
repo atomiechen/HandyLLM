@@ -506,6 +506,19 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             raise ValueError(f"unsupported output_path_buffering value: {run_config.output_path_buffering}")
 
+    @classmethod
+    @contextmanager
+    def get_fd_and_base_path(cls, run_config: RunConfig):
+        if run_config.output_fd:
+            # stream response to a file descriptor, no base_path
+            yield run_config.output_fd, None
+        elif run_config.output_path:
+            # stream response to a file
+            with cls.open_output_path_fd(run_config) as fout:
+                yield fout, Path(run_config.output_path).parent.resolve()
+        else:
+            yield None, None
+
 
 class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
         
@@ -590,26 +603,12 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             response = requestor.stream()
-            if run_config.output_fd:
-                # dump frontmatter, no base_path
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                # stream response to a file descriptor
+            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
+                if fout:
+                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
                 role, content, tool_calls = converter.stream_msgs2raw(
                     cls._wrap_gen_chat(response, run_config), 
-                    run_config.output_fd
-                    )
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    # dump frontmatter
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = converter.stream_msgs2raw(
-                        cls._wrap_gen_chat(response, run_config), 
-                        fout
-                        )
-            else:
-                role, content, tool_calls = converter.stream_msgs2raw(
-                    cls._wrap_gen_chat(response, run_config)
+                    fout
                     )
         else:
             response = requestor.fetch()
@@ -801,17 +800,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             response = requestor.stream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = cls._stream_completions_proc(response, run_config, run_config.output_fd)
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
+            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
+                if fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = cls._stream_completions_proc(response, run_config, fout)
-            else:
-                content = cls._stream_completions_proc(response, run_config)
+                content = cls._stream_completions_proc(response, run_config, fout)
         else:
             response = requestor.fetch()
             content = response['choices'][0]['text']
