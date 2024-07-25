@@ -11,7 +11,8 @@ __all__ = [
     'CompletionsChunk',    
 ]
 
-from typing import MutableMapping, Optional, Sequence
+from typing import MutableMapping, Optional, Sequence, TypedDict
+from typing_extensions import NotRequired
 
 
 class DictProxy(dict):
@@ -101,14 +102,17 @@ class ToolCallDelta(DictProxy):
     function: Function
 
 
-class ChatChunkDelta(DictProxy):
-    role: str
-    content: Optional[str]
-    tool_calls: Optional[list[ToolCallDelta]]
+class ChatChunkDelta(TypedDict):
+    '''
+    Note that following keys may not exist in the delta dict.
+    '''
+    role: NotRequired[str]
+    content: NotRequired[Optional[str]]
+    tool_calls: NotRequired[list[ToolCallDelta]]
 
 
 class ChatChunkChoice(DictProxy):
-    delta: Optional[ChatChunkDelta]
+    delta: ChatChunkDelta
     logprobs: Optional[Logprobs]
     finish_reason: Optional[str]
     index: int
