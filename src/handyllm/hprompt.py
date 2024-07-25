@@ -40,9 +40,11 @@ from .utils import (
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
+from .response import ChatResponse, CompletionsResponse, ToolCallDelta
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
+ResponseType = TypeVar('ResponseType')
 YieldType = TypeVar('YieldType')
 
 
@@ -63,7 +65,7 @@ DEFAULT_BLACKLIST = (
 )
 
 
-class HandyPrompt(ABC, Generic[YieldType]):
+class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
@@ -295,7 +297,7 @@ class HandyPrompt(ABC, Generic[YieldType]):
         cls, 
         client: OpenAIClient, 
         evaled_prompt,
-    ) -> dict:
+    ) -> ResponseType:
         ...
     
     def fetch(
@@ -304,7 +306,7 @@ class HandyPrompt(ABC, Generic[YieldType]):
         run_config: RunConfig = DEFAULT_CONFIG,
         var_map: Optional[VarMapType] = None,
         **kwargs
-        ) -> dict:
+        ):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         if client:
@@ -457,7 +459,7 @@ class HandyPrompt(ABC, Generic[YieldType]):
             raise ValueError(f"unsupported output_path_buffering value: {run_config.output_path_buffering}")
 
 
-class ChatPrompt(HandyPrompt[Tuple[str, Optional[str], dict]]):
+class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
         
     def __init__(
         self, 
@@ -675,7 +677,7 @@ class ChatPrompt(HandyPrompt[Tuple[str, Optional[str], dict]]):
         self.messages.append(msg)
 
 
-class CompletionsPrompt(HandyPrompt[str]):
+class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
     
     def __init__(
         self, 
