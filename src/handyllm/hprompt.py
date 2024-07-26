@@ -23,9 +23,9 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, AsyncGenerator, AsyncIterable, Generator, Generic, Iterable, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
+from typing import IO, AsyncGenerator, Generator, Generic, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import yaml
 import frontmatter
@@ -221,6 +221,24 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         
         return run_config
     
+    @staticmethod
+    @contextmanager
+    def ensure_sync_client(client: Optional[OpenAIClient]):
+        if client:
+            yield client
+        else:
+            with OpenAIClient(ClientMode.SYNC) as client:
+                yield client
+    
+    @staticmethod
+    @asynccontextmanager
+    async def ensure_async_client(client: Optional[OpenAIClient]):
+        if client:
+            yield client
+        else:
+            async with OpenAIClient(ClientMode.ASYNC) as client:
+                yield client
+    
     @classmethod
     @abstractmethod
     def _run_with_client(
@@ -239,12 +257,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            new_prompt = cls._run_with_client(client, evaled_prompt, stream)
-        else:
-            with OpenAIClient(ClientMode.SYNC) as client:
-                new_prompt = cls._run_with_client(client, evaled_prompt, stream)
-        return new_prompt
+        with cls.ensure_sync_client(client) as client:
+            return cls._run_with_client(client, evaled_prompt, stream)
     
     @classmethod
     @abstractmethod
@@ -264,12 +278,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
-        else:
-            async with OpenAIClient(ClientMode.ASYNC) as client:
-                new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
-        return new_prompt
+        async with cls.ensure_async_client(client) as client:
+            return await cls._arun_with_client(client, evaled_prompt, stream)
     
     @classmethod
     @abstractmethod
@@ -289,12 +299,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         ):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            iterable_response = cls._stream_with_client(client, evaled_prompt)
-        else:
-            with OpenAIClient(ClientMode.SYNC) as client:
-                iterable_response = cls._stream_with_client(client, evaled_prompt)
-        return iterable_response
+        with cls.ensure_sync_client(client) as client:
+            yield from cls._stream_with_client(client, evaled_prompt)
     
     @classmethod
     @abstractmethod
@@ -313,13 +319,9 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         **kwargs) -> AsyncGenerator[YieldType, None]:
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            iterable_response = cls._astream_with_client(client, evaled_prompt)
-        else:
-            async with OpenAIClient(ClientMode.ASYNC) as client:
-                iterable_response = cls._astream_with_client(client, evaled_prompt)
-        async for item in iterable_response:
-            yield item
+        async with cls.ensure_async_client(client) as client:
+            async for item in cls._astream_with_client(client, evaled_prompt):
+                yield item
     
     @classmethod
     @abstractmethod
@@ -339,12 +341,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         ):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            response = cls._fetch_with_client(client, evaled_prompt)
-        else:
-            with OpenAIClient(ClientMode.SYNC) as client:
-                response = cls._fetch_with_client(client, evaled_prompt)
-        return response
+        with cls.ensure_sync_client(client) as client:
+            return cls._fetch_with_client(client, evaled_prompt)
 
     @classmethod
     @abstractmethod
@@ -363,12 +361,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         **kwargs):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            response = await cls._afetch_with_client(client, evaled_prompt)
-        else:
-            async with OpenAIClient(ClientMode.ASYNC) as client:
-                response = await cls._afetch_with_client(client, evaled_prompt)
-        return response
+        async with cls.ensure_async_client(client) as client:
+            return await cls._afetch_with_client(client, evaled_prompt)
     
     @staticmethod
     def _prepare_output_path(
@@ -644,6 +638,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
+        print("why it is None", client, client._sync_client, client._async_client)
         requestor = client.chat(
             messages=evaled_prompt.data,
             **evaled_prompt.request
