@@ -637,24 +637,12 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             response = await requestor.astream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
+            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
+                if fout:
+                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
                 role, content, tool_calls = await converter.astream_msgs2raw(
                     cls._awrap_gen_chat(response, run_config), 
-                    run_config.output_fd
-                    )
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await converter.astream_msgs2raw(
-                        cls._awrap_gen_chat(response, run_config), 
-                        fout
-                        )
-            else:
-                role, content, tool_calls = await converter.astream_msgs2raw(
-                    cls._awrap_gen_chat(response, run_config)
+                    fout
                     )
         else:
             response = await requestor.afetch()
@@ -843,17 +831,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         if stream:
             response = await requestor.astream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = await cls._astream_completions_proc(response, run_config, run_config.output_fd)
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
+            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
+                if fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = await cls._astream_completions_proc(response, run_config, fout)
-            else:
-                content = await cls._astream_completions_proc(response, run_config)
+                content = await cls._astream_completions_proc(response, run_config, fout)
         else:
             response = await requestor.afetch()
             content = response['choices'][0]['text']
