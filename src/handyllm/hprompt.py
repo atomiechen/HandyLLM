@@ -606,10 +606,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             with cls.get_fd_and_base_path(run_config) as (fout, base_path):
                 if fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                role, content, tool_calls = converter.stream_msgs2raw(
-                    cls._wrap_gen_chat(response, run_config), 
-                    fout
-                    )
+                role = ""
+                content = ""
+                tool_calls = []
+                for r, text, tool_call in converter.stream_msgs2raw(cls._wrap_gen_chat(response, run_config), fout):
+                    if r != role:
+                        role = r
+                    if tool_call:
+                        tool_calls.append(tool_call)
+                    elif text:
+                        content += text
+                if not tool_calls:
+                    # should return None if no tool calls
+                    tool_calls = None
         else:
             response = requestor.fetch()
             role = response['choices'][0]['message']['role']
@@ -640,10 +649,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             with cls.get_fd_and_base_path(run_config) as (fout, base_path):
                 if fout:
                     fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                role, content, tool_calls = await converter.astream_msgs2raw(
-                    cls._awrap_gen_chat(response, run_config), 
-                    fout
-                    )
+                role = ""
+                content = ""
+                tool_calls = []
+                async for r, text, tool_call in converter.astream_msgs2raw(cls._awrap_gen_chat(response, run_config), fout):
+                    if r != role:
+                        role = r
+                    if tool_call:
+                        tool_calls.append(tool_call)
+                    elif text:
+                        content += text
+                if not tool_calls:
+                    # should return None if no tool calls
+                    tool_calls = None
         else:
             response = await requestor.afetch()
             role = response['choices'][0]['message']['role']
