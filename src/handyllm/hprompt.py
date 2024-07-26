@@ -508,16 +508,16 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
 
     @classmethod
     @contextmanager
-    def get_fd_and_base_path(cls, run_config: RunConfig):
+    def open_fd(cls, run_config: RunConfig):
         if run_config.output_fd:
             # stream response to a file descriptor, no base_path
-            yield run_config.output_fd, None
+            yield run_config.output_fd
         elif run_config.output_path:
             # stream response to a file
             with cls.open_output_path_fd(run_config) as fout:
-                yield fout, Path(run_config.output_path).parent.resolve()
+                yield fout
         else:
-            yield None, None
+            yield None
 
 
 class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
@@ -567,25 +567,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
                         pass
         
         return replaced
-    
-    @staticmethod
-    def _wrap_gen_chat(response: Iterable[dict], run_config: RunConfig):
-        for role, content, tool_call in stream_chat_all(response):
-            if run_config.on_chunk:
-                run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                run_config.on_chunk(role, content, tool_call)
-            yield role, content, tool_call
-    
-    @staticmethod
-    async def _awrap_gen_chat(response: AsyncIterable[dict], run_config: RunConfig):
-        async for role, content, tool_call in astream_chat_all(response):
-            if run_config.on_chunk:
-                if inspect.iscoroutinefunction(run_config.on_chunk):
-                    await run_config.on_chunk(role, content, tool_call)
-                else:
-                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                    run_config.on_chunk(role, content, tool_call)
-            yield role, content, tool_call
 
     @classmethod
     def _run_with_client(
@@ -601,24 +582,21 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **new_request
         )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = requestor.stream()
-            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
-                if fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                role = ""
-                content = ""
-                tool_calls = []
-                for r, text, tool_call in converter.stream_msgs2raw(cls._wrap_gen_chat(response, run_config), fout):
-                    if r != role:
-                        role = r
-                    if tool_call:
-                        tool_calls.append(tool_call)
-                    elif text:
-                        content += text
-                if not tool_calls:
-                    # should return None if no tool calls
-                    tool_calls = None
+            role = ""
+            content = ""
+            tool_calls = []
+            for r, text, tool_call in cls._stream_with_client(client, evaled_prompt):
+                if r != role:
+                    role = r
+                if tool_call:
+                    tool_calls.append(tool_call)
+                elif text:
+                    content += text
+            if not tool_calls:
+                # should return None if no tool calls
+                tool_calls = None
         else:
             response = requestor.fetch()
             role = response['choices'][0]['message']['role']
@@ -644,24 +622,21 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **new_request
         )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = await requestor.astream()
-            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
-                if fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                role = ""
-                content = ""
-                tool_calls = []
-                async for r, text, tool_call in converter.astream_msgs2raw(cls._awrap_gen_chat(response, run_config), fout):
-                    if r != role:
-                        role = r
-                    if tool_call:
-                        tool_calls.append(tool_call)
-                    elif text:
-                        content += text
-                if not tool_calls:
-                    # should return None if no tool calls
-                    tool_calls = None
+            role = ""
+            content = ""
+            tool_calls = []
+            async for r, text, tool_call in (await cls._astream_with_client(client, evaled_prompt)):
+                if r != role:
+                    role = r
+                if tool_call:
+                    tool_calls.append(tool_call)
+                elif text:
+                    content += text
+            if not tool_calls:
+                # should return None if no tool calls
+                tool_calls = None
         else:
             response = await requestor.afetch()
             role = response['choices'][0]['message']['role']
@@ -685,7 +660,17 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = requestor.stream()
-        return cls._wrap_gen_chat(response, run_config)
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        def gen():
+            with cls.open_fd(run_config) as fout:
+                if fout:
+                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+                for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
+                    if run_config.on_chunk:
+                        run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                        run_config.on_chunk(role, content, tool_call)
+                    yield role, content, tool_call
+        return gen()
     
     @classmethod
     async def _astream_with_client(
@@ -699,7 +684,20 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = await requestor.astream()
-        return cls._awrap_gen_chat(response, run_config)
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        async def agen():
+            with cls.open_fd(run_config) as fout:
+                if fout:
+                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+                async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
+                    if run_config.on_chunk:
+                        if inspect.iscoroutinefunction(run_config.on_chunk):
+                            await run_config.on_chunk(role, content, tool_call)
+                        else:
+                            run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                            run_config.on_chunk(role, content, tool_call)
+                    yield role, content, tool_call
+        return agen()
     
     @classmethod
     def _fetch_with_client(
@@ -776,19 +774,6 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         for key, value in var_map.items():
             new_prompt = new_prompt.replace(key, value)
         return new_prompt
-    
-    @staticmethod
-    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
-        # stream response to fd
-        content = ""
-        for text in stream_completions(response):
-            if run_config.on_chunk:
-                run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                run_config.on_chunk(text)
-            if fd:
-                fd.write(text)
-            content += text
-        return content
 
     @classmethod
     def _run_with_client(
@@ -804,34 +789,17 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **new_request
         )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = requestor.stream()
-            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
-                if fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                content = cls._stream_completions_proc(response, run_config, fout)
+            content = ""
+            for text in cls._stream_with_client(client, evaled_prompt):
+                content += text
         else:
             response = requestor.fetch()
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
             )
-
-    @staticmethod
-    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
-        # stream response to fd
-        content = ""
-        async for text in astream_completions(response):
-            if run_config.on_chunk:
-                if inspect.iscoroutinefunction(run_config.on_chunk):
-                    await run_config.on_chunk(text)
-                else:
-                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                    run_config.on_chunk(text)
-            if fd:
-                fd.write(text)
-            content += text
-        return content
     
     @classmethod
     async def _arun_with_client(
@@ -847,12 +815,11 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **new_request
         )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = await requestor.astream()
-            with cls.get_fd_and_base_path(run_config) as (fout, base_path):
-                if fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                content = await cls._astream_completions_proc(response, run_config, fout)
+            content = ""
+            async for text in (await cls._astream_with_client(client, evaled_prompt)):
+                content += text
         else:
             response = await requestor.afetch()
             content = response['choices'][0]['text']
@@ -872,11 +839,19 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = requestor.stream()
-        for text in stream_completions(response):
-            if run_config.on_chunk:
-                run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                run_config.on_chunk(text)
-            yield text
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        def gen():
+            with cls.open_fd(run_config) as fout:
+                if fout:
+                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+                for text in stream_completions(response):
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                    yield text
+        return gen()
     
     @classmethod
     async def _astream_with_client(
@@ -890,15 +865,21 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = await requestor.astream()
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         async def agen():
-            async for text in astream_completions(response):
-                if run_config.on_chunk:
-                    if inspect.iscoroutinefunction(run_config.on_chunk):
-                        await run_config.on_chunk(text)
-                    else:
-                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                        run_config.on_chunk(text)
-                yield text
+            with cls.open_fd(run_config) as fout:
+                if fout:
+                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+                async for text in astream_completions(response):
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        if inspect.iscoroutinefunction(run_config.on_chunk):
+                            await run_config.on_chunk(text)
+                        else:
+                            run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                            run_config.on_chunk(text)
+                    yield text
         return agen()
     
     @classmethod
