@@ -125,12 +125,9 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     
     @classmethod
     def _dump_fd_if_set(cls, run_config: RunConfig, request: MutableMapping, data):
-        with cls.open_fd(run_config) as fout:
+        with cls.open_and_dump_frontmatter(run_config, request) as fout:
             if fout:
-                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                frontmatter_data = cls._dumps_frontmatter(request, run_config, base_path)
-                serialized_data = cls._serialize_data(data)
-                fout.write(frontmatter_data + serialized_data)
+                fout.write(cls._serialize_data(data))
     
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
@@ -516,6 +513,15 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             yield None
 
+    @classmethod
+    @contextmanager
+    def open_and_dump_frontmatter(cls, run_config: RunConfig, request: MutableMapping):
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                fout.write(cls._dumps_frontmatter(request, run_config, base_path))
+            yield fout
+
 
 class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
         
@@ -643,10 +649,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         )
         response = requestor.stream()
         def gen():
-            with cls.open_fd(run_config) as fout:
-                if fout:
-                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
                 for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
                     if run_config.on_chunk:
                         run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
@@ -667,10 +670,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         )
         response = await requestor.astream()
         async def agen():
-            with cls.open_fd(run_config) as fout:
-                if fout:
-                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
                 async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
                     if run_config.on_chunk:
                         if inspect.iscoroutinefunction(run_config.on_chunk):
@@ -822,10 +822,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = requestor.stream()
         def gen():
-            with cls.open_fd(run_config) as fout:
-                if fout:
-                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
                 for text in stream_completions(response):
                     if fout:
                         fout.write(text)
@@ -848,10 +845,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = await requestor.astream()
         async def agen():
-            with cls.open_fd(run_config) as fout:
-                if fout:
-                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                    fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
+            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
                 async for text in astream_completions(response):
                     if fout:
                         fout.write(text)
