@@ -39,16 +39,12 @@ mock_stream_data = [
 ]
 tmp = ["data: " + json.dumps(data) for data in mock_stream_data]
 tmp.append("data: [DONE]")
-body = "\n".join(tmp)
+stream_body = "\n".join(tmp)
 
 
 @responses.activate
 def test_chat_fetch():
-    responses.add(
-        method=responses.POST,
-        url=re.compile(r'.*'),
-        json=mock_fetch_data,
-    )
+    responses.add(responses.POST, url=re.compile(r'.*'), json=mock_fetch_data)
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     response = prompt.fetch(api_key='fake-key')
@@ -65,12 +61,7 @@ async def test_async_chat_fetch():
 
 @responses.activate
 def test_chat_stream():
-    responses.add(
-        method=responses.POST,
-        url=re.compile(r'.*'),
-        body=body,
-    )
-    
+    responses.add(responses.POST, url=re.compile(r'.*'), body=stream_body)
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
@@ -85,8 +76,7 @@ def test_chat_stream():
 @pytest.mark.asyncio
 @respx.mock
 async def test_async_chat_stream():
-    respx.post(re.compile(r'.*')).respond(text=body)
-    
+    respx.post(re.compile(r'.*')).respond(text=stream_body)
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
@@ -97,4 +87,29 @@ async def test_async_chat_stream():
         assert text
         content += text
     assert content == "Hello world!"
+
+@responses.activate
+def test_chat_run():
+    responses.add(responses.POST, url=re.compile(r'.*'), json=mock_fetch_data)
+    prompt_file = tests_dir / 'assets' / 'chat.hprompt'
+    prompt = load_from(prompt_file, cls=ChatPrompt)
+    result_prompt = prompt.run(api_key='fake-key')
+    assert result_prompt.result_str == "\n\nHello there, how may I assist you today?"
+
+    responses.replace(responses.POST, url=re.compile(r'.*'), body=stream_body)
+    result_prompt = prompt.run(api_key='fake-key', stream=True)
+    assert result_prompt.result_str == "Hello world!"
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_chat_run():
+    respx.post(re.compile(r'.*')).respond(json=mock_fetch_data)
+    prompt_file = tests_dir / 'assets' / 'chat.hprompt'
+    prompt = load_from(prompt_file, cls=ChatPrompt)
+    result_prompt = await prompt.arun(api_key='fake-key')
+    assert result_prompt.result_str == "\n\nHello there, how may I assist you today?"
+
+    respx.post(re.compile(r'.*')).respond(text=stream_body)
+    result_prompt = await prompt.arun(api_key='fake-key', stream=True)
+    assert result_prompt.result_str == "Hello world!"
 
