@@ -39,5 +39,5 @@ def test_chat_fetch():
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     response = prompt.fetch(api_key='fake-key')
-    assert response.choices[0].message.role == "assistant"
+    assert response.choices[0].message["role"] == "assistant"
 

@@ -65,7 +65,7 @@ def test_chat_fetch():
             {'role': 'user', 'content': 'Hello!'},
         ]).fetch()
         print(response)
-        assert response.choices[0].message.role == "assistant"
+        assert response.choices[0].message["role"] == "assistant"
         assert response.usage.total_tokens == 21
 
 @responses.activate
