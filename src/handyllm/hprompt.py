@@ -303,7 +303,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         client: OpenAIClient, 
         evaled_prompt: HandyPrompt,
     ) -> AsyncGenerator[YieldType, None]:
-        pass
+        ...
     
     async def astream(
         self,
@@ -314,11 +314,12 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         if client:
-            iterable_response = await cls._astream_with_client(client, evaled_prompt)
+            iterable_response = cls._astream_with_client(client, evaled_prompt)
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
-                iterable_response = await cls._astream_with_client(client, evaled_prompt)
-        return iterable_response
+                iterable_response = cls._astream_with_client(client, evaled_prompt)
+        async for item in iterable_response:
+            yield item
     
     @classmethod
     @abstractmethod
@@ -618,7 +619,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             role = ""
             content = ""
             tool_calls = []
-            async for r, text, tool_call in (await cls._astream_with_client(client, evaled_prompt)):
+            async for r, text, tool_call in cls._astream_with_client(client, evaled_prompt):
                 if r != role:
                     role = r
                 if tool_call:
@@ -648,14 +649,12 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = requestor.stream()
-        def gen():
-            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-                for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
-                    if run_config.on_chunk:
-                        run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                        run_config.on_chunk(role, content, tool_call)
-                    yield role, content, tool_call
-        return gen()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
+                if run_config.on_chunk:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                    run_config.on_chunk(role, content, tool_call)
+                yield role, content, tool_call
     
     @classmethod
     async def _astream_with_client(
@@ -669,17 +668,15 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = await requestor.astream()
-        async def agen():
-            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-                async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
-                    if run_config.on_chunk:
-                        if inspect.iscoroutinefunction(run_config.on_chunk):
-                            await run_config.on_chunk(role, content, tool_call)
-                        else:
-                            run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                            run_config.on_chunk(role, content, tool_call)
-                    yield role, content, tool_call
-        return agen()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
+                if run_config.on_chunk:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(role, content, tool_call)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                        run_config.on_chunk(role, content, tool_call)
+                yield role, content, tool_call
     
     @classmethod
     def _fetch_with_client(
@@ -800,7 +797,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         response = None
         if stream:
             content = ""
-            async for text in (await cls._astream_with_client(client, evaled_prompt)):
+            async for text in cls._astream_with_client(client, evaled_prompt):
                 content += text
         else:
             response = await cls._afetch_with_client(client, evaled_prompt)
@@ -821,16 +818,14 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = requestor.stream()
-        def gen():
-            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-                for text in stream_completions(response):
-                    if fout:
-                        fout.write(text)
-                    if run_config.on_chunk:
-                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                        run_config.on_chunk(text)
-                    yield text
-        return gen()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            for text in stream_completions(response):
+                if fout:
+                    fout.write(text)
+                if run_config.on_chunk:
+                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                    run_config.on_chunk(text)
+                yield text
     
     @classmethod
     async def _astream_with_client(
@@ -844,19 +839,17 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = await requestor.astream()
-        async def agen():
-            with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-                async for text in astream_completions(response):
-                    if fout:
-                        fout.write(text)
-                    if run_config.on_chunk:
-                        if inspect.iscoroutinefunction(run_config.on_chunk):
-                            await run_config.on_chunk(text)
-                        else:
-                            run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                            run_config.on_chunk(text)
-                    yield text
-        return agen()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            async for text in astream_completions(response):
+                if fout:
+                    fout.write(text)
+                if run_config.on_chunk:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(text)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                yield text
     
     @classmethod
     def _fetch_with_client(
