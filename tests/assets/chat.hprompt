@@ -2,9 +2,8 @@
 model: gpt-4o
 meta:
   var_map_path: var_map.txt
-  output_path: out/%Y-%m-%d/result.%H-%M-%S.hprompt
-  output_evaled_prompt_path: evaled/%Y-%m-%d/result.%H-%M-%S.hprompt
-  credential_path: ../credential.yml
+  output_path: tmp-out/%Y-%m-%d/result.%H-%M-%S.hprompt
+  output_evaled_prompt_path: tmp-evaled/%Y-%m-%d/result.%H-%M-%S.hprompt
 ---
 
 $user$

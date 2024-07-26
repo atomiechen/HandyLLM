@@ -3,9 +3,11 @@ __all__ = [
     'Requestor',
     'DictRequestor',
     'BinRequestor',
+    'ChatRequestor',
+    'CompletionsRequestor',
 ]
 
-from typing import AsyncIterable, Callable, Iterable, Optional, Union, cast
+from typing import AsyncGenerator, Callable, Generator, Generic, Optional, TypeVar, Union, cast
 import asyncio
 import logging
 import json
@@ -14,13 +16,19 @@ import requests
 import httpx
 
 from ._constants import API_TYPES_AZURE
+from .response import ChatChunk, CompletionsChunk, DictProxy, ChatResponse, CompletionsResponse
 
 
 module_logger = logging.getLogger(__name__)
 module_logger.addHandler(logging.NullHandler())
 
+ResponseType = TypeVar('ResponseType')
+YieldType = TypeVar('YieldType')
+DictResponseType = TypeVar('DictResponseType', bound='DictProxy')
+DictYieldType = TypeVar('DictYieldType', bound='DictProxy')
 
-class Requestor:
+
+class Requestor(Generic[ResponseType, YieldType]):
     def __init__(
         self, 
         api_type, 
@@ -155,21 +163,21 @@ class Requestor:
         err_msg = f"API error ({self.url} {response.status_code} {reason}) - {message}"
         return Exception(err_msg)
 
-    def stream(self) -> Iterable:
+    def stream(self) -> Generator[YieldType, None, None]:
         '''
-        Request in stream mode.
+        Request in stream mode, will return a generator.
         '''
         self._change_stream_mode(True)
-        return cast(Iterable, self.call())
+        return cast(Generator, self.call())
 
-    def run(self) -> Union[dict, bytes]:
+    def fetch(self) -> ResponseType:
         '''
-        Request in non-stream mode.
+        Request in non-stream mode, will not return until the response is complete.
         '''
         self._change_stream_mode(False)
-        return cast(Union[dict, bytes], self.call())
+        return cast(ResponseType, self.call())
 
-    def call(self):
+    def call(self) -> Union[ResponseType, Generator[YieldType, None, None]]:
         '''
         Execute the request. Stream or non-stream mode depends on the stream parameter.
         '''
@@ -202,7 +210,7 @@ class Requestor:
             
             if self._response_callback:
                 response = self._response_callback(response, prepare_ret)
-            return response
+            return cast(Union[ResponseType, Generator[YieldType, None, None]], response)
         except Exception as e:
             if self._exception_callback:
                 self._exception_callback(e, prepare_ret)
@@ -267,21 +275,21 @@ class Requestor:
         self._check_image_error(response)
         return response
 
-    async def astream(self) -> AsyncIterable:
+    async def astream(self) -> AsyncGenerator[YieldType, None]:
         '''
-        Request in stream mode asynchronously.
+        Request in stream mode asynchronously, will return an async generator.
         '''
         self._change_stream_mode(True)
-        return cast(AsyncIterable, await self.acall())
+        return cast(AsyncGenerator, await self.acall())
 
-    async def arun(self) -> Union[dict, bytes]:
+    async def afetch(self) -> ResponseType:
         '''
-        Request in non-stream mode asynchronously.
+        Request in non-stream mode asynchronously, will not return until the response is complete.
         '''
         self._change_stream_mode(False)
-        return cast(Union[dict, bytes], await self.acall())
+        return cast(ResponseType, await self.acall())
 
-    async def acall(self):
+    async def acall(self) -> Union[ResponseType, AsyncGenerator[YieldType, None]]:
         '''
         Execute the request asynchronously. Stream or non-stream mode depends on the stream parameter.
         '''
@@ -314,7 +322,7 @@ class Requestor:
             
             if self._response_callback:
                 response = self._response_callback(response, prepare_ret)
-            return response
+            return cast(Union[ResponseType, AsyncGenerator[YieldType, None]], response)
         except Exception as e:
             if self._exception_callback:
                 self._exception_callback(e, prepare_ret)
@@ -403,50 +411,42 @@ class Requestor:
         self._exception_callback = func
 
 
-class DictRequestor(Requestor):
+class DictRequestor(Requestor[DictResponseType, DictYieldType], Generic[DictResponseType, DictYieldType]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.raw = False
     
-    def call(self) -> Union[dict, Iterable[dict]]:
-        return cast(Union[dict, Iterable[dict]], super().call())
+    def call(self) -> Union[DictResponseType, Generator[DictYieldType, None, None]]:
+        response = super().call()
+        if self._stream:
+            def gen_wrapper(response):
+                for data in response:
+                    yield DictProxy(data)
+            return cast(Generator[DictYieldType, None, None], gen_wrapper(response))
+        else:
+            return cast(DictResponseType, DictProxy(response))
     
-    async def acall(self) -> Union[dict, AsyncIterable[dict]]:
-        return cast(Union[dict, AsyncIterable[dict]], await super().acall())
-    
-    def run(self) -> dict:
-        return cast(dict, super().run())
-    
-    async def arun(self) -> dict:
-        return cast(dict, await super().arun())
-    
-    def stream(self) -> Iterable[dict]:
-        return super().stream()
-    
-    async def astream(self) -> AsyncIterable[dict]:
-        return await super().astream()
+    async def acall(self) -> Union[DictResponseType, AsyncGenerator[DictYieldType, None]]:
+        response = await super().acall()
+        if self._stream:
+            async def agen_wrapper(response):
+                async for data in response:
+                    yield DictProxy(data)
+            return cast(AsyncGenerator[DictYieldType, None], agen_wrapper(response))
+        else:
+            return cast(DictResponseType, DictProxy(response))
 
 
-class BinRequestor(Requestor):
+class BinRequestor(Requestor[bytes, bytes]):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.raw = True
-    
-    def call(self) -> Union[bytes, Iterable[bytes]]:
-        return cast(Union[bytes, Iterable[bytes]], super().call())
-    
-    async def acall(self) -> Union[bytes, AsyncIterable[bytes]]:
-        return cast(Union[bytes, AsyncIterable[bytes]], await super().acall())
 
-    def run(self) -> bytes:
-        return cast(bytes, super().run())
-    
-    async def arun(self) -> bytes:
-        return cast(bytes, await super().arun())
-    
-    def stream(self) -> Iterable[bytes]:
-        return super().stream()
-    
-    async def astream(self) -> AsyncIterable[bytes]:
-        return await super().astream()
+
+class ChatRequestor(DictRequestor[ChatResponse, ChatChunk]):
+    pass
+
+
+class CompletionsRequestor(DictRequestor[CompletionsResponse, CompletionsChunk]):
+    pass
 

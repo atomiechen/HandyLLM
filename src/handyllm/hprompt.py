@@ -23,9 +23,9 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, Any, MutableMapping, Optional, Type, Union, TypeVar, cast
+from typing import IO, AsyncGenerator, Generator, Generic, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import yaml
 import frontmatter
@@ -40,9 +40,12 @@ from .utils import (
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
+from .response import ChatResponse, CompletionsResponse, ToolCallDelta
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
+ResponseType = TypeVar('ResponseType')
+YieldType = TypeVar('YieldType')
 
 
 converter = PromptConverter()
@@ -62,7 +65,7 @@ DEFAULT_BLACKLIST = (
 )
 
 
-class HandyPrompt(ABC):
+class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
@@ -73,7 +76,7 @@ class HandyPrompt(ABC):
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[ResponseType] = None,
         ):
         self.data = data
         self.request = request or {}
@@ -100,7 +103,8 @@ class HandyPrompt(ABC):
     def result_str(self) -> str:
         return str(self.data)
     
-    def _serialize_data(self, data) -> str:
+    @staticmethod
+    def _serialize_data(data) -> str:
         '''
         Serialize the data to a string. 
         This method can be overridden by subclasses.
@@ -118,6 +122,12 @@ class HandyPrompt(ABC):
             front_data['meta'] = run_config.to_dict(retain_object=False, base_path=base_path)
         post = frontmatter.Post("", None, **front_data)
         return frontmatter.dumps(post, handler, Dumper=MySafeDumper).strip() + "\n\n"
+    
+    @classmethod
+    def _dump_fd_if_set(cls, run_config: RunConfig, request: MutableMapping, data):
+        with cls.open_and_dump_frontmatter(run_config, request) as fout:
+            if fout:
+                fout.write(cls._serialize_data(data))
     
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
@@ -211,6 +221,24 @@ class HandyPrompt(ABC):
         
         return run_config
     
+    @staticmethod
+    @contextmanager
+    def ensure_sync_client(client: Optional[OpenAIClient]):
+        if client:
+            yield client
+        else:
+            with OpenAIClient(ClientMode.SYNC) as client:
+                yield client
+    
+    @staticmethod
+    @asynccontextmanager
+    async def ensure_async_client(client: Optional[OpenAIClient]):
+        if client:
+            yield client
+        else:
+            async with OpenAIClient(ClientMode.ASYNC) as client:
+                yield client
+    
     @classmethod
     @abstractmethod
     def _run_with_client(
@@ -229,13 +257,8 @@ class HandyPrompt(ABC):
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            new_prompt = cls._run_with_client(client, evaled_prompt, stream)
-        else:
-            with OpenAIClient(ClientMode.SYNC) as client:
-                new_prompt = cls._run_with_client(client, evaled_prompt, stream)
-        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
-        return new_prompt
+        with cls.ensure_sync_client(client) as client:
+            return cls._run_with_client(client, evaled_prompt, stream)
     
     @classmethod
     @abstractmethod
@@ -255,13 +278,91 @@ class HandyPrompt(ABC):
         **kwargs) -> PromptType:
         evaled_prompt, stream = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
-        if client:
-            new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
-        else:
-            async with OpenAIClient(ClientMode.ASYNC) as client:
-                new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
-        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
-        return new_prompt
+        async with cls.ensure_async_client(client) as client:
+            return await cls._arun_with_client(client, evaled_prompt, stream)
+    
+    @classmethod
+    @abstractmethod
+    def _stream_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt: HandyPrompt,
+    ) -> Generator[YieldType, None, None]:
+        ...
+    
+    def stream(
+        self,
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs
+        ):
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        with cls.ensure_sync_client(client) as client:
+            yield from cls._stream_with_client(client, evaled_prompt)
+    
+    @classmethod
+    @abstractmethod
+    async def _astream_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt: HandyPrompt,
+    ) -> AsyncGenerator[YieldType, None]:
+        ...
+    
+    async def astream(
+        self,
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs) -> AsyncGenerator[YieldType, None]:
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        async with cls.ensure_async_client(client) as client:
+            async for item in cls._astream_with_client(client, evaled_prompt):
+                yield item
+    
+    @classmethod
+    @abstractmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt: HandyPrompt,
+    ) -> ResponseType:
+        ...
+    
+    def fetch(
+        self, 
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs
+        ):
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        with cls.ensure_sync_client(client) as client:
+            return cls._fetch_with_client(client, evaled_prompt)
+
+    @classmethod
+    @abstractmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+    ) -> ResponseType:
+        ...
+    
+    async def afetch(
+        self, 
+        client: Optional[OpenAIClient] = None, 
+        run_config: RunConfig = DEFAULT_CONFIG,
+        var_map: Optional[VarMapType] = None,
+        **kwargs):
+        evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
+        cls = type(self)
+        async with cls.ensure_async_client(client) as client:
+            return await cls._afetch_with_client(client, evaled_prompt)
     
     @staticmethod
     def _prepare_output_path(
@@ -318,17 +419,6 @@ class HandyPrompt(ABC):
                 raise ValueError(f"unsupported credential type: {evaled_run_config.credential_type}")
         
         return evaled_prompt, stream
-    
-    @staticmethod
-    def _post_check_output(stream: bool, run_config: RunConfig, new_prompt: HandyPrompt):
-        if not stream:
-            # if stream is True, the response is already streamed to 
-            # a file or a file descriptor
-            if run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-            elif run_config.output_path:
-                new_prompt.dump_to(run_config.output_path, mkdir=True)
-        return new_prompt
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> tuple[MutableMapping, RunConfig]:
         if inplace:
@@ -405,8 +495,30 @@ class HandyPrompt(ABC):
         else:
             raise ValueError(f"unsupported output_path_buffering value: {run_config.output_path_buffering}")
 
+    @classmethod
+    @contextmanager
+    def open_fd(cls, run_config: RunConfig):
+        if run_config.output_fd:
+            # stream response to a file descriptor, no base_path
+            yield run_config.output_fd
+        elif run_config.output_path:
+            # stream response to a file
+            with cls.open_output_path_fd(run_config) as fout:
+                yield fout
+        else:
+            yield None
 
-class ChatPrompt(HandyPrompt):
+    @classmethod
+    @contextmanager
+    def open_and_dump_frontmatter(cls, run_config: RunConfig, request: MutableMapping):
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                fout.write(cls._dumps_frontmatter(request, run_config, base_path))
+            yield fout
+
+
+class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
         
     def __init__(
         self, 
@@ -414,7 +526,7 @@ class ChatPrompt(HandyPrompt):
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[ChatResponse] = None,
         ):
         super().__init__(messages, request, meta, base_path, response)
     
@@ -432,7 +544,8 @@ class ChatPrompt(HandyPrompt):
             return ""
         return self.messages[-1]['content']
     
-    def _serialize_data(self, data) -> str:
+    @staticmethod
+    def _serialize_data(data) -> str:
         return converter.msgs2raw(data)
     
     def _eval_data(self, var_map) -> list:
@@ -453,25 +566,6 @@ class ChatPrompt(HandyPrompt):
                         pass
         
         return replaced
-    
-    @staticmethod
-    def _wrap_gen_chat(response, run_config: RunConfig):
-        for role, content, tool_call in stream_chat_all(response):
-            if run_config.on_chunk:
-                run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                run_config.on_chunk(role, content, tool_call)
-            yield role, content, tool_call
-    
-    @staticmethod
-    async def _awrap_gen_chat(response, run_config: RunConfig):
-        async for role, content, tool_call in astream_chat_all(response):
-            if run_config.on_chunk:
-                if inspect.iscoroutinefunction(run_config.on_chunk):
-                    await run_config.on_chunk(role, content, tool_call)
-                else:
-                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                    run_config.on_chunk(role, content, tool_call)
-            yield role, content, tool_call
 
     @classmethod
     def _run_with_client(
@@ -481,44 +575,28 @@ class ChatPrompt(HandyPrompt):
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
-        requestor = client.chat(
-            messages=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = requestor.stream()
-            if run_config.output_fd:
-                # dump frontmatter, no base_path
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                # stream response to a file descriptor
-                role, content, tool_calls = converter.stream_msgs2raw(
-                    cls._wrap_gen_chat(response, run_config), 
-                    run_config.output_fd
-                    )
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    # dump frontmatter
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = converter.stream_msgs2raw(
-                        cls._wrap_gen_chat(response, run_config), 
-                        fout
-                        )
-            else:
-                role, content, tool_calls = converter.stream_msgs2raw(
-                    cls._wrap_gen_chat(response, run_config)
-                    )
+            role = ""
+            content = ""
+            tool_calls = []
+            for r, text, tool_call in cls._stream_with_client(client, evaled_prompt):
+                if r != role:
+                    role = r
+                if tool_call:
+                    tool_calls.append(tool_call)
+                elif text:
+                    content += text
+            if not tool_calls:
+                # should return None if no tool calls
+                tool_calls = None
+            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
         else:
-            response = requestor.run()
-            role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message'].get('content')
-            tool_calls = response['choices'][0]['message'].get('tool_calls')
+            response = cls._fetch_with_client(client, evaled_prompt)
+            messages = [response['choices'][0]['message']]
         return ChatPrompt(
-            [{"role": role, "content": content, "tool_calls": tool_calls}],
-            new_request, run_config, base_path,
-            response=response
+            messages, evaled_prompt.request, run_config, base_path, response=response
         )
     
     @classmethod
@@ -529,43 +607,101 @@ class ChatPrompt(HandyPrompt):
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
+        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
+        if stream:
+            role = ""
+            content = ""
+            tool_calls = []
+            async for r, text, tool_call in cls._astream_with_client(client, evaled_prompt):
+                if r != role:
+                    role = r
+                if tool_call:
+                    tool_calls.append(tool_call)
+                elif text:
+                    content += text
+            if not tool_calls:
+                # should return None if no tool calls
+                tool_calls = None
+            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
+        else:
+            response = await cls._afetch_with_client(client, evaled_prompt)
+            messages = [response['choices'][0]['message']]
+        return ChatPrompt(
+            messages, evaled_prompt.request, run_config, base_path, response=response
+        )
+    
+    @classmethod
+    def _stream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+        ):
+        run_config = evaled_prompt.run_config
+        print("why it is None", client, client._sync_client, client._async_client)
         requestor = client.chat(
             messages=evaled_prompt.data,
-            **new_request
+            **evaled_prompt.request
         )
-        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-        if stream:
-            response = await requestor.astream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                role, content, tool_calls = await converter.astream_msgs2raw(
-                    cls._awrap_gen_chat(response, run_config), 
-                    run_config.output_fd
-                    )
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    role, content, tool_calls = await converter.astream_msgs2raw(
-                        cls._awrap_gen_chat(response, run_config), 
-                        fout
-                        )
-            else:
-                role, content, tool_calls = await converter.astream_msgs2raw(
-                    cls._awrap_gen_chat(response, run_config)
-                    )
-        else:
-            response = await requestor.arun()
-            role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message'].get('content')
-            tool_calls = response['choices'][0]['message'].get('tool_calls')
-        return ChatPrompt(
-            [{"role": role, "content": content, "tool_calls": tool_calls}],
-            new_request, run_config, base_path,
-            response=response
+        response = requestor.stream()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
+                if run_config.on_chunk:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                    run_config.on_chunk(role, content, tool_call)
+                yield role, content, tool_call
+    
+    @classmethod
+    async def _astream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
         )
+        response = await requestor.astream()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
+                if run_config.on_chunk:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(role, content, tool_call)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                        run_config.on_chunk(role, content, tool_call)
+                yield role, content, tool_call
+    
+    @classmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt: HandyPrompt, 
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, (response['choices'][0]['message'],))
+        return response
+
+    @classmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt, 
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, (response['choices'][0]['message'],))
+        return response
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list, dict or another ChatPrompt
@@ -597,7 +733,7 @@ class ChatPrompt(HandyPrompt):
         self.messages.append(msg)
 
 
-class CompletionsPrompt(HandyPrompt):
+class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
     
     def __init__(
         self, 
@@ -605,7 +741,7 @@ class CompletionsPrompt(HandyPrompt):
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[CompletionsResponse] = None,
         ):
         super().__init__(prompt, request, meta, base_path, response)
     
@@ -622,19 +758,6 @@ class CompletionsPrompt(HandyPrompt):
         for key, value in var_map.items():
             new_prompt = new_prompt.replace(key, value)
         return new_prompt
-    
-    @staticmethod
-    def _stream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
-        # stream response to fd
-        content = ""
-        for text in stream_completions(response):
-            if run_config.on_chunk:
-                run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                run_config.on_chunk(text)
-            if fd:
-                fd.write(text)
-            content += text
-        return content
 
     @classmethod
     def _run_with_client(
@@ -644,47 +767,18 @@ class CompletionsPrompt(HandyPrompt):
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = requestor.stream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = cls._stream_completions_proc(response, run_config, run_config.output_fd)
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = cls._stream_completions_proc(response, run_config, fout)
-            else:
-                content = cls._stream_completions_proc(response, run_config)
+            content = ""
+            for text in cls._stream_with_client(client, evaled_prompt):
+                content += text
         else:
-            response = requestor.run()
+            response = cls._fetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
-            content, new_request, run_config, base_path, response=response
-            )
-
-    @staticmethod
-    async def _astream_completions_proc(response, run_config: RunConfig, fd: Optional[IO[str]] = None) -> str:
-        # stream response to fd
-        content = ""
-        async for text in astream_completions(response):
-            if run_config.on_chunk:
-                if inspect.iscoroutinefunction(run_config.on_chunk):
-                    await run_config.on_chunk(text)
-                else:
-                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                    run_config.on_chunk(text)
-            if fd:
-                fd.write(text)
-            content += text
-        return content
+            content, evaled_prompt.request, run_config, base_path, response=response
+        )
     
     @classmethod
     async def _arun_with_client(
@@ -694,31 +788,93 @@ class CompletionsPrompt(HandyPrompt):
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+        response = None
         if stream:
-            response = await requestor.astream()
-            if run_config.output_fd:
-                # stream response to a file descriptor
-                run_config.output_fd.write(cls._dumps_frontmatter(new_request, run_config))
-                content = await cls._astream_completions_proc(response, run_config, run_config.output_fd)
-            elif run_config.output_path:
-                # stream response to a file
-                with cls.open_output_path_fd(run_config) as fout:
-                    fout.write(cls._dumps_frontmatter(new_request, run_config, base_path))
-                    content = await cls._astream_completions_proc(response, run_config, fout)
-            else:
-                content = await cls._astream_completions_proc(response, run_config)
+            content = ""
+            async for text in cls._astream_with_client(client, evaled_prompt):
+                content += text
         else:
-            response = await requestor.arun()
+            response = await cls._afetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
-            content, new_request, run_config, base_path, response=response
-            )
+            content, evaled_prompt.request, run_config, base_path, response=response
+        )
+    
+    @classmethod
+    def _stream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.stream()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            for text in stream_completions(response):
+                if fout:
+                    fout.write(text)
+                if run_config.on_chunk:
+                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                    run_config.on_chunk(text)
+                yield text
+    
+    @classmethod
+    async def _astream_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.astream()
+        with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
+            async for text in astream_completions(response):
+                if fout:
+                    fout.write(text)
+                if run_config.on_chunk:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(text)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                yield text
+    
+    @classmethod
+    def _fetch_with_client(
+        cls, 
+        client: OpenAIClient, 
+        evaled_prompt: HandyPrompt, 
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, response["choices"][0]["text"])
+        return response
+    
+    @classmethod
+    async def _afetch_with_client(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt, 
+        ):
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, response["choices"][0]["text"])
+        return response
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt

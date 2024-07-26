@@ -27,6 +27,7 @@ import os
 import time
 
 from .types import PathType
+from .response import ToolCallDelta
 
 
 def get_filename_from_url(download_url):
@@ -51,7 +52,7 @@ def download_binary(download_url, file_path=None, dir='.'):
 
 def stream_chat_all(response: Iterable[dict]):
     role = ''
-    tool_call = {}
+    tool_call = ToolCallDelta()
     for data in response:
         try:
             message = data['choices'][0]['delta']
@@ -68,7 +69,7 @@ def stream_chat_all(response: Iterable[dict]):
                         # this is a new tool call, yield the previous one
                         yield role, content, tool_call
                         # reset the tool call
-                        tool_call = chunk
+                        tool_call = ToolCallDelta(chunk)
             elif content:
                 yield role, content, tool_call
         except (KeyError, IndexError):
@@ -95,7 +96,7 @@ def stream_completions(response: Iterable[dict]):
 
 async def astream_chat_all(response: AsyncIterable[dict]):
     role = ''
-    tool_call = {}
+    tool_call = ToolCallDelta()
     async for data in response:
         try:
             message = data['choices'][0]['delta']
@@ -112,7 +113,7 @@ async def astream_chat_all(response: AsyncIterable[dict]):
                         # this is a new tool call, yield the previous one
                         yield role, content, tool_call
                         # reset the tool call
-                        tool_call = chunk
+                        tool_call = ToolCallDelta(chunk)
             elif content:
                 yield role, content, tool_call
         except (KeyError, IndexError):
@@ -153,7 +154,7 @@ async def astream_to_file(response: AsyncIterable[bytes], file_path: PathType):
     with open(file_path, 'wb') as f:
         await astream_to_fd(response, f)
 
-def VM(**kwargs):
+def VM(**kwargs: str):
     # transform kwargs to a variable map dict
     # change each key to a % wrapped string
     transformed_vm = {f'%{key}%': value for key, value in kwargs.items()}
