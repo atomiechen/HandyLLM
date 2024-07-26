@@ -123,6 +123,15 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         post = frontmatter.Post("", None, **front_data)
         return frontmatter.dumps(post, handler, Dumper=MySafeDumper).strip() + "\n\n"
     
+    @classmethod
+    def _dump_fd_if_set(cls, run_config: RunConfig, request: MutableMapping, data):
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                frontmatter_data = cls._dumps_frontmatter(request, run_config, base_path)
+                serialized_data = cls._serialize_data(data)
+                fout.write(frontmatter_data + serialized_data)
+    
     def dumps(self, base_path: Optional[PathType] = None) -> str:
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
@@ -270,7 +279,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     def _stream_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
     ) -> Generator[YieldType, None, None]:
         ...
     
@@ -295,7 +304,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     async def _astream_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
     ) -> AsyncGenerator[YieldType, None]:
         pass
     
@@ -319,7 +328,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     def _fetch_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
     ) -> ResponseType:
         ...
     
@@ -344,7 +353,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     async def _afetch_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
     ) -> ResponseType:
         ...
     
@@ -565,7 +574,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -587,9 +595,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             response = cls._fetch_with_client(client, evaled_prompt)
             messages = [response['choices'][0]['message']]
         return ChatPrompt(
-            messages,
-            new_request, run_config, base_path,
-            response=response
+            messages, evaled_prompt.request, run_config, base_path, response=response
         )
     
     @classmethod
@@ -600,7 +606,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         stream: bool,
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -622,16 +627,14 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             response = await cls._afetch_with_client(client, evaled_prompt)
             messages = [response['choices'][0]['message']]
         return ChatPrompt(
-            messages,
-            new_request, run_config, base_path,
-            response=response
+            messages, evaled_prompt.request, run_config, base_path, response=response
         )
     
     @classmethod
     def _stream_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
         requestor = client.chat(
@@ -655,7 +658,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
     async def _astream_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
         requestor = client.chat(
@@ -682,7 +685,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
     def _fetch_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt
+        evaled_prompt: HandyPrompt, 
         ):
         run_config = evaled_prompt.run_config
         requestor = client.chat(
@@ -690,19 +693,14 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = requestor.fetch()
-        with cls.open_fd(run_config) as fout:
-            if fout:
-                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
-                serialized_data = cls._serialize_data((response['choices'][0]['message'],))
-                fout.write(frontmatter_data + serialized_data)
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, (response['choices'][0]['message'],))
         return response
 
     @classmethod
     async def _afetch_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt
+        evaled_prompt: HandyPrompt, 
         ):
         run_config = evaled_prompt.run_config
         requestor = client.chat(
@@ -710,12 +708,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = await requestor.afetch()
-        with cls.open_fd(run_config) as fout:
-            if fout:
-                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
-                serialized_data = cls._serialize_data((response['choices'][0]['message'],))
-                fout.write(frontmatter_data + serialized_data)
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, (response['choices'][0]['message'],))
         return response
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
@@ -782,7 +775,6 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -793,8 +785,8 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             response = cls._fetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
-            content, new_request, run_config, base_path, response=response
-            )
+            content, evaled_prompt.request, run_config, base_path, response=response
+        )
     
     @classmethod
     async def _arun_with_client(
@@ -804,7 +796,6 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         stream: bool,
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
-        new_request = evaled_prompt.request
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -815,14 +806,14 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             response = await cls._afetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
-            content, new_request, run_config, base_path, response=response
-            )
+            content, evaled_prompt.request, run_config, base_path, response=response
+        )
     
     @classmethod
     def _stream_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
         requestor = client.completions(
@@ -848,7 +839,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
     async def _astream_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt,
+        evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
         requestor = client.completions(
@@ -877,7 +868,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
     def _fetch_with_client(
         cls, 
         client: OpenAIClient, 
-        evaled_prompt
+        evaled_prompt: HandyPrompt, 
         ):
         run_config = evaled_prompt.run_config
         requestor = client.completions(
@@ -885,19 +876,14 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = requestor.fetch()
-        with cls.open_fd(run_config) as fout:
-            if fout:
-                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
-                serialized_data = cls._serialize_data(response["choices"][0]["text"])
-                fout.write(frontmatter_data + serialized_data)
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, response["choices"][0]["text"])
         return response
     
     @classmethod
     async def _afetch_with_client(
         cls,
         client: OpenAIClient,
-        evaled_prompt
+        evaled_prompt: HandyPrompt, 
         ):
         run_config = evaled_prompt.run_config
         requestor = client.completions(
@@ -905,12 +891,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = await requestor.afetch()
-        with cls.open_fd(run_config) as fout:
-            if fout:
-                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
-                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
-                serialized_data = cls._serialize_data(response["choices"][0]["text"])
-                fout.write(frontmatter_data + serialized_data)
+        cls._dump_fd_if_set(run_config, evaled_prompt.request, response["choices"][0]["text"])
         return response
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
