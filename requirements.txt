@@ -5,3 +5,4 @@ pytest
 pytest-cov
 pytest-asyncio
 responses  # mocking for requests
+respx  # mocking for httpx
