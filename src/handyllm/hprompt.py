@@ -76,7 +76,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[ResponseType] = None,
         ):
         self.data = data
         self.request = request or {}
@@ -103,7 +103,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
     def result_str(self) -> str:
         return str(self.data)
     
-    def _serialize_data(self, data) -> str:
+    @staticmethod
+    def _serialize_data(data) -> str:
         '''
         Serialize the data to a string. 
         This method can be overridden by subclasses.
@@ -237,7 +238,6 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             with OpenAIClient(ClientMode.SYNC) as client:
                 new_prompt = cls._run_with_client(client, evaled_prompt, stream)
-        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
     @classmethod
@@ -263,7 +263,6 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         else:
             async with OpenAIClient(ClientMode.ASYNC) as client:
                 new_prompt = await cls._arun_with_client(client, evaled_prompt, stream)
-        cls._post_check_output(stream, evaled_prompt.run_config, new_prompt)
         return new_prompt
     
     @classmethod
@@ -419,17 +418,6 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
                 raise ValueError(f"unsupported credential type: {evaled_run_config.credential_type}")
         
         return evaled_prompt, stream
-    
-    @staticmethod
-    def _post_check_output(stream: bool, run_config: RunConfig, new_prompt: HandyPrompt):
-        if not stream:
-            # if stream is True, the response is already streamed to 
-            # a file or a file descriptor
-            if run_config.output_fd:
-                new_prompt.dump(run_config.output_fd)
-            elif run_config.output_path:
-                new_prompt.dump_to(run_config.output_path, mkdir=True)
-        return new_prompt
 
     def _merge_non_data(self: PromptType, other: PromptType, inplace=False) -> tuple[MutableMapping, RunConfig]:
         if inplace:
@@ -528,7 +516,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[ChatResponse] = None,
         ):
         super().__init__(messages, request, meta, base_path, response)
     
@@ -546,7 +534,8 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             return ""
         return self.messages[-1]['content']
     
-    def _serialize_data(self, data) -> str:
+    @staticmethod
+    def _serialize_data(data) -> str:
         return converter.msgs2raw(data)
     
     def _eval_data(self, var_map) -> list:
@@ -577,10 +566,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        requestor = client.chat(
-            messages=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -597,13 +582,12 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             if not tool_calls:
                 # should return None if no tool calls
                 tool_calls = None
+            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
         else:
-            response = requestor.fetch()
-            role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message'].get('content')
-            tool_calls = response['choices'][0]['message'].get('tool_calls')
+            response = cls._fetch_with_client(client, evaled_prompt)
+            messages = [response['choices'][0]['message']]
         return ChatPrompt(
-            [{"role": role, "content": content, "tool_calls": tool_calls}],
+            messages,
             new_request, run_config, base_path,
             response=response
         )
@@ -617,10 +601,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         ) -> ChatPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        requestor = client.chat(
-            messages=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -637,13 +617,12 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             if not tool_calls:
                 # should return None if no tool calls
                 tool_calls = None
+            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
         else:
-            response = await requestor.afetch()
-            role = response['choices'][0]['message']['role']
-            content = response['choices'][0]['message'].get('content')
-            tool_calls = response['choices'][0]['message'].get('tool_calls')
+            response = await cls._afetch_with_client(client, evaled_prompt)
+            messages = [response['choices'][0]['message']]
         return ChatPrompt(
-            [{"role": role, "content": content, "tool_calls": tool_calls}],
+            messages,
             new_request, run_config, base_path,
             response=response
         )
@@ -660,10 +639,10 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = requestor.stream()
-        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         def gen():
             with cls.open_fd(run_config) as fout:
                 if fout:
+                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
                     fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
                 for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
                     if run_config.on_chunk:
@@ -684,10 +663,10 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             **evaled_prompt.request
         )
         response = await requestor.astream()
-        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         async def agen():
             with cls.open_fd(run_config) as fout:
                 if fout:
+                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
                     fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
                 async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
                     if run_config.on_chunk:
@@ -705,9 +684,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         client: OpenAIClient, 
         evaled_prompt
         ):
-        result_prompt = cls._run_with_client(client, evaled_prompt, stream=False)
-        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
-        return cast(ChatResponse, result_prompt.response)
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
+                serialized_data = cls._serialize_data((response['choices'][0]['message'],))
+                fout.write(frontmatter_data + serialized_data)
+        return response
 
     @classmethod
     async def _afetch_with_client(
@@ -715,9 +704,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         client: OpenAIClient,
         evaled_prompt
         ):
-        result_prompt = await cls._arun_with_client(client, evaled_prompt, stream=False)
-        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
-        return cast(ChatResponse, result_prompt.response)
+        run_config = evaled_prompt.run_config
+        requestor = client.chat(
+            messages=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
+                serialized_data = cls._serialize_data((response['choices'][0]['message'],))
+                fout.write(frontmatter_data + serialized_data)
+        return response
 
     def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
         # support concatenation with string, list, dict or another ChatPrompt
@@ -757,7 +756,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         request: Optional[MutableMapping] = None, 
         meta: Optional[Union[MutableMapping, RunConfig]] = None, 
         base_path: Optional[PathType] = None,
-        response: Optional[Any] = None,
+        response: Optional[CompletionsResponse] = None,
         ):
         super().__init__(prompt, request, meta, base_path, response)
     
@@ -784,10 +783,6 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -795,7 +790,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             for text in cls._stream_with_client(client, evaled_prompt):
                 content += text
         else:
-            response = requestor.fetch()
+            response = cls._fetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
@@ -810,10 +805,6 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         ) -> CompletionsPrompt:
         run_config = evaled_prompt.run_config
         new_request = evaled_prompt.request
-        requestor = client.completions(
-            prompt=evaled_prompt.data,
-            **new_request
-        )
         base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         response = None
         if stream:
@@ -821,7 +812,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             async for text in (await cls._astream_with_client(client, evaled_prompt)):
                 content += text
         else:
-            response = await requestor.afetch()
+            response = await cls._afetch_with_client(client, evaled_prompt)
             content = response['choices'][0]['text']
         return CompletionsPrompt(
             content, new_request, run_config, base_path, response=response
@@ -839,10 +830,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = requestor.stream()
-        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         def gen():
             with cls.open_fd(run_config) as fout:
                 if fout:
+                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
                     fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
                 for text in stream_completions(response):
                     if fout:
@@ -865,10 +856,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
             **evaled_prompt.request
         )
         response = await requestor.astream()
-        base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
         async def agen():
             with cls.open_fd(run_config) as fout:
                 if fout:
+                    base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
                     fout.write(cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path))
                 async for text in astream_completions(response):
                     if fout:
@@ -888,9 +879,19 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         client: OpenAIClient, 
         evaled_prompt
         ):
-        result_prompt = cls._run_with_client(client, evaled_prompt, stream=False)
-        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
-        return cast(CompletionsResponse, result_prompt.response)
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = requestor.fetch()
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
+                serialized_data = cls._serialize_data(response["choices"][0]["text"])
+                fout.write(frontmatter_data + serialized_data)
+        return response
     
     @classmethod
     async def _afetch_with_client(
@@ -898,9 +899,19 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         client: OpenAIClient,
         evaled_prompt
         ):
-        result_prompt = await cls._arun_with_client(client, evaled_prompt, stream=False)
-        cls._post_check_output(False, evaled_prompt.run_config, result_prompt)
-        return cast(CompletionsResponse, result_prompt.response)
+        run_config = evaled_prompt.run_config
+        requestor = client.completions(
+            prompt=evaled_prompt.data,
+            **evaled_prompt.request
+        )
+        response = await requestor.afetch()
+        with cls.open_fd(run_config) as fout:
+            if fout:
+                base_path = Path(run_config.output_path).parent.resolve() if run_config.output_path else None
+                frontmatter_data = cls._dumps_frontmatter(evaled_prompt.request, run_config, base_path)
+                serialized_data = cls._serialize_data(response["choices"][0]["text"])
+                fout.write(frontmatter_data + serialized_data)
+        return response
     
     def __add__(self: CompletionsPrompt, other: Union[str, CompletionsPrompt]):
         # support concatenation with string or another CompletionsPrompt
