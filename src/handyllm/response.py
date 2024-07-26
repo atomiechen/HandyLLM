@@ -48,10 +48,10 @@ class ToolCall(DictProxy):
     function: Function
 
 
-class Message(DictProxy):
+class Message(TypedDict):
     role: str
     content: Optional[str]
-    tool_calls: Optional[list[ToolCall]]
+    tool_calls: NotRequired[list[ToolCall]]
 
 
 class TopLogProbItem(DictProxy):
