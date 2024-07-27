@@ -68,10 +68,9 @@ def trans_stream_chat(consumer: Generator[YieldType, ShortChatChunk, None]) -> G
                 if 'role' in message:
                     role = cast(str, message['role'])
                 content = cast(Optional[str], message.get('content'))
-                tool_calls = cast(Optional[list], message.get('tool_calls'))
+                tool_calls = cast(Optional[list[ToolCallDelta]], message.get('tool_calls'))
                 if tool_calls:
                     for chunk in tool_calls:
-                        chunk = cast(dict, chunk)
                         if chunk['index'] == tool_call.get('index'):
                             tool_call['function']['arguments'] += chunk['function']['arguments']
                         else:
