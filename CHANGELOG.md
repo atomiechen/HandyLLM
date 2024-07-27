@@ -5,6 +5,59 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.9.0] - 2024-07-28
+
+### Added
+
+- `OpenAIClient`: 
+  - constructor support `endpoint_manager`, `endpoints` and `load_path` param
+  - support loading from YAML file and `Mapping` obj
+  - APIs support `endpoints` param
+  - APIs `endpoint` param supports `Mapping` type
+- `EndpointManager`: 
+  - support loading from YAML file using `endpoints` key, or from `Iterable` obj
+  - raise ValueError when getting endpoint out of empty
+- rename `_types` to `types` and expose all definitions
+- `requestor.py`: 
+  - add `fetch()`, `afetch()`, `stream()` and `astream()` methods
+  - use generic and add `DictRequestor`, `BinRequestor`, `ChatRequestor` and `CompletionsRequestor`
+- `hprompt.py`: 
+  - add 'endpoints' to default record blacklist
+  - add `RunConfig.var_map_file_format` for specifying variable map file format, including JSON / YAML
+  - `load_var_map()` supports format param
+  - `image_url` in chat hprompt file now supports local path (file://), both absolute and relative
+  - add `fetch()`, `afetch()`, `stream()` and `astream()` methods
+- `prompt_converter.py`:
+  - add generator sink `consume_stream2fd()`
+- `utils.py`:
+  - add generator filter `trans_stream_chat()`, generator sink `echo_consumer()`
+- `response.py`: add `DictProxy` as base class for different types of responses
+- `__init__.py` import everything from hprompt for convenience
+- `cache_manager.py`: add `CacheManager` for general purpose caching to text files
+  - support `load_method` and `dump_method`
+  - infer format from file suffix only when convert handler is not provided
+- added tests:
+  - load prompt type specification
+  - variable map substitution
+  - ChatPrompt and CompletionsPrompt's API calls, supports for RunConfig.on_chunk, and addition operations
+  - chat hprompt `image_url`
+  - `OpenAIClient` loading, chat `fetch()` & `stream()`
+  - `endpoint_manager.py`
+  - `cache_manager.py`
+  - audio speech
+  - legacy OpenAIAPI
+- improved type hints
+
+### Fixed
+
+- `hprompt.py`: 'type' object is not subscriptable on python 3.8
+
+### Removed
+
+- `hprompt.py`: remove the `var_map` related configurations from the evaluated prompt, as it is already applied
+- `prompt_converter.py`: remove `stream_msgs2raw()` and `astream_msgs2raw()` as no longer needed
+
+
 ## [0.8.2] - 2024-06-30
 
 ### Added
