@@ -2,7 +2,10 @@ import json
 from pathlib import Path
 import re
 
-from handyllm import CompletionsPrompt, load_from, stream_completions, astream_completions
+from handyllm import (
+    CompletionsPrompt, load_from, stream_completions, astream_completions,
+    RunConfig,
+)
 import pytest
 import responses
 import respx
@@ -105,4 +108,34 @@ async def test_async_completions_run():
     respx.post(re.compile(r'.*')).respond(text=stream_body)
     result_prompt = await prompt.arun(api_key='fake-key', stream=True)
     assert result_prompt.result_str == "This is indeed a test"
+
+@pytest.mark.asyncio
+@respx.mock
+@responses.activate
+async def test_on_chunk_completions():
+    responses.add(responses.POST, url=re.compile(r'.*'), body=stream_body)
+    respx.post(re.compile(r'.*')).respond(text=stream_body)
+    prompt_file = tests_dir / 'assets' / 'completions.hprompt'
+    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    
+    def on_chunk(data):
+        state['content'] += data
+    
+    async def aon_chunk(data):
+        state['content'] += data
+    
+    sync_run_config = RunConfig(on_chunk=on_chunk)
+    async_run_config = RunConfig(on_chunk=aon_chunk)
+    
+    state = {"content": ""}
+    prompt.run(run_config=sync_run_config, api_key='fake-key', stream=True)
+    assert state["content"] == "This is indeed a test"
+    
+    state = {"content": ""}
+    await prompt.arun(run_config=sync_run_config, api_key='fake-key', stream=True)
+    assert state["content"] == "This is indeed a test"
+    
+    state = {"content": ""}
+    await prompt.arun(run_config=async_run_config, api_key='fake-key', stream=True)
+    assert state["content"] == "This is indeed a test"
 
