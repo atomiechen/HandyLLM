@@ -638,7 +638,6 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
-        print("why it is None", client, client._sync_client, client._async_client)
         requestor = client.chat(
             messages=evaled_prompt.data,
             **evaled_prompt.request
