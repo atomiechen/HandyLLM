@@ -3,10 +3,10 @@ __all__ = [
 ]
 
 import re
-from typing import IO, AsyncIterable, Iterable, MutableMapping, MutableSequence, Optional
+from typing import IO, Generator, MutableMapping, MutableSequence
 import yaml
 
-from .types import PathType
+from .types import PathType, ShortChatChunk
 
 
 class PromptConverter:
@@ -107,56 +107,26 @@ class PromptConverter:
         return raw_prompt
 
     @staticmethod
-    def stream_msgs2raw(gen_sync: Iterable, fd: Optional[IO[str]] = None):
+    def consume_stream2fd(fd: IO[str]) -> Generator[None, ShortChatChunk, None]:
         # stream response to fd
         role = ""
         role_completed = False
-        if fd:
-            for r, text, tool_call in gen_sync:
-                if r != role:
-                    role = r
-                    fd.write(f"${role}$")  # do not add newline
-                if tool_call:
-                    if not role_completed:
-                        fd.write(' {type="tool_calls"}\n')
-                        role_completed = True
-                    # dump tool calls
-                    fd.write(yaml.dump([tool_call], allow_unicode=True))
-                elif text:
-                    if not role_completed:
-                        fd.write('\n')
-                        role_completed = True
-                    fd.write(text)
-                yield r, text, tool_call
-        else:
-            for item in gen_sync:
-                yield item
-
-    @staticmethod
-    async def astream_msgs2raw(gen_async: AsyncIterable, fd: Optional[IO[str]] = None):
-        # stream response to fd
-        role = ""
-        role_completed = False
-        if fd:
-            async for r, text, tool_call in gen_async:
-                if r != role:
-                    role = r
-                    fd.write(f"${role}$")  # do not add newline
-                if tool_call:
-                    if not role_completed:
-                        fd.write(' {type="tool_calls"}\n')
-                        role_completed = True
-                    # dump tool calls
-                    fd.write(yaml.dump([tool_call], allow_unicode=True))
-                elif text:
-                    if not role_completed:
-                        fd.write('\n')
-                        role_completed = True
-                    fd.write(text)
-                yield r, text, tool_call
-        else:
-            async for item in gen_async:
-                yield item
+        while True:
+            r, text, tool_call = yield
+            if r != role:
+                role = r
+                fd.write(f"${role}$")  # do not add newline
+            if tool_call:
+                if not role_completed:
+                    fd.write(' {type="tool_calls"}\n')
+                    role_completed = True
+                # dump tool calls
+                fd.write(yaml.dump([tool_call], allow_unicode=True))
+            elif text:
+                if not role_completed:
+                    fd.write('\n')
+                    role_completed = True
+                fd.write(text)
     
     @classmethod
     def msgs2rawfile(cls, msgs, raw_prompt_path: PathType):
