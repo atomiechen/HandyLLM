@@ -3,7 +3,7 @@ __all__ = [
 ]
 
 import re
-from typing import IO, Generator, MutableMapping, MutableSequence
+from typing import IO, Generator, MutableMapping, MutableSequence, Optional
 import yaml
 
 from .types import PathType, ShortChatChunk
@@ -107,12 +107,14 @@ class PromptConverter:
         return raw_prompt
 
     @staticmethod
-    def consume_stream2fd(fd: IO[str]) -> Generator[None, ShortChatChunk, None]:
+    def consume_stream2fd(fd: IO[str]) -> Generator[Optional[ShortChatChunk], ShortChatChunk, None]:
         # stream response to fd
         role = ""
         role_completed = False
+        data = None
         while True:
-            r, text, tool_call = yield
+            data = yield data
+            r, text, tool_call = data
             if r != role:
                 role = r
                 fd.write(f"${role}$")  # do not add newline

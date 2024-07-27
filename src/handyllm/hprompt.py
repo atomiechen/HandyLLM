@@ -35,11 +35,11 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, trans_stream_chat, local_path_to_base64, 
+    astream_chat_all, astream_completions, echo_consumer, trans_stream_chat, local_path_to_base64, 
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
-from .types import PathType, SyncHandlerCompletions, VarMapType
+from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
 from .response import ChatChunk, ChatResponse, CompletionsResponse
 
 
@@ -644,15 +644,17 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         )
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            if fout:
-                producer = trans_stream_chat(converter.consume_stream2fd(fout))
-                next(producer)  # "prime" the coroutine
-                for chat_chunk in response:
-                    producer.send(chat_chunk)
-                    yield chat_chunk
-                producer.close()
-            else:
-                yield from response
+            producer = trans_stream_chat(
+                converter.consume_stream2fd(fout) if fout else echo_consumer()
+            )
+            next(producer)  # "prime" the coroutine
+            for chat_chunk in response:
+                ret = producer.send(chat_chunk)
+                if run_config.on_chunk and ret:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                    run_config.on_chunk(*ret)
+                yield chat_chunk
+            producer.close()
     
     @classmethod
     async def _astream_with_client(
@@ -667,16 +669,20 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         )
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            if fout:
-                producer = trans_stream_chat(converter.consume_stream2fd(fout))
-                next(producer)  # "prime" the coroutine
-                async for chat_chunk in response:
-                    producer.send(chat_chunk)
-                    yield chat_chunk
-                producer.close()
-            else:
-                async for chat_chunk in response:
-                    yield chat_chunk
+            producer = trans_stream_chat(
+                converter.consume_stream2fd(fout) if fout else echo_consumer()
+            )
+            next(producer)  # "prime" the coroutine
+            async for chat_chunk in response:
+                ret = producer.send(chat_chunk)
+                if run_config.on_chunk and ret:
+                    if inspect.iscoroutinefunction(run_config.on_chunk):
+                        await run_config.on_chunk(*ret)
+                    else:
+                        run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                        run_config.on_chunk(*ret)
+                yield chat_chunk
+            producer.close()
     
     @classmethod
     def _fetch_with_client(
