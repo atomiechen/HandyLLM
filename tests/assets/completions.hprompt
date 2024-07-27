@@ -1,5 +1,8 @@
 ---
 model: davinci-002
+meta:
+  output_path: tmp-out/%Y-%m-%d/result.%H-%M-%S.hprompt
+  output_evaled_prompt_path: tmp-evaled/%Y-%m-%d/result.%H-%M-%S.hprompt
 ---
 
 Count to 10. 1, 2,

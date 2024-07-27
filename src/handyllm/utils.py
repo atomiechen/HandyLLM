@@ -1,6 +1,8 @@
 __all__ = [
     'get_filename_from_url',
     'download_binary',
+    'trans_stream_chat',
+    'echo_consumer',
     'stream_chat_all',
     'stream_chat_with_role',
     'stream_chat',
@@ -20,14 +22,16 @@ __all__ = [
 
 import base64
 from pathlib import Path
-from typing import IO, AsyncIterable, Iterable, Optional, cast
+from typing import IO, AsyncGenerator, AsyncIterable, Generator, Iterable, Optional, TypeVar, cast
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 import os
 import time
 
-from .types import PathType
-from .response import ToolCallDelta
+from .types import PathType, ShortChatChunk
+from .response import ChatChunk, CompletionsChunk, ToolCallDelta
+
+YieldType = TypeVar('YieldType')
 
 
 def get_filename_from_url(download_url):
@@ -50,88 +54,89 @@ def download_binary(download_url, file_path=None, dir='.'):
         file.write(response.content)
     return file_path
 
-def stream_chat_all(response: Iterable[dict]):
+def trans_stream_chat(consumer: Generator[YieldType, ShortChatChunk, None]) -> Generator[Optional[YieldType], ChatChunk, None]:
+    next(consumer) # prime the generator
     role = ''
     tool_call = ToolCallDelta()
-    for data in response:
-        try:
-            message = data['choices'][0]['delta']
-            if 'role' in message:
-                role = cast(str, message['role'])
-            content = cast(Optional[str], message.get('content'))
-            tool_calls = cast(Optional[list], message.get('tool_calls'))
-            if tool_calls:
-                for chunk in tool_calls:
-                    chunk = cast(dict, chunk)
-                    if chunk['index'] == tool_call.get('index'):
-                        tool_call['function']['arguments'] += chunk['function']['arguments']
-                    else:
-                        # this is a new tool call, yield the previous one
-                        yield role, content, tool_call
-                        # reset the tool call
-                        tool_call = ToolCallDelta(chunk)
-            elif content:
-                yield role, content, tool_call
-        except (KeyError, IndexError):
-            pass
-    if tool_call:
-        # yield the last tool call
-        yield role, None, tool_call
+    ret = None
+    try:
+        while True:
+            data = yield ret
+            ret = None
+            try:
+                message = data['choices'][0]['delta']
+                if 'role' in message:
+                    role = cast(str, message['role'])
+                content = cast(Optional[str], message.get('content'))
+                tool_calls = cast(Optional[list[ToolCallDelta]], message.get('tool_calls'))
+                if tool_calls:
+                    for chunk in tool_calls:
+                        if chunk['index'] == tool_call.get('index'):
+                            tool_call['function']['arguments'] += chunk['function']['arguments']
+                        else:
+                            # this is a new tool call, yield the previous one
+                            ret = consumer.send((role, content, tool_call))
+                            # reset the tool call
+                            tool_call = ToolCallDelta(chunk)
+                elif content:
+                    ret = consumer.send((role, content, tool_call))
+            except (KeyError, IndexError):
+                pass
+    except GeneratorExit:
+        if tool_call:
+            # yield the last tool call
+            ret = consumer.send((role, None, tool_call))
+        consumer.close()
 
-def stream_chat_with_role(response: Iterable[dict]):
+def echo_consumer():
+    data = None
+    while True:
+        data = yield data
+
+def stream_chat_all(response: Iterable[ChatChunk]) -> Generator[ShortChatChunk, None, None]:
+    producer = trans_stream_chat(echo_consumer())
+    next(producer) # prime the generator
+    for data in response:
+        ret = producer.send(data)
+        if ret is not None:
+            yield ret
+    producer.close()
+
+def stream_chat_with_role(response: Iterable[ChatChunk]):
     for role, text, _ in stream_chat_all(response):
         if text:
             yield role, text
 
-def stream_chat(response: Iterable[dict]):
+def stream_chat(response: Iterable[ChatChunk]):
     for _, text in stream_chat_with_role(response):
         yield text
 
-def stream_completions(response: Iterable[dict]):
+def stream_completions(response: Iterable[CompletionsChunk]):
     for data in response:
         try:
             yield cast(str, data['choices'][0]['text'])
         except (KeyError, IndexError):
             pass
 
-async def astream_chat_all(response: AsyncIterable[dict]):
-    role = ''
-    tool_call = ToolCallDelta()
+async def astream_chat_all(response: AsyncIterable[ChatChunk]) -> AsyncGenerator[ShortChatChunk, None]:
+    producer = trans_stream_chat(echo_consumer())
+    next(producer) # prime the generator
     async for data in response:
-        try:
-            message = data['choices'][0]['delta']
-            if 'role' in message:
-                role = cast(str, message['role'])
-            content = cast(Optional[str], message.get('content'))
-            tool_calls = message.get('tool_calls')
-            if tool_calls:
-                for chunk in tool_calls:
-                    chunk = cast(dict, chunk)
-                    if chunk['index'] == tool_call.get('index'):
-                        tool_call['function']['arguments'] += chunk['function']['arguments']
-                    else:
-                        # this is a new tool call, yield the previous one
-                        yield role, content, tool_call
-                        # reset the tool call
-                        tool_call = ToolCallDelta(chunk)
-            elif content:
-                yield role, content, tool_call
-        except (KeyError, IndexError):
-            pass
-    if tool_call:
-        # yield the last tool call
-        yield role, None, tool_call
+        ret = producer.send(data)
+        if ret is not None:
+            yield ret
+    producer.close()
 
-async def astream_chat_with_role(response: AsyncIterable[dict]):
+async def astream_chat_with_role(response: AsyncIterable[ChatChunk]):
     async for role, text, _ in astream_chat_all(response):
         if text:
             yield role, text
 
-async def astream_chat(response: AsyncIterable[dict]):
+async def astream_chat(response: AsyncIterable[ChatChunk]):
     async for _, text in astream_chat_with_role(response):
         yield text
 
-async def astream_completions(response: AsyncIterable[dict]):
+async def astream_completions(response: AsyncIterable[CompletionsChunk]):
     async for data in response:
         try:
             yield cast(str, data['choices'][0]['text'])

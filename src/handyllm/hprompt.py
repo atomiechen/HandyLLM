@@ -23,7 +23,7 @@ import io
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import IO, AsyncGenerator, Generator, Generic, MutableMapping, Optional, Tuple, Type, Union, TypeVar, cast
+from typing import IO, AsyncGenerator, Generator, Generic, MutableMapping, Optional, Type, Union, TypeVar, cast
 from abc import abstractmethod, ABC
 from contextlib import asynccontextmanager, contextmanager
 
@@ -35,12 +35,12 @@ from dotenv import load_dotenv
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
 from .utils import (
-    astream_chat_all, astream_completions, local_path_to_base64, 
+    astream_chat_all, astream_completions, echo_consumer, trans_stream_chat, local_path_to_base64, 
     stream_chat_all, stream_completions, 
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
-from .types import PathType, SyncHandlerCompletions, VarMapType, SyncHandlerChat
-from .response import ChatResponse, CompletionsResponse, ToolCallDelta
+from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
+from .response import ChatChunk, ChatResponse, CompletionsChunk, CompletionsResponse
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -518,7 +518,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
             yield fout
 
 
-class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDelta]]):
+class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         
     def __init__(
         self, 
@@ -581,7 +581,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             role = ""
             content = ""
             tool_calls = []
-            for r, text, tool_call in cls._stream_with_client(client, evaled_prompt):
+            for r, text, tool_call in stream_chat_all(cls._stream_with_client(client, evaled_prompt)):
                 if r != role:
                     role = r
                 if tool_call:
@@ -613,7 +613,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
             role = ""
             content = ""
             tool_calls = []
-            async for r, text, tool_call in cls._astream_with_client(client, evaled_prompt):
+            async for r, text, tool_call in astream_chat_all(cls._astream_with_client(client, evaled_prompt)):
                 if r != role:
                     role = r
                 if tool_call:
@@ -638,18 +638,23 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         evaled_prompt: HandyPrompt,
         ):
         run_config = evaled_prompt.run_config
-        print("why it is None", client, client._sync_client, client._async_client)
         requestor = client.chat(
             messages=evaled_prompt.data,
             **evaled_prompt.request
         )
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            for role, content, tool_call in converter.stream_msgs2raw(stream_chat_all(response), fout):
-                if run_config.on_chunk:
+            producer = trans_stream_chat(
+                converter.consume_stream2fd(fout) if fout else echo_consumer()
+            )
+            next(producer)  # "prime" the coroutine
+            for chat_chunk in response:
+                ret = producer.send(chat_chunk)
+                if run_config.on_chunk and ret:
                     run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                    run_config.on_chunk(role, content, tool_call)
-                yield role, content, tool_call
+                    run_config.on_chunk(*ret)
+                yield chat_chunk
+            producer.close()
     
     @classmethod
     async def _astream_with_client(
@@ -664,14 +669,20 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         )
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            async for role, content, tool_call in converter.astream_msgs2raw(astream_chat_all(response), fout):
-                if run_config.on_chunk:
+            producer = trans_stream_chat(
+                converter.consume_stream2fd(fout) if fout else echo_consumer()
+            )
+            next(producer)  # "prime" the coroutine
+            async for chat_chunk in response:
+                ret = producer.send(chat_chunk)
+                if run_config.on_chunk and ret:
                     if inspect.iscoroutinefunction(run_config.on_chunk):
-                        await run_config.on_chunk(role, content, tool_call)
+                        await run_config.on_chunk(*ret)
                     else:
                         run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                        run_config.on_chunk(role, content, tool_call)
-                yield role, content, tool_call
+                        run_config.on_chunk(*ret)
+                yield chat_chunk
+            producer.close()
     
     @classmethod
     def _fetch_with_client(
@@ -733,7 +744,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, Tuple[str, Optional[str], ToolCallDel
         self.messages.append(msg)
 
 
-class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
+class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk]):
     
     def __init__(
         self, 
@@ -771,7 +782,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         response = None
         if stream:
             content = ""
-            for text in cls._stream_with_client(client, evaled_prompt):
+            for text in stream_completions(cls._stream_with_client(client, evaled_prompt)):
                 content += text
         else:
             response = cls._fetch_with_client(client, evaled_prompt)
@@ -792,7 +803,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         response = None
         if stream:
             content = ""
-            async for text in cls._astream_with_client(client, evaled_prompt):
+            async for text in astream_completions(cls._astream_with_client(client, evaled_prompt)):
                 content += text
         else:
             response = await cls._afetch_with_client(client, evaled_prompt)
@@ -814,13 +825,17 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            for text in stream_completions(response):
-                if fout:
-                    fout.write(text)
-                if run_config.on_chunk:
-                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                    run_config.on_chunk(text)
-                yield text
+            for chunk in response:
+                try:
+                    text = cast(str, chunk['choices'][0]['text'])
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                except (KeyError, IndexError):
+                    pass
+                yield chunk
     
     @classmethod
     async def _astream_with_client(
@@ -835,16 +850,20 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            async for text in astream_completions(response):
-                if fout:
-                    fout.write(text)
-                if run_config.on_chunk:
-                    if inspect.iscoroutinefunction(run_config.on_chunk):
-                        await run_config.on_chunk(text)
-                    else:
-                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                        run_config.on_chunk(text)
-                yield text
+            async for chunk in response:
+                try:
+                    text = cast(str, chunk['choices'][0]['text'])
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        if inspect.iscoroutinefunction(run_config.on_chunk):
+                            await run_config.on_chunk(text)
+                        else:
+                            run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                            run_config.on_chunk(text)
+                except (KeyError, IndexError):
+                    pass
+                yield chunk
     
     @classmethod
     def _fetch_with_client(

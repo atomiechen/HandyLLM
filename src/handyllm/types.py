@@ -8,11 +8,14 @@ __all__ = [
     'OnChunkType',
     'StrHandler',
     'StringifyHandler',
+    'ShortChatChunk',
 ]
 
 import sys
 from typing import Any, Awaitable, Callable, Dict, MutableMapping, Optional, Union
 from os import PathLike
+
+from .response import ToolCallDelta
 
 
 if sys.version_info >= (3, 9):
@@ -30,3 +33,5 @@ OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, A
 
 StrHandler = Callable[[str], Any]
 StringifyHandler = Callable[[Any], str]
+
+ShortChatChunk = tuple[str, Optional[str], ToolCallDelta]
