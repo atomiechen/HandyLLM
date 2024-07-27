@@ -40,7 +40,7 @@ from .utils import (
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
-from .response import ChatChunk, ChatResponse, CompletionsResponse
+from .response import ChatChunk, ChatResponse, CompletionsChunk, CompletionsResponse
 
 
 PromptType = TypeVar('PromptType', bound='HandyPrompt')
@@ -744,7 +744,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         self.messages.append(msg)
 
 
-class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
+class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk]):
     
     def __init__(
         self, 
@@ -782,7 +782,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         response = None
         if stream:
             content = ""
-            for text in cls._stream_with_client(client, evaled_prompt):
+            for text in stream_completions(cls._stream_with_client(client, evaled_prompt)):
                 content += text
         else:
             response = cls._fetch_with_client(client, evaled_prompt)
@@ -803,7 +803,7 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         response = None
         if stream:
             content = ""
-            async for text in cls._astream_with_client(client, evaled_prompt):
+            async for text in astream_completions(cls._astream_with_client(client, evaled_prompt)):
                 content += text
         else:
             response = await cls._afetch_with_client(client, evaled_prompt)
@@ -825,13 +825,17 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            for text in stream_completions(response):
-                if fout:
-                    fout.write(text)
-                if run_config.on_chunk:
-                    run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                    run_config.on_chunk(text)
-                yield text
+            for chunk in response:
+                try:
+                    text = cast(str, chunk['choices'][0]['text'])
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                        run_config.on_chunk(text)
+                except (KeyError, IndexError):
+                    pass
+                yield chunk
     
     @classmethod
     async def _astream_with_client(
@@ -846,16 +850,20 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, str]):
         )
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
-            async for text in astream_completions(response):
-                if fout:
-                    fout.write(text)
-                if run_config.on_chunk:
-                    if inspect.iscoroutinefunction(run_config.on_chunk):
-                        await run_config.on_chunk(text)
-                    else:
-                        run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
-                        run_config.on_chunk(text)
-                yield text
+            async for chunk in response:
+                try:
+                    text = cast(str, chunk['choices'][0]['text'])
+                    if fout:
+                        fout.write(text)
+                    if run_config.on_chunk:
+                        if inspect.iscoroutinefunction(run_config.on_chunk):
+                            await run_config.on_chunk(text)
+                        else:
+                            run_config.on_chunk = cast(SyncHandlerCompletions, run_config.on_chunk)
+                            run_config.on_chunk(text)
+                except (KeyError, IndexError):
+                    pass
+                yield chunk
     
     @classmethod
     def _fetch_with_client(

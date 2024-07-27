@@ -29,7 +29,7 @@ import os
 import time
 
 from .types import PathType, ShortChatChunk
-from .response import ChatChunk, ToolCallDelta
+from .response import ChatChunk, CompletionsChunk, ToolCallDelta
 
 YieldType = TypeVar('YieldType')
 
@@ -112,7 +112,7 @@ def stream_chat(response: Iterable[ChatChunk]):
     for _, text in stream_chat_with_role(response):
         yield text
 
-def stream_completions(response: Iterable[dict]):
+def stream_completions(response: Iterable[CompletionsChunk]):
     for data in response:
         try:
             yield cast(str, data['choices'][0]['text'])
@@ -137,7 +137,7 @@ async def astream_chat(response: AsyncIterable[ChatChunk]):
     async for _, text in astream_chat_with_role(response):
         yield text
 
-async def astream_completions(response: AsyncIterable[dict]):
+async def astream_completions(response: AsyncIterable[CompletionsChunk]):
     async for data in response:
         try:
             yield cast(str, data['choices'][0]['text'])
