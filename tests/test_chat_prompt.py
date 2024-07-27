@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 import re
-from handyllm import ChatPrompt, load_from
+from handyllm import ChatPrompt, load_from, stream_chat_all, astream_chat_all
 import pytest
 import responses
 import respx
@@ -65,7 +65,7 @@ def test_chat_stream():
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
-    for role, text, tool_call in prompt.stream(api_key='fake-key'):
+    for role, text, tool_call in stream_chat_all(prompt.stream(api_key='fake-key')):
         print(role, text, tool_call)
         assert role == 'assistant'
         assert not tool_call
@@ -80,7 +80,7 @@ async def test_async_chat_stream():
     prompt_file = tests_dir / 'assets' / 'chat.hprompt'
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
-    async for role, text, tool_call in prompt.astream(api_key='fake-key'):
+    async for role, text, tool_call in astream_chat_all(prompt.astream(api_key='fake-key')):
         print(role, text, tool_call)
         assert role == 'assistant'
         assert not tool_call
