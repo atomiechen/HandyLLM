@@ -60,3 +60,28 @@ def test_var_map():
     assert 'Substituted text from YAML file.' in raw
     assert 'international' not in raw
 
+def test_add_chat_prompt():
+    prompt1 = ChatPrompt(messages=[
+        {'role': 'system', 'content': 'Hello there!'},
+        {'role': 'user', 'content': 'Hi!'}
+    ])
+    prompt2 = ChatPrompt(messages=[
+        {'role': 'assistant', 'content': 'How are you?'},
+        {'role': 'user', 'content': 'I am fine.'}
+    ])
+    prompt = prompt1 + prompt2
+    assert len(prompt.messages) == 4
+    
+    prompt += {'role': 'assistant', 'content': 'What can I do for you?'}
+    prompt += "I want to know more about the product."
+    assert len(prompt.messages) == 6
+
+def test_add_completions_prompt():
+    prompt1 = CompletionsPrompt("This is a test.")
+    prompt2 = CompletionsPrompt("This is indeed a test.")
+    prompt = prompt1 + prompt2
+    assert prompt.prompt == "This is a test.This is indeed a test."
+
+    prompt += "Let's see if this works."
+    assert prompt.prompt == "This is a test.This is indeed a test.Let's see if this works."
+
