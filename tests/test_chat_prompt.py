@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
 import re
-from handyllm import ChatPrompt, load_from, stream_chat_all, astream_chat_all
+from handyllm import (
+    ChatPrompt, load_from, stream_chat_all, astream_chat_all,
+    RunConfig
+)
 import pytest
 import responses
 import respx
@@ -112,4 +115,44 @@ async def test_async_chat_run():
     respx.post(re.compile(r'.*')).respond(text=stream_body)
     result_prompt = await prompt.arun(api_key='fake-key', stream=True)
     assert result_prompt.result_str == "Hello world!"
+
+@pytest.mark.asyncio
+@respx.mock
+@responses.activate
+async def test_on_chunk_chat():
+    responses.add(responses.POST, url=re.compile(r'.*'), body=stream_body)
+    respx.post(re.compile(r'.*')).respond(text=stream_body)
+    prompt_file = tests_dir / 'assets' / 'chat.hprompt'
+    prompt = load_from(prompt_file, cls=ChatPrompt)
+    
+    def on_chunk(role, content, tool_call):
+        state["role"] = role
+        state['content'] += content
+        state['tool_call'] = tool_call
+    
+    async def aon_chunk(role, content, tool_call):
+        state["role"] = role
+        state['content'] += content
+        state['tool_call'] = tool_call
+        
+    sync_run_config = RunConfig(on_chunk=on_chunk)
+    async_run_config = RunConfig(on_chunk=aon_chunk)
+    
+    state = {"content": ""}
+    prompt.run(run_config=sync_run_config, api_key='fake-key', stream=True)
+    assert state['role'] == 'assistant'
+    assert state['content'] == "Hello world!"
+    assert not state['tool_call']
+    
+    state = {"content": ""}
+    await prompt.arun(run_config=sync_run_config, api_key='fake-key', stream=True)
+    assert state['role'] == 'assistant'
+    assert state['content'] == "Hello world!"
+    assert not state['tool_call']
+
+    state = {"content": ""}
+    await prompt.arun(run_config=async_run_config, api_key='fake-key', stream=True)
+    assert state['role'] == 'assistant'
+    assert state['content'] == "Hello world!"
+    assert not state['tool_call']
 
