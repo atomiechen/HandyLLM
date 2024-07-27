@@ -9,33 +9,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+Check 🌟s for attractive new features!
+
+- `hprompt.py`: 
+  - 🌟 `image_url` in chat hprompt file now supports local path (file://), both absolute and relative
+  - 🌟 add `fetch()`, `afetch()`, `stream()` and `astream()` methods for direct and typed API responses
+  - add `RunConfig.var_map_file_format` for specifying variable map file format, including JSON / YAML; `load_var_map()` supports format param
+- `requestor.py`: 
+  - 🌟 add `fetch()`, `afetch()`, `stream()` and `astream()` methods for typed API responses
+  - use generic and add `DictRequestor`, `BinRequestor`, `ChatRequestor` and `CompletionsRequestor`
 - `OpenAIClient`: 
-  - constructor support `endpoint_manager`, `endpoints` and `load_path` param
-  - support loading from YAML file and `Mapping` obj
+  - 🌟 constructor supports `endpoint_manager`, `endpoints` and `load_path` param; supports loading from YAML file and `Mapping` obj
   - APIs support `endpoints` param
   - APIs `endpoint` param supports `Mapping` type
-- `EndpointManager`: 
-  - support loading from YAML file using `endpoints` key, or from `Iterable` obj
-  - raise ValueError when getting endpoint out of empty
-- rename `_types` to `types` and expose all definitions
-- `requestor.py`: 
-  - add `fetch()`, `afetch()`, `stream()` and `astream()` methods
-  - use generic and add `DictRequestor`, `BinRequestor`, `ChatRequestor` and `CompletionsRequestor`
-- `hprompt.py`: 
-  - add 'endpoints' to default record blacklist
-  - add `RunConfig.var_map_file_format` for specifying variable map file format, including JSON / YAML
-  - `load_var_map()` supports format param
-  - `image_url` in chat hprompt file now supports local path (file://), both absolute and relative
-  - add `fetch()`, `afetch()`, `stream()` and `astream()` methods
+- 🌟 added `cache_manager.py`: `CacheManager` for general purpose caching to text files
+  - add `load_method` and `dump_method` params
+  - infers format from file suffix when convert handler is not provided
+- 🌟 added `response.py`: `DictProxy` for quick access to well-defined response dict
+- `EndpointManager`: supports loading from YAML file using `endpoints` key, or from `Iterable` obj
+- `__init__.py` import everything from hprompt for convenience
+- rename `_types.py` to `types.py` and expose all definitions
 - `prompt_converter.py`:
   - add generator sink `consume_stream2fd()`
 - `utils.py`:
   - add generator filter `trans_stream_chat()`, generator sink `echo_consumer()`
-- `response.py`: add `DictProxy` as base class for different types of responses
-- `__init__.py` import everything from hprompt for convenience
-- `cache_manager.py`: add `CacheManager` for general purpose caching to text files
-  - support `load_method` and `dump_method`
-  - infer format from file suffix only when convert handler is not provided
+- a lot improved type hints
 - added tests:
   - load prompt type specification
   - variable map substitution
@@ -46,7 +44,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   - `cache_manager.py`
   - audio speech
   - legacy OpenAIAPI
-- improved type hints
+
+### Changed
+
+- `hprompt.py`: 
+  - add 'endpoints' to default record blacklist
+  - remove the `var_map` related configurations from the evaluated prompt, as it is already applied
+- `EndpointManager`: 
+  - raises ValueError when getting endpoint out of empty
 
 ### Fixed
 
@@ -54,7 +59,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
-- `hprompt.py`: remove the `var_map` related configurations from the evaluated prompt, as it is already applied
 - `prompt_converter.py`: remove `stream_msgs2raw()` and `astream_msgs2raw()` as no longer needed
 
 
