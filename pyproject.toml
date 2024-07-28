@@ -39,3 +39,8 @@ handyllm = "handyllm.__main__:cli"
 addopts = [
   "--ignore=examples"
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# ref: https://github.com/astral-sh/ruff/issues/2407#issuecomment-1974783543
+# Ignore unused imports and import * in __init__.py files
+"__init__.py" = ["F401", "F403"]
