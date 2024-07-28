@@ -9,28 +9,38 @@ def get_version():
     if sys.version_info >= (3, 8):
         # if python 3.8 or later, use importlib.metadata
         import importlib.metadata
+
         return importlib.metadata.version(package_name)
     else:
         # if older python, use pkg_resources
         import pkg_resources
+
         return pkg_resources.get_distribution(package_name).version
+
 
 def register_hprompt_command(subparsers: argparse._SubParsersAction):
     parser_hprompt = subparsers.add_parser(
-        'hprompt', 
+        "hprompt",
         help="Run hprompt files",
         description="Run hprompt files",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser_hprompt.add_argument("path", nargs='+', help="Path(s) to hprompt file")
-    parser_hprompt.add_argument("-o", "--output", help="Output path; if not provided, output to stderr")
-    parser_hprompt.add_argument("-v", "--verbose", action="store_true", default=False, help="Verbose output")
-    parser_hprompt.add_argument("-vm", "--var-map", help="Variable map in the format key1=value1|key2=value2")
+    parser_hprompt.add_argument("path", nargs="+", help="Path(s) to hprompt file")
+    parser_hprompt.add_argument(
+        "-o", "--output", help="Output path; if not provided, output to stderr"
+    )
+    parser_hprompt.add_argument(
+        "-v", "--verbose", action="store_true", default=False, help="Verbose output"
+    )
+    parser_hprompt.add_argument(
+        "-vm", "--var-map", help="Variable map in the format key1=value1|key2=value2"
+    )
     parser_hprompt.add_argument("-vmp", "--var-map-path", help="Variable map file path")
+
 
 def hprompt_command(args):
     from handyllm import hprompt
-    
+
     run_config = hprompt.RunConfig()
     if args.var_map:
         var_map = {}
@@ -49,8 +59,7 @@ def hprompt_command(args):
             # run_config.output_fd = sys.stderr
             # write to stderr without buffering
             run_config.output_fd = io.TextIOWrapper(
-                os.fdopen(sys.stderr.fileno(), 'wb', buffering=0), 
-                write_through=True
+                os.fdopen(sys.stderr.fileno(), "wb", buffering=0), write_through=True
             )
     if args.verbose:
         run_config.verbose = True
@@ -61,6 +70,7 @@ def hprompt_command(args):
         prompt += hprompt.load_from(next_path)
         result_prompt = prompt.run(run_config=run_config)
 
+
 def cli():
     """Main entry point for the handyllm CLI."""
     parser = argparse.ArgumentParser(
@@ -69,7 +79,8 @@ def cli():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="version",
         version=get_version(),
     )
@@ -84,4 +95,3 @@ def cli():
 
 if __name__ == "__main__":
     cli()
-
