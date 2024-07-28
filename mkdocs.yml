@@ -1,0 +1,4 @@
+site_name: HandyLLM
+site_url: https://atomiechen.github.io/handyllm
+theme:
+  name: material
