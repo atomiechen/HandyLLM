@@ -28,6 +28,7 @@ from typing import (
     AsyncIterable,
     Generator,
     Iterable,
+    List,
     Optional,
     TypeVar,
     cast,
@@ -83,7 +84,7 @@ def trans_stream_chat(
                     role = cast(str, message["role"])
                 content = cast(Optional[str], message.get("content"))
                 tool_calls = cast(
-                    Optional[list[ToolCallDelta]], message.get("tool_calls")
+                    Optional[List[ToolCallDelta]], message.get("tool_calls")
                 )
                 if tool_calls:
                     for chunk in tool_calls:

@@ -11,7 +11,7 @@ __all__ = [
     "CompletionsChunk",
 ]
 
-from typing import MutableMapping, Optional, Sequence, TypedDict
+from typing import List, MutableMapping, Optional, Sequence, TypedDict
 from typing_extensions import NotRequired
 
 
@@ -51,24 +51,24 @@ class ToolCall(DictProxy):
 class Message(TypedDict):
     role: str
     content: Optional[str]
-    tool_calls: NotRequired[list[ToolCall]]
+    tool_calls: NotRequired[List[ToolCall]]
 
 
 class TopLogProbItem(DictProxy):
     token: str
     logprob: float
-    bytes: Optional[list[int]]
+    bytes: Optional[List[int]]
 
 
 class LogProbItem(DictProxy):
     token: str
     logprob: float
-    bytes: Optional[list[int]]
-    top_logprobs: list[TopLogProbItem]
+    bytes: Optional[List[int]]
+    top_logprobs: List[TopLogProbItem]
 
 
 class Logprobs(DictProxy):
-    content: Optional[list[LogProbItem]]
+    content: Optional[List[LogProbItem]]
 
 
 class ChatChoice(DictProxy):
@@ -86,7 +86,7 @@ class Usage(DictProxy):
 
 class ChatResponse(DictProxy):
     id: str
-    choices: list[ChatChoice]
+    choices: List[ChatChoice]
     created: int
     model: str
     service_tier: Optional[str]
@@ -109,7 +109,7 @@ class ChatChunkDelta(TypedDict):
 
     role: NotRequired[str]
     content: NotRequired[Optional[str]]
-    tool_calls: NotRequired[list[ToolCallDelta]]
+    tool_calls: NotRequired[List[ToolCallDelta]]
 
 
 class ChatChunkChoice(DictProxy):
@@ -121,7 +121,7 @@ class ChatChunkChoice(DictProxy):
 
 class ChatChunk(DictProxy):
     id: str
-    choices: list[ChatChunkChoice]
+    choices: List[ChatChunkChoice]
     created: int
     model: str
     service_tier: Optional[str]
@@ -146,7 +146,7 @@ class CompletionChoice(DictProxy):
 
 class CompletionsResponse(DictProxy):
     id: str
-    choices: list[CompletionChoice]
+    choices: List[CompletionChoice]
     created: int
     model: str
     system_fingerprint: str
@@ -159,4 +159,4 @@ class CompletionsChunkChoice(DictProxy):
 
 
 class CompletionsChunk(DictProxy):
-    choices: list[CompletionsChunkChoice]
+    choices: List[CompletionsChunkChoice]

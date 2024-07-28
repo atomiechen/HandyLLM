@@ -12,7 +12,16 @@ __all__ = [
 ]
 
 import sys
-from typing import Any, Awaitable, Callable, Dict, MutableMapping, Optional, Union
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 from os import PathLike
 
 from .response import ToolCallDelta
@@ -36,4 +45,4 @@ OnChunkType = Union[
 StrHandler = Callable[[str], Any]
 StringifyHandler = Callable[[Any], str]
 
-ShortChatChunk = tuple[str, Optional[str], ToolCallDelta]
+ShortChatChunk = Tuple[str, Optional[str], ToolCallDelta]

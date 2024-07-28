@@ -27,10 +27,12 @@ from datetime import datetime
 from typing import (
     IO,
     AsyncGenerator,
+    Dict,
     Generator,
     Generic,
     MutableMapping,
     Optional,
+    Tuple,
     Type,
     Union,
     TypeVar,
@@ -476,7 +478,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
 
     def _merge_non_data(
         self: PromptType, other: PromptType, inplace=False
-    ) -> tuple[MutableMapping, RunConfig]:
+    ) -> Tuple[MutableMapping, RunConfig]:
         if inplace:
             merge_dict(self.request, other.request, strategy=Strategy.ADDITIVE)
             self.run_config.merge(other.run_config, inplace=True)
@@ -1095,7 +1097,7 @@ def dump_to(
 
 def load_var_map(
     path: PathType, format: VarMapFileFormat = VarMapFileFormat.TEXT
-) -> dict[str, str]:
+) -> Dict[str, str]:
     """
     Read all content that needs to be replaced in the prompt from a text file.
     """

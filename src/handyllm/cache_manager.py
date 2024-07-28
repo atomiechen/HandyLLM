@@ -5,7 +5,7 @@ from inspect import iscoroutinefunction
 import json
 from os import PathLike
 from pathlib import Path
-from typing import Callable, Collection, Iterable, Optional, TypeVar, Union, cast
+from typing import Callable, Collection, Iterable, List, Optional, TypeVar, Union, cast
 from typing_extensions import ParamSpec
 import yaml
 
@@ -67,7 +67,7 @@ def _load_files(
 
 def _dump_files(
     results,
-    files: list[Path],
+    files: List[Path],
     dump_method: Optional[
         Union[Collection[Optional[StringifyHandler]], StringifyHandler]
     ],
