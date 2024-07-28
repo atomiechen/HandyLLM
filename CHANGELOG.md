@@ -5,6 +5,21 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.9.1] - 2024-07-28
+
+### Added
+
+- 🔧 add lint dependency ruff
+  - add `scripts/lint.sh` for linting
+  - add `scripts/format.sh` for formatting, and format all files
+  - add CI test workflow
+
+### Fixed
+
+- fix errors reported by ruff (E711, E722, F541)
+- fix TypeError on python 3.8 ('type' object is not subscriptable)
+
+
 ## [0.9.0] - 2024-07-28
 
 ### Added
