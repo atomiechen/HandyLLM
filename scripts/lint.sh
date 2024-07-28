@@ -1,5 +1,5 @@
 set -e
 set -x
 
-ruff check src/handyllm tests
-ruff format src/handyllm tests --check
+ruff check src tests examples
+ruff format src tests examples --check
