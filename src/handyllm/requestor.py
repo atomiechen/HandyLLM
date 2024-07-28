@@ -145,7 +145,7 @@ class Requestor(Generic[ResponseType, YieldType]):
     def _get_image_retry(self, response):
         try:
             return int(response.headers.get('retry-after'))
-        except:
+        except Exception:
             return 1
     
     def _check_timeout(self, timeout_ddl):
@@ -157,7 +157,7 @@ class Requestor(Generic[ResponseType, YieldType]):
         try:
             # message = response.json()['error']['message']
             message = response.json()
-        except:
+        except Exception:
             message = response.text
         reason = response.reason if isinstance(response, requests.Response) else response.reason_phrase
         err_msg = f"API error ({self.url} {response.status_code} {reason}) - {message}"

@@ -44,9 +44,9 @@ def get_filename_from_url(download_url):
 def download_binary(download_url, file_path=None, dir='.'):
     import requests
     response = requests.get(download_url, allow_redirects=True)
-    if file_path == None:
+    if file_path is None:
         filename = get_filename_from_url(download_url)
-        if filename == '' or filename == None:
+        if filename == '' or filename is None:
             filename = 'download_' + time.strftime("%Y%m%d_%H%M%S")
         file_path = os.path.abspath(os.path.join(dir, filename))
     # Open the file in binary mode and write to it.

@@ -37,7 +37,7 @@ class Endpoint:
         # do not print api_key
         listed_attributes = [
             f'name={repr(self.name)}' if self.name else None,
-            f'api_key=*' if self.api_key else None,
+            'api_key=*' if self.api_key else None,
             f'organization={repr(self.organization)}' if self.organization else None,
             f'api_base={repr(self.api_base)}' if self.api_base else None,
             f'api_type={repr(self.api_type)}' if self.api_type else None,
