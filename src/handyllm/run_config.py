@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from enum import auto
 from pathlib import Path
-from typing import IO, Mapping, Optional
+from typing import IO, List, Mapping, Optional
 from dataclasses import dataclass, asdict, fields, replace
 
 from mergedeep import merge as merge_dict, Strategy
@@ -38,8 +38,8 @@ class RunConfig:
     record_request: Optional[RecordRequestMode] = (
         None  # default: RecordRequestMode.BLACKLIST
     )
-    record_blacklist: Optional[list[str]] = None  # default: DEFAULT_BLACKLIST
-    record_whitelist: Optional[list[str]] = None
+    record_blacklist: Optional[List[str]] = None  # default: DEFAULT_BLACKLIST
+    record_whitelist: Optional[List[str]] = None
     # variable map
     var_map: Optional[VarMapType] = None
     # variable map file path

@@ -5,7 +5,7 @@ __all__ = [
     "ClientMode",
 ]
 
-from typing import Iterable, Mapping, Optional, TypeVar, Union
+from typing import Dict, Iterable, Mapping, Optional, TypeVar, Union
 import os
 import json
 import time
@@ -81,7 +81,7 @@ class OpenAIClient:
     # set this to your model-engine map;
     # or environment variable MODEL_ENGINE_MAP will be used;
     # can be None.
-    model_engine_map: Optional[dict[str, str]]
+    model_engine_map: Optional[Dict[str, str]]
 
     # set this to your endpoint manager
     endpoint_manager: Optional[EndpointManager] = None
@@ -95,7 +95,7 @@ class OpenAIClient:
         organization: Optional[str] = None,
         api_type: Optional[TYPE_API_TYPES] = None,
         api_version: Optional[str] = None,
-        model_engine_map: Optional[dict[str, str]] = None,
+        model_engine_map: Optional[Dict[str, str]] = None,
         endpoint_manager: Optional[EndpointManager] = None,
         endpoints: Optional[Iterable] = None,
         load_path: Optional[PathType] = None,

@@ -30,7 +30,10 @@ on:
         required: false
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
   build-n-publish:
+    needs: test
     uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@main
     with:
       publish_testpypi: ${{ inputs.publish_testpypi }}
