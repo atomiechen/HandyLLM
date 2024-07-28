@@ -1,6 +1,7 @@
 from handyllm import OpenAIAPI
 
 from dotenv import load_dotenv, find_dotenv
+
 # load env parameters from file named .env
 # API key is read from environment variable OPENAI_API_KEY
 # organization is read from environment variable OPENAI_ORGANIZATION
@@ -14,10 +15,7 @@ load_dotenv(find_dotenv())
 def example_chat():
     # ----- EXAMPLE 1 -----
 
-    prompt = [{
-        "role": "user",
-        "content": "please tell me a joke"
-        }]
+    prompt = [{"role": "user", "content": "please tell me a joke"}]
     response = OpenAIAPI.chat(
         model="gpt-3.5-turbo",
         messages=prompt,
@@ -26,9 +24,9 @@ def example_chat():
         top_p=1.0,
         frequency_penalty=0.0,
         presence_penalty=0.0,
-        timeout=10
-        )
-    print(response['choices'][0]['message']['content'])
+        timeout=10,
+    )
+    print(response["choices"][0]["message"]["content"])
 
 
 print()
@@ -45,14 +43,13 @@ def example_completions():
         max_tokens=256,
         echo=True,  # Echo back the prompt in addition to the completion
     )
-    print(response['choices'][0]['text'])
+    print(response["choices"][0]["text"])
 
 
 if __name__ == "__main__":
     example_chat()
-    
+
     print()
     print("-----")
-    
-    example_completions()
 
+    example_completions()
