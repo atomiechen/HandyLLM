@@ -35,7 +35,9 @@ class VarMapFileFormat(AutoStrEnum):
 @dataclass
 class RunConfig:
     # record request arguments
-    record_request: Optional[RecordRequestMode] = None  # default: RecordRequestMode.BLACKLIST
+    record_request: Optional[RecordRequestMode] = (
+        None  # default: RecordRequestMode.BLACKLIST
+    )
     record_blacklist: Optional[list[str]] = None  # default: DEFAULT_BLACKLIST
     record_whitelist: Optional[list[str]] = None
     # variable map
@@ -43,12 +45,14 @@ class RunConfig:
     # variable map file path
     var_map_path: Optional[PathType] = None
     # variable map file type: json, yaml, text
-    var_map_file_format: Optional[VarMapFileFormat] = None  # default: guess from the file extension
+    var_map_file_format: Optional[VarMapFileFormat] = (
+        None  # default: guess from the file extension
+    )
     # callback for each chunk generated in stream mode of the response
     on_chunk: Optional[OnChunkType] = None
     # output the response to a file
     output_path: Optional[PathType] = None
-    # buffering for opening the output file in stream mode: -1 for system default, 
+    # buffering for opening the output file in stream mode: -1 for system default,
     # 0 for unbuffered, 1 for line buffered, any other positive value for buffer size
     output_path_buffering: Optional[int] = None
     # output the response to a file descriptor
@@ -61,11 +65,13 @@ class RunConfig:
     # credential type: env, json, yaml
     # if env, load environment variables from the credential file
     # if json or yaml, load the content of the file as request arguments
-    credential_type: Optional[CredentialType] = None  # default: guess from the file extension
-    
+    credential_type: Optional[CredentialType] = (
+        None  # default: guess from the file extension
+    )
+
     # verbose output to stderr
     verbose: Optional[bool] = None  # default: False
-    
+
     def __setattr__(self, name: str, value: object):
         if name == "record_request":
             # validate record_request value
@@ -101,10 +107,10 @@ class RunConfig:
             else:
                 raise ValueError(f"unsupported var_map_file_format value: {value}")
         super().__setattr__(name, value)
-    
+
     def __len__(self):
         return len([f for f in fields(self) if getattr(self, f.name) is not None])
-    
+
     @classmethod
     def from_dict(cls, obj: Mapping, base_path: Optional[PathType] = None):
         input_kwargs = {}
@@ -113,24 +119,31 @@ class RunConfig:
                 input_kwargs[field.name] = obj[field.name]
         # add base_path to path fields and convert to resolved path
         if base_path:
-            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
+            for path_field in (
+                "output_path",
+                "output_evaled_prompt_path",
+                "var_map_path",
+                "credential_path",
+            ):
                 if path_field in input_kwargs:
                     org_path = input_kwargs[path_field]
                     new_path = str(Path(base_path, org_path).resolve())
                     # retain trailing slash
-                    if org_path.endswith(('/')):
-                        new_path += '/'
+                    if org_path.endswith(("/")):
+                        new_path += "/"
                     input_kwargs[path_field] = new_path
         return cls(**input_kwargs)
-    
+
     def pretty_print(self, file=sys.stderr):
         print("RunConfig:", file=file)
         for field in fields(self):
             value = getattr(self, field.name)
             if value is not None:
                 print(f"  {field.name}: {value}", file=file)
-    
-    def to_dict(self, retain_object=False, base_path: Optional[PathType] = None) -> dict:
+
+    def to_dict(
+        self, retain_object=False, base_path: Optional[PathType] = None
+    ) -> dict:
         # record and remove file descriptors
         tmp_output_fd = self.output_fd
         tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd
@@ -139,7 +152,7 @@ class RunConfig:
         self.output_evaled_prompt_fd = None
         self.on_chunk = None
         # convert to dict
-        obj = asdict(self, dict_factory=lambda x: { k: v for k, v in x if v is not None })
+        obj = asdict(self, dict_factory=lambda x: {k: v for k, v in x if v is not None})
         # restore file descriptors
         self.output_fd = tmp_output_fd
         self.output_evaled_prompt_fd = tmp_output_evaled_prompt_fd
@@ -151,7 +164,12 @@ class RunConfig:
             obj["on_chunk"] = self.on_chunk
         # convert path to relative path
         if base_path:
-            for path_field in ("output_path", "output_evaled_prompt_path", "var_map_path", "credential_path"):
+            for path_field in (
+                "output_path",
+                "output_evaled_prompt_path",
+                "var_map_path",
+                "credential_path",
+            ):
                 if path_field in obj:
                     org_path = obj[path_field]
                     try:
@@ -172,7 +190,7 @@ class RunConfig:
         for field in fields(RunConfig):
             v = getattr(other, field.name)
             if v is not None:
-                if field.name == 'var_map':
+                if field.name == "var_map":
                     if new_run_config.var_map is None:
                         new_run_config.var_map = {}
                     # merge the two var_map dicts in place
@@ -180,4 +198,3 @@ class RunConfig:
                 else:
                     setattr(new_run_config, field.name, v)
         return new_run_config
-

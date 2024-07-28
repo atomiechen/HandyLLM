@@ -2,6 +2,7 @@ from handyllm import OpenAIAPI
 
 import json
 from dotenv import load_dotenv, find_dotenv
+
 # load env parameters from file named .env
 # API key is read from environment variable OPENAI_API_KEY
 # organization is read from environment variable OPENAI_ORGANIZATION

@@ -35,3 +35,7 @@ temp*
 .coverage*
 .pytest_cache
 htmlcov
+
+# ruff output
+.ruff_cache
+

@@ -3,6 +3,7 @@ from handyllm import utils
 
 import json
 from dotenv import load_dotenv, find_dotenv
+
 # load env parameters from file named .env
 # API key is read from environment variable OPENAI_API_KEY
 # organization is read from environment variable OPENAI_ORGANIZATION
@@ -19,7 +20,7 @@ response = OpenAIAPI.images_generations(
     # timeout=10,
 )
 print(json.dumps(response, indent=2))
-download_url = response['data'][0]['url']
+download_url = response["data"][0]["url"]
 file_path = utils.download_binary(download_url)
 print(f"generated image: {file_path}")
 
@@ -36,7 +37,7 @@ with open(file_path, "rb") as file_bin:
             # timeout=10,
         )
 print(json.dumps(response, indent=2))
-download_url = response['data'][0]['url']
+download_url = response["data"][0]["url"]
 file_path = utils.download_binary(download_url)
 print(f"edited image: {file_path}")
 
@@ -49,7 +50,6 @@ with open(file_path, "rb") as file_bin:
         # timeout=10,
     )
 print(json.dumps(response, indent=2))
-download_url = response['data'][0]['url']
+download_url = response["data"][0]["url"]
 file_path = utils.download_binary(download_url)
 print(f"varied image: {file_path}")
-

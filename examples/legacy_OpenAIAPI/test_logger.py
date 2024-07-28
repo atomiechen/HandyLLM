@@ -1,6 +1,7 @@
+import logging
+from dotenv import load_dotenv, find_dotenv
 from handyllm import OpenAIAPI
 
-from dotenv import load_dotenv, find_dotenv
 # load env parameters from file named .env
 # API key is read from environment variable OPENAI_API_KEY
 # organization is read from environment variable OPENAI_ORGANIZATION
@@ -10,7 +11,6 @@ load_dotenv(find_dotenv())
 # OpenAIAPI.api_key = 'sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
 # OpenAIAPI.organization = None
 
-import logging
 logging.basicConfig(level=logging.DEBUG)
 my_logger = logging.getLogger(__file__)
 
@@ -18,11 +18,8 @@ my_logger = logging.getLogger(__file__)
 def example_chat():
     # ----- EXAMPLE 1 -----
 
-    prompt = [{
-        "role": "user",
-        "content": "please tell me a joke"
-        }]
-    response = OpenAIAPI.chat(
+    prompt = [{"role": "user", "content": "please tell me a joke"}]
+    OpenAIAPI.chat(
         model="gpt-3.5-turbo",
         messages=prompt,
         temperature=0.2,
@@ -32,8 +29,8 @@ def example_chat():
         presence_penalty=0.0,
         timeout=10,
         logger=my_logger,
-        log_marks=['mark: line 1', 'mark: line 2'],
-        )
+        log_marks=["mark: line 1", "mark: line 2"],
+    )
 
 
 def example_completions():
@@ -47,9 +44,9 @@ def example_completions():
         # echo=True,  # Echo back the prompt in addition to the completion
         stream=True,
         logger=my_logger,
-        log_marks='you can also pass a string here',
+        log_marks="you can also pass a string here",
     )
-    # If set stream to True, the response should be explicitly iterated to 
+    # If set stream to True, the response should be explicitly iterated to
     # make the logger work
     for _ in OpenAIAPI.stream_completions(response):
         pass
@@ -58,4 +55,3 @@ def example_completions():
 if __name__ == "__main__":
     example_chat()
     example_completions()
-

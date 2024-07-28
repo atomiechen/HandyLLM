@@ -1,14 +1,14 @@
 __all__ = [
-    'PathType',
-    'VarMapType',
-    'SyncHandlerChat',
-    'SyncHandlerCompletions',
-    'AsyncHandlerChat',
-    'AsyncHandlerCompletions',
-    'OnChunkType',
-    'StrHandler',
-    'StringifyHandler',
-    'ShortChatChunk',
+    "PathType",
+    "VarMapType",
+    "SyncHandlerChat",
+    "SyncHandlerCompletions",
+    "AsyncHandlerChat",
+    "AsyncHandlerCompletions",
+    "OnChunkType",
+    "StrHandler",
+    "StringifyHandler",
+    "ShortChatChunk",
 ]
 
 import sys
@@ -29,7 +29,9 @@ SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
 SyncHandlerCompletions = Callable[[str], Any]
 AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]]
 AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
-OnChunkType = Union[SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions]
+OnChunkType = Union[
+    SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions
+]
 
 StrHandler = Callable[[str], Any]
 StringifyHandler = Callable[[Any], str]

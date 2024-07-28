@@ -1,14 +1,14 @@
 __all__ = [
-    'DictProxy',
-    'Message',
-    'ChatChoice',
-    'ChatResponse',
-    'ChatChunkChoice',
-    'ChatChunk',
-    'CompletionChoice',
-    'CompletionsResponse',
-    'CompletionsChunkChoice',
-    'CompletionsChunk',    
+    "DictProxy",
+    "Message",
+    "ChatChoice",
+    "ChatResponse",
+    "ChatChunkChoice",
+    "ChatChunk",
+    "CompletionChoice",
+    "CompletionsResponse",
+    "CompletionsChunkChoice",
+    "CompletionsChunk",
 ]
 
 from typing import MutableMapping, Optional, Sequence, TypedDict
@@ -26,7 +26,7 @@ class DictProxy(dict):
 
     def __setattr__(self, attr, value):
         self[attr] = self._wrap(value)
-    
+
     def _wrap(self, value):
         if isinstance(value, DictProxy):
             return value
@@ -103,9 +103,10 @@ class ToolCallDelta(DictProxy):
 
 
 class ChatChunkDelta(TypedDict):
-    '''
+    """
     Note that following keys may not exist in the delta dict.
-    '''
+    """
+
     role: NotRequired[str]
     content: NotRequired[Optional[str]]
     tool_calls: NotRequired[list[ToolCallDelta]]
@@ -159,4 +160,3 @@ class CompletionsChunkChoice(DictProxy):
 
 class CompletionsChunk(DictProxy):
     choices: list[CompletionsChunkChoice]
-
