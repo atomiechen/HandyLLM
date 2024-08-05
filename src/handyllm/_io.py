@@ -1,5 +1,7 @@
 from pathlib import Path
 import yaml
+from functools import wraps
+
 from .response import DictProxy
 
 
@@ -16,10 +18,13 @@ MySafeDumper.add_multi_representer(
 )
 
 
+@wraps(yaml.dump)
 def yaml_dump(*args, **kwargs):
-    return yaml.dump(*args, Dumper=MySafeDumper, allow_unicode=True, **kwargs)
+    kwargs.setdefault("Dumper", MySafeDumper)
+    kwargs.setdefault("allow_unicode", True)
+    return yaml.dump(*args, **kwargs)
 
-
-def yaml_load(stream):
-    return yaml.safe_load(stream)
+@wraps(yaml.safe_load)
+def yaml_load(*args, **kwargs):
+    return yaml.safe_load(*args, **kwargs)
 
