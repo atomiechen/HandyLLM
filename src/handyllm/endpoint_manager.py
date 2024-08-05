@@ -6,10 +6,10 @@ __all__ = [
 from threading import Lock
 from collections.abc import MutableSequence
 from typing import Iterable, Mapping, Optional, Union
-import yaml
 
 from .types import PathType
 from ._utils import isiterable
+from ._io import yaml_load
 
 
 class Endpoint:
@@ -124,7 +124,7 @@ class EndpointManager(MutableSequence):
 
     def load_from(self, path: PathType, encoding="utf-8", override=False):
         with open(path, "r", encoding=encoding) as fin:
-            obj = yaml.safe_load(fin)
+            obj = yaml_load(fin)
         if isinstance(obj, Mapping):
             obj = obj.get("endpoints", None)
         if obj:
