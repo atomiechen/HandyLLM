@@ -7,7 +7,7 @@ __all__ = [
 
 from typing import Dict, Iterable, Mapping, Optional, TypeVar, Union
 import os
-import json
+from json import JSONDecodeError
 import time
 from enum import Enum, auto
 import asyncio
@@ -35,7 +35,7 @@ from ._constants import (
     TYPE_API_TYPES,
 )
 from .types import PathType
-from ._io import yaml_load
+from ._io import yaml_load, json_loads
 
 
 RequestorType = TypeVar("RequestorType", bound="Requestor")
@@ -257,8 +257,8 @@ class OpenAIClient:
         if not json_str:
             return None
         try:
-            return json.loads(json_str)
-        except json.JSONDecodeError:
+            return json_loads(json_str)
+        except JSONDecodeError:
             return None
 
     def _consume_kwargs(self, kwargs):

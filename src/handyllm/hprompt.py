@@ -17,7 +17,6 @@ __all__ = [
 ]
 
 import inspect
-import json
 import re
 import copy
 import io
@@ -59,7 +58,7 @@ from .utils import (
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
 from .response import ChatChunk, ChatResponse, CompletionsChunk, CompletionsResponse
-from ._io import MySafeDumper, yaml_load
+from ._io import MySafeDumper, json_load, yaml_load
 
 
 PromptType = TypeVar("PromptType", bound="HandyPrompt")
@@ -453,7 +452,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
                     evaled_run_config.credential_path, "r", encoding="utf-8"
                 ) as fin:
                     if evaled_run_config.credential_type == CredentialType.JSON:
-                        credential_dict = json.load(fin)
+                        credential_dict = json_load(fin)
                     else:
                         credential_dict = yaml_load(fin)
                 # do not overwrite the existing request arguments

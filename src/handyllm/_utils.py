@@ -1,12 +1,12 @@
 import collections.abc
 import copy
-import json
 from urllib.parse import quote_plus
 import time
 import inspect
 
 from ._constants import API_TYPES_AZURE
 from .prompt_converter import PromptConverter
+from ._io import json_dumps
 
 
 def get_request_url(request_url, api_type, api_version, engine):
@@ -41,7 +41,7 @@ def wrap_log_input(input_content: str, log_marks, kwargs):
         input_lines = [str(item) for item in log_marks]
     else:
         input_lines = [str(log_marks)]
-    input_lines.append(json.dumps(arguments, indent=2, ensure_ascii=False))
+    input_lines.append(json_dumps(arguments, indent=2, ensure_ascii=False))
     input_lines.append(" INPUT START ".center(50, "-"))
     input_lines.append(input_content)
     input_lines.append(" INPUT END ".center(50, "-") + "\n")

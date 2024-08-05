@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import yaml
 from functools import wraps
@@ -28,3 +29,22 @@ def yaml_dump(*args, **kwargs):
 def yaml_load(*args, **kwargs):
     return yaml.safe_load(*args, **kwargs)
 
+@wraps(json.dump)
+def json_dump(*args, **kwargs):
+    kwargs.setdefault("ensure_ascii", False)
+    kwargs.setdefault("indent", 2)
+    return json.dump(*args, **kwargs)
+
+@wraps(json.dumps)
+def json_dumps(*args, **kwargs):
+    kwargs.setdefault("ensure_ascii", False)
+    kwargs.setdefault("indent", 2)
+    return json.dumps(*args, **kwargs)
+
+@wraps(json.load)
+def json_load(*args, **kwargs):
+    return json.load(*args, **kwargs)
+
+@wraps(json.loads)
+def json_loads(*args, **kwargs):
+    return json.loads(*args, **kwargs)
