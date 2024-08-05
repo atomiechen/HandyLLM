@@ -7,12 +7,10 @@ __all__ = [
 
 from typing import Dict, Iterable, Mapping, Optional, TypeVar, Union
 import os
-import json
+from json import JSONDecodeError
 import time
 from enum import Enum, auto
 import asyncio
-
-import yaml
 
 from .endpoint_manager import Endpoint, EndpointManager
 from .requestor import (
@@ -37,6 +35,7 @@ from ._constants import (
     TYPE_API_TYPES,
 )
 from .types import PathType
+from ._io import yaml_load, json_loads
 
 
 RequestorType = TypeVar("RequestorType", bound="Requestor")
@@ -145,7 +144,7 @@ class OpenAIClient:
 
     def load_from(self, path: PathType, encoding="utf-8", override=False):
         with open(path, "r", encoding=encoding) as fin:
-            obj = yaml.safe_load(fin)
+            obj = yaml_load(fin)
         if obj:
             self.load_from_obj(obj, override=override)
 
@@ -258,8 +257,8 @@ class OpenAIClient:
         if not json_str:
             return None
         try:
-            return json.loads(json_str)
-        except json.JSONDecodeError:
+            return json_loads(json_str)
+        except JSONDecodeError:
             return None
 
     def _consume_kwargs(self, kwargs):

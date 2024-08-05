@@ -22,7 +22,9 @@ class DictProxy(dict):
             self[key] = self._wrap(value)
 
     def __getattr__(self, attr):
-        return self[attr]
+        if attr in self:
+            return self[attr]
+        raise AttributeError(f"Attribute {attr} not found")
 
     def __setattr__(self, attr, value):
         self[attr] = self._wrap(value)

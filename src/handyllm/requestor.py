@@ -20,7 +20,6 @@ from typing import (
 )
 import asyncio
 import logging
-import json
 import time
 import requests
 import httpx
@@ -33,6 +32,7 @@ from .response import (
     ChatResponse,
     CompletionsResponse,
 )
+from ._io import json_loads
 
 
 module_logger = logging.getLogger(__name__)
@@ -272,7 +272,7 @@ class Requestor(Generic[ResponseType, YieldType]):
                             return
                         if byte_line.startswith(b"data: "):
                             line = byte_line[len(b"data: ") :].decode("utf-8")
-                            yield json.loads(line)
+                            yield json_loads(line)
             except Exception as e:
                 if self._exception_callback:
                     self._exception_callback(e, prepare_ret)
@@ -393,7 +393,7 @@ class Requestor(Generic[ResponseType, YieldType]):
                         return
                     if raw_line.startswith("data: "):
                         line = raw_line[len("data: ") :]
-                        yield json.loads(line)
+                        yield json_loads(line)
         except Exception as e:
             if self._exception_callback:
                 self._exception_callback(e, prepare_ret)
