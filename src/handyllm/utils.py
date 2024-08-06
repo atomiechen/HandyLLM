@@ -21,6 +21,7 @@ __all__ = [
 ]
 
 import base64
+import copy
 from pathlib import Path
 from typing import (
     IO,
@@ -69,7 +70,7 @@ def download_binary(download_url, file_path=None, dir="."):
 
 def trans_stream_chat(
     consumer: Generator[YieldType, ShortChatChunk, None],
-) -> Generator[Optional[YieldType], ChatChunk, None]:
+) -> Generator[Optional[YieldType], Optional[ChatChunk], None]:
     next(consumer)  # prime the generator
     role = ""
     tool_call = ToolCallDelta()
@@ -77,6 +78,8 @@ def trans_stream_chat(
     try:
         while True:
             data = yield ret
+            if data is None:
+                break
             ret = None
             try:
                 message = data["choices"][0]["delta"]
@@ -93,19 +96,24 @@ def trans_stream_chat(
                                 "arguments"
                             ]
                         else:
-                            # this is a new tool call, yield the previous one
-                            ret = consumer.send((role, content, tool_call))
+                            if tool_call:
+                                # this is a new tool call, yield the previous one
+                                ret = consumer.send((role, content, tool_call))
                             # reset the tool call
-                            tool_call = ToolCallDelta(chunk)
+                            tool_call = copy.deepcopy(chunk)
                 elif content:
                     ret = consumer.send((role, content, tool_call))
             except (KeyError, IndexError):
                 pass
-    except GeneratorExit:
         if tool_call:
             # yield the last tool call
             ret = consumer.send((role, None, tool_call))
+            yield ret
+        else:
+            yield None
         consumer.close()
+    except GeneratorExit:
+        pass
 
 
 def echo_consumer():
@@ -123,6 +131,9 @@ def stream_chat_all(
         ret = producer.send(data)
         if ret is not None:
             yield ret
+    ret = producer.send(None)  # signal the end of the stream
+    if ret is not None:
+        yield ret
     producer.close()
 
 
@@ -154,6 +165,9 @@ async def astream_chat_all(
         ret = producer.send(data)
         if ret is not None:
             yield ret
+    ret = producer.send(None)  # signal the end of the stream
+    if ret is not None:
+        yield ret
     producer.close()
 
 

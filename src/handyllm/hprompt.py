@@ -731,6 +731,10 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                     run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                     run_config.on_chunk(*ret)
                 yield chat_chunk
+            ret = producer.send(None)  # signal the end of the stream
+            if run_config.on_chunk and ret:
+                run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                run_config.on_chunk(*ret)
             producer.close()
 
     @classmethod
@@ -756,6 +760,13 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                         run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                         run_config.on_chunk(*ret)
                 yield chat_chunk
+            ret = producer.send(None)  # signal the end of the stream
+            if run_config.on_chunk and ret:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(*ret)
+                else:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                    run_config.on_chunk(*ret)
             producer.close()
 
     @classmethod
