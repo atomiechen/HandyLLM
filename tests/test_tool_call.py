@@ -558,9 +558,15 @@ def test_tool_call_stream(capsys: CaptureFixture[str]):
         assert content is None
     assert len(tool_calls) == 2
     assert tool_calls[0]["function"]["name"] == "get_current_weather"
-    assert tool_calls[0]["function"]["arguments"] == '{"location": "San Francisco, CA", "unit": "fahrenheit"}'
+    assert (
+        tool_calls[0]["function"]["arguments"]
+        == '{"location": "San Francisco, CA", "unit": "fahrenheit"}'
+    )
     assert tool_calls[1]["function"]["name"] == "get_current_weather"
-    assert tool_calls[1]["function"]["arguments"] == '{"location": "New York, NY", "unit": "fahrenheit"}'
+    assert (
+        tool_calls[1]["function"]["arguments"]
+        == '{"location": "New York, NY", "unit": "fahrenheit"}'
+    )
 
     # make sure no debug prints
     captured = capsys.readouterr()
