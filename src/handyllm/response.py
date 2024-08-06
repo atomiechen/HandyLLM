@@ -9,6 +9,15 @@ __all__ = [
     "CompletionsResponse",
     "CompletionsChunkChoice",
     "CompletionsChunk",
+    "Function",
+    "ToolCall",
+    "TopLogProbItem",
+    "LogProbItem",
+    "Logprobs",
+    "Usage",
+    "ToolCallDelta",
+    "ChatChunkDelta",
+    "CompletionLogprobs",
 ]
 
 from typing import List, MutableMapping, Optional, Sequence, TypedDict
