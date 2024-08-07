@@ -2,3 +2,17 @@ site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
 theme:
   name: material
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: false
+      languages:
+        - locale: en
+          default: true
+          name: en - English
+          build: true
+        - locale: zh
+          name: zh - 简体中文
+          build: true
