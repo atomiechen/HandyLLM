@@ -6,6 +6,10 @@ theme:
     - navigation.tabs
     # - navigation.tabs.sticky
 
+markdown_extensions:
+  - mdx_include:
+      base_path: docs
+
 plugins:
   - search
   - i18n:
