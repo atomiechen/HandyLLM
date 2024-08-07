@@ -2,6 +2,9 @@ site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
 theme:
   name: material
+  features:
+    - navigation.tabs
+    # - navigation.tabs.sticky
 
 plugins:
   - search
@@ -16,3 +19,9 @@ plugins:
         - locale: zh
           name: zh - 简体中文
           build: true
+          nav_translations:
+            Getting Started: 快速上手
+
+nav:
+  - HandyLLM: index.md
+  - Getting Started: getting-started.md
