@@ -1,3 +1,6 @@
 mkdocs-material
 mkdocs-static-i18n[material]
 mdx_include
+
+# for hprompt highlight
+git+https://github.com/atomiechen/pygments-handyllm.git
