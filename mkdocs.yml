@@ -5,10 +5,17 @@ theme:
   features:
     - navigation.tabs
     # - navigation.tabs.sticky
+    - content.code.copy
 
 markdown_extensions:
   - mdx_include:
       base_path: docs
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
 
 plugins:
   - search
