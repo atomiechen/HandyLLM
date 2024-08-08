@@ -1,0 +1,22 @@
+/* highlight generic heading */
+.highlight .gh {
+  position: relative;
+  font-weight: bold;
+}
+
+/* highlight generic heading (light mode) */
+[data-md-color-scheme="default"] .highlight .gh {
+  color: green;
+}
+
+/* highlight generic heading (dark mode) */
+[data-md-color-scheme="slate"] .highlight .gh {
+  color: #0FF1CE;
+}
+
+/* add bottom line to generic heading */
+.highlight span:has(.gh) {
+  border-bottom: 1px solid;
+  border-bottom-style: dotted;
+  border-bottom-width: 1px;
+}
