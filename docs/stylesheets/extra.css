@@ -1,12 +1,12 @@
 /* highlight generic heading */
 .highlight .gh {
   position: relative;
-  font-weight: bold;
+  font-weight: bolder;
 }
 
 /* highlight generic heading (light mode) */
 [data-md-color-scheme="default"] .highlight .gh {
-  color: green;
+  color: rgb(18, 109, 229);
 }
 
 /* highlight generic heading (dark mode) */
@@ -19,4 +19,19 @@
   border-bottom: 1px solid;
   border-bottom-style: dotted;
   border-bottom-width: 1px;
+}
+
+/* highlight name variable */
+.highlight .nv {
+  font-weight: bolder;
+}
+
+/* highlight name variable (light mode) */
+[data-md-color-scheme="default"] .highlight .nv {
+  color: rgb(224, 114, 94);
+}
+
+/* highlight name variable (dark mode) */
+[data-md-color-scheme="slate"] .highlight .nv {
+  color: rgb(252, 194, 88);
 }
