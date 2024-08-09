@@ -2,23 +2,22 @@ __all__ = ["CacheManager"]
 
 from functools import wraps
 from inspect import iscoroutinefunction
-import json
 from os import PathLike
 from pathlib import Path
 from typing import Callable, Collection, Iterable, List, Optional, TypeVar, Union, cast
 from typing_extensions import ParamSpec
-import yaml
 
 from .types import PathType, StrHandler, StringifyHandler
+from ._io import json_load, json_dump, yaml_load, yaml_dump
 
 
 def _suffix_loader(file: Path):
     with open(file, "r", encoding="utf-8") as f:
         # determine the format according to the file suffix
         if file.suffix.endswith(".yaml") or file.suffix.endswith(".yml"):
-            content = yaml.safe_load(f)
+            content = yaml_load(f)
         elif file.suffix.endswith(".json"):
-            content = json.load(f)
+            content = json_load(f)
         else:
             content = f.read()
         return content
@@ -28,9 +27,9 @@ def _suffix_dumper(file: Path, content):
     with open(file, "w", encoding="utf-8") as f:
         # determine the format according to the file suffix
         if file.suffix.endswith(".yaml") or file.suffix.endswith(".yml"):
-            yaml.dump(content, f, default_flow_style=False, allow_unicode=True)
+            yaml_dump(content, f, default_flow_style=False)
         elif file.suffix.endswith(".json"):
-            json.dump(content, f, ensure_ascii=False, indent=2)
+            json_dump(content, f)
         else:
             f.write(str(content))
 

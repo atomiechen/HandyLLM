@@ -2,9 +2,9 @@ __all__ = ["PromptConverter"]
 
 import re
 from typing import IO, Generator, MutableMapping, MutableSequence, Optional
-import yaml
 
 from .types import PathType, ShortChatChunk
+from ._io import yaml_dump, yaml_load
 
 
 class PromptConverter:
@@ -16,9 +16,10 @@ class PromptConverter:
     @property
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
-        # return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
         return (
-            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*({[^}]*?})?[^\S\r\n]*$"
+            r"^\$("
+            + "|".join(self.role_keys)
+            + r")\$[^\S\r\n]*(?:{([^{}]*?)})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -55,23 +56,29 @@ class PromptConverter:
                 content = content.strip()
             msg = {"role": role, "content": content}
             if extra:
-                # remove curly braces
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra[1:-1]
+                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
+                    extra,
                 )
                 # parse extra properties
                 extra_properties = {}
-                for key, value in key_values_pairs:
-                    # remove quotes of the value
-                    extra_properties[key] = value[1:-1]
+                for matches in key_values_pairs:
+                    key, value, tool, array = matches
+                    if tool:
+                        extra_properties["type"] = "tool_calls"
+                    elif array:
+                        extra_properties["type"] = "content_array"
+                    else:
+                        # remove quotes of the value
+                        extra_properties[key] = value[1:-1]
                 if "type" in extra_properties:
                     type_of_msg = extra_properties.pop("type")
                     if type_of_msg == "tool_calls":
-                        msg["tool_calls"] = yaml.safe_load(content)
+                        msg["tool_calls"] = yaml_load(content)
                         msg["content"] = None
                     elif type_of_msg == "content_array":
                         # parse content array
-                        msg["content"] = yaml.safe_load(content)
+                        msg["content"] = yaml_load(content)
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
             msgs.append(msg)
@@ -99,10 +106,10 @@ class PromptConverter:
             }
             if tool_calls:
                 extra_properties["type"] = "tool_calls"
-                content = yaml.dump(tool_calls, allow_unicode=True)
+                content = yaml_dump(tool_calls)
             elif isinstance(content, MutableSequence):
                 extra_properties["type"] = "content_array"
-                content = yaml.dump(content, allow_unicode=True)
+                content = yaml_dump(content)
             if extra_properties:
                 extra = (
                     " {"
@@ -136,7 +143,7 @@ class PromptConverter:
                     fd.write(' {type="tool_calls"}\n')
                     role_completed = True
                 # dump tool calls
-                fd.write(yaml.dump([tool_call], allow_unicode=True))
+                fd.write(yaml_dump([tool_call]))
             elif text:
                 if not role_completed:
                     fd.write("\n")

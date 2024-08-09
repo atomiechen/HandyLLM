@@ -17,7 +17,6 @@ __all__ = [
 ]
 
 import inspect
-import json
 import re
 import copy
 import io
@@ -41,7 +40,6 @@ from typing import (
 from abc import abstractmethod, ABC
 from contextlib import asynccontextmanager, contextmanager
 
-import yaml
 import frontmatter
 from mergedeep import merge as merge_dict, Strategy
 from dotenv import load_dotenv
@@ -60,6 +58,7 @@ from .utils import (
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
 from .response import ChatChunk, ChatResponse, CompletionsChunk, CompletionsResponse
+from ._io import MySafeDumper, json_load, yaml_load
 
 
 PromptType = TypeVar("PromptType", bound="HandyPrompt")
@@ -70,15 +69,6 @@ YieldType = TypeVar("YieldType")
 converter = PromptConverter()
 handler = frontmatter.YAMLHandler()
 
-
-# add multi representer for Path, for YAML serialization
-class MySafeDumper(yaml.SafeDumper):
-    pass
-
-
-MySafeDumper.add_multi_representer(
-    Path, lambda dumper, data: dumper.represent_str(str(data))
-)
 
 p_var_map = re.compile(r"(%\w+%)")
 
@@ -462,9 +452,9 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
                     evaled_run_config.credential_path, "r", encoding="utf-8"
                 ) as fin:
                     if evaled_run_config.credential_type == CredentialType.JSON:
-                        credential_dict = json.load(fin)
+                        credential_dict = json_load(fin)
                     else:
-                        credential_dict = yaml.safe_load(fin)
+                        credential_dict = yaml_load(fin)
                 # do not overwrite the existing request arguments
                 for key, value in credential_dict.items():
                     if key not in evaled_request:
@@ -741,6 +731,10 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                     run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                     run_config.on_chunk(*ret)
                 yield chat_chunk
+            ret = producer.send(None)  # signal the end of the stream
+            if run_config.on_chunk and ret:
+                run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                run_config.on_chunk(*ret)
             producer.close()
 
     @classmethod
@@ -766,6 +760,13 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                         run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
                         run_config.on_chunk(*ret)
                 yield chat_chunk
+            ret = producer.send(None)  # signal the end of the stream
+            if run_config.on_chunk and ret:
+                if inspect.iscoroutinefunction(run_config.on_chunk):
+                    await run_config.on_chunk(*ret)
+                else:
+                    run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
+                    run_config.on_chunk(*ret)
             producer.close()
 
     @classmethod
@@ -1103,7 +1104,7 @@ def load_var_map(
     """
     with open(path, "r", encoding="utf-8") as fin:
         if format in (VarMapFileFormat.JSON, VarMapFileFormat.YAML):
-            return yaml.safe_load(fin)
+            return yaml_load(fin)
         content = fin.read()
     substitute_map = {}
     blocks = p_var_map.split(content)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "HandyLLM"
-version = "0.9.1"
+version = "0.9.2"
 authors = [
   { name="Atomie CHEN", email="atomic_cwh@163.com" },
 ]
@@ -41,6 +41,6 @@ addopts = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# ref: https://github.com/astral-sh/ruff/issues/2407#issuecomment-1974783543
-# Ignore unused imports and import * in __init__.py files
-"__init__.py" = ["F401", "F403"]
+# # ref: https://github.com/astral-sh/ruff/issues/2407#issuecomment-1974783543
+# # Ignore unused imports and import * in __init__.py files
+# "__init__.py" = ["F401", "F403"]

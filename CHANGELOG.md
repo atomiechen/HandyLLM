@@ -5,6 +5,24 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.9.2] - 2024-08-09
+
+### Fixed
+
+- fix DictProxy YAML dump
+- fix tool calls in stream mode: missing last tool call
+
+### Changed
+
+- change import behavior:
+  - `__init__.py`: 
+    - use explicit imports instead of `*`
+    - limit imports from `utils.py`
+    - remove all imports from `response.py` and `types.py` (please import them directly)
+  - `response.py`: add missing items to `__all__`
+- add `py.typed` for better IDE support
+
+
 ## [0.9.1] - 2024-07-28
 
 ### Added
