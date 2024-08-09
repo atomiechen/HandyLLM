@@ -16,9 +16,10 @@ class PromptConverter:
     @property
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
-        # return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
         return (
-            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*({[^}]*?})?[^\S\r\n]*$"
+            r"^\$("
+            + "|".join(self.role_keys)
+            + r")\$[^\S\r\n]*(?:{([^{}]*?)})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -55,15 +56,21 @@ class PromptConverter:
                 content = content.strip()
             msg = {"role": role, "content": content}
             if extra:
-                # remove curly braces
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra[1:-1]
+                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
+                    extra,
                 )
                 # parse extra properties
                 extra_properties = {}
-                for key, value in key_values_pairs:
-                    # remove quotes of the value
-                    extra_properties[key] = value[1:-1]
+                for matches in key_values_pairs:
+                    key, value, tool, array = matches
+                    if tool:
+                        extra_properties["type"] = "tool_calls"
+                    elif array:
+                        extra_properties["type"] = "content_array"
+                    else:
+                        # remove quotes of the value
+                        extra_properties[key] = value[1:-1]
                 if "type" in extra_properties:
                     type_of_msg = extra_properties.pop("type")
                     if type_of_msg == "tool_calls":
