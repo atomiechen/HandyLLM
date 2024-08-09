@@ -17,7 +17,9 @@ class PromptConverter:
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
         return (
-            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*({[^{}]*?})?[^\S\r\n]*$"
+            r"^\$("
+            + "|".join(self.role_keys)
+            + r")\$[^\S\r\n]*(?:{([^{}]*?)}|([^{}]*?))?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -46,17 +48,16 @@ class PromptConverter:
         # convert plain text to messages format
         msgs = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
-        for idx in range(1, len(blocks), 3):
+        for idx in range(1, len(blocks), 4):
             role = blocks[idx]
-            extra = blocks[idx + 1]
-            content = blocks[idx + 2]
+            extra = blocks[idx + 1] or blocks[idx + 2]
+            content = blocks[idx + 3]
             if content:
                 content = content.strip()
             msg = {"role": role, "content": content}
             if extra:
-                # remove curly braces
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra[1:-1]
+                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')', extra
                 )
                 # parse extra properties
                 extra_properties = {}
