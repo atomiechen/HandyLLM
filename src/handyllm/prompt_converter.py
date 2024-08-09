@@ -99,25 +99,18 @@ class PromptConverter:
             role = message.get("role")
             content = message.get("content")
             tool_calls = message.get("tool_calls")
-            extra_properties = {
-                key: message[key]
-                for key in message
-                if key not in ["role", "content", "tool_calls"]
-            }
+            extras = []
+            for key in message:
+                if key not in ["role", "content", "tool_calls"]:
+                    extras.append(f"{key}={message[key]}")
             if tool_calls:
-                extra_properties["type"] = "tool_calls"
+                extras.append("tool")
                 content = yaml_dump(tool_calls)
             elif isinstance(content, MutableSequence):
-                extra_properties["type"] = "content_array"
+                extras.append("array")
                 content = yaml_dump(content)
-            if extra_properties:
-                extra = (
-                    " {"
-                    + " ".join(
-                        [f'{key}="{extra_properties[key]}"' for key in extra_properties]
-                    )
-                    + "}"
-                )
+            if extras:
+                extra = " {" + " ".join(extras) + "}"
             else:
                 extra = ""
             messages.append(f"${role}${extra}\n{content}")
@@ -140,7 +133,7 @@ class PromptConverter:
                 fd.write(f"${role}$")  # do not add newline
             if tool_call:
                 if not role_completed:
-                    fd.write(' {type="tool_calls"}\n')
+                    fd.write(" {tool}\n")
                     role_completed = True
                 # dump tool calls
                 fd.write(yaml_dump([tool_call]))
