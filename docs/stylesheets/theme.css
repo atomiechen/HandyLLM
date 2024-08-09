@@ -1,0 +1,29 @@
+:root {
+  --md-primary-fg-color: #1C3251;
+}
+
+[data-md-color-scheme=default] {
+  --md-accent-fg-color: #fca001;
+  --md-typeset-a-color: #2c79e6;
+}
+
+[data-md-color-scheme=slate] {
+  --md-accent-fg-color: #57b3ff;
+  --md-typeset-a-color: #FCB401;
+}
+
+/* 
+  set bigger logo
+  ref: https://github.com/squidfunk/mkdocs-material/discussions/2933#discussioncomment-1168075
+ */
+.md-header__button.md-logo {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 4em;
+  width: 4em;
+}

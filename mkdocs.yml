@@ -2,6 +2,8 @@ site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
 theme:
   name: material
+  logo: assets/icon_round.svg
+  favicon: assets/icon_round.svg
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
@@ -10,12 +12,16 @@ theme:
         name: Switch to light mode
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      scheme: default 
+      primary: custom
+      accent: custom
+      scheme: default
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
+      primary: custom
+      accent: custom
       scheme: slate
       toggle:
         icon: material/brightness-4
@@ -36,7 +42,8 @@ markdown_extensions:
   - pymdownx.superfences
 
 extra_css:
-  - stylesheets/extra.css
+  - stylesheets/theme.css
+  - stylesheets/code.css
 
 plugins:
   - search
