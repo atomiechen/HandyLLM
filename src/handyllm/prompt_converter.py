@@ -16,9 +16,8 @@ class PromptConverter:
     @property
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
-        # return r'^\$(' + '|'.join(self.role_keys) + r')\$$'
         return (
-            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*({[^}]*?})?[^\S\r\n]*$"
+            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*({[^{}]*?})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
