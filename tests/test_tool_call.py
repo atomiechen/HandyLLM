@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
 import re
-from handyllm import load_from, ChatPrompt, stream_chat_all
+from handyllm import load_from, ChatPrompt, stream_chat_all, RunConfig
 from pytest import CaptureFixture
+import pytest
 import responses
+import respx
 
 
 tests_dir = Path(__file__).parent
@@ -571,3 +573,38 @@ def test_tool_call_stream(capsys: CaptureFixture[str]):
     # make sure no debug prints
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+@pytest.mark.asyncio
+@respx.mock
+@responses.activate
+async def test_on_chunk_tool_call():
+    responses.add(responses.POST, url=re.compile(r".*"), body=stream_body)
+    respx.post(re.compile(r".*")).respond(text=stream_body)
+    prompt_file = tests_dir / "assets" / "chat_tool.hprompt"
+    prompt = load_from(prompt_file, cls=ChatPrompt)
+
+    def on_chunk(role, content, tool_call):
+        assert role == "assistant"
+        assert content is None
+        state.append(tool_call)
+
+    async def aon_chunk(role, content, tool_call):
+        assert role == "assistant"
+        assert content is None
+        state.append(tool_call)
+
+    sync_run_config = RunConfig(on_chunk=on_chunk)
+    async_run_config = RunConfig(on_chunk=aon_chunk)
+
+    state = []
+    prompt.run(run_config=sync_run_config, api_key="fake-key", stream=True)
+    assert len(state) == 2
+
+    state = []
+    await prompt.arun(run_config=sync_run_config, api_key="fake-key", stream=True)
+    assert len(state) == 2
+
+    state = []
+    await prompt.arun(run_config=async_run_config, api_key="fake-key", stream=True)
+    assert len(state) == 2
