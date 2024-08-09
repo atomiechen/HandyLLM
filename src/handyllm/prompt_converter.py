@@ -57,7 +57,7 @@ class PromptConverter:
             msg = {"role": role, "content": content}
             if extra:
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:\s|^)(?:(tool)|(array))(?:\s|$)', extra
+                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)', extra
                 )
                 # parse extra properties
                 extra_properties = {}
