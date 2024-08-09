@@ -1,9 +1,13 @@
 site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
+repo_url: https://github.com/atomiechen/HandyLLM
+repo_name: atomiechen/HandyLLM
 theme:
   name: material
   logo: assets/icon_round.svg
   favicon: assets/icon_round.svg
+  icon:
+    repo: fontawesome/brands/git-alt
   palette:
     # Palette toggle for automatic mode
     - media: "(prefers-color-scheme)"
