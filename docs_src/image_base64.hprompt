@@ -1,0 +1,10 @@
+---
+model: gpt-4o
+---
+
+$user$ {array}
+- text: What's in this image?
+  type: text
+- image_url:
+    url: data:image/jpeg;base64,%base64_image%
+  type: image_url

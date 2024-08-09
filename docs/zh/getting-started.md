@@ -90,3 +90,21 @@ result_prompt = my_prompt.run(var_map=VM(
 ````hprompt
 {! ../docs_src/tool.hprompt !}
 ````
+
+## 图片输入
+
+首先需要在 `$user$` 中指定为 `array` 类型 （或者写为 `type="content_array"`），表示输入的部分为YAML列表：
+
+````hprompt
+{! ../docs_src/image.hprompt !}
+````
+
+HandyLLM 同样支持直接从本地文件或base64字符串加载图片：
+
+````hprompt
+{! ../docs_src/image_local.hprompt !}
+````
+
+````hprompt
+{! ../docs_src/image_base64.hprompt !}
+````
