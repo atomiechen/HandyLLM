@@ -19,7 +19,7 @@ class PromptConverter:
         return (
             r"^\$("
             + "|".join(self.role_keys)
-            + r")\$[^\S\r\n]*(?:{([^{}]*?)}|([^{}]*?))?[^\S\r\n]*$"
+            + r")\$[^\S\r\n]*(?:{([^{}]*?)})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -48,16 +48,17 @@ class PromptConverter:
         # convert plain text to messages format
         msgs = []
         blocks = re.split(self.split_pattern, raw_prompt, flags=re.MULTILINE)
-        for idx in range(1, len(blocks), 4):
+        for idx in range(1, len(blocks), 3):
             role = blocks[idx]
-            extra = blocks[idx + 1] or blocks[idx + 2]
-            content = blocks[idx + 3]
+            extra = blocks[idx + 1]
+            content = blocks[idx + 2]
             if content:
                 content = content.strip()
             msg = {"role": role, "content": content}
             if extra:
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)', extra
+                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
+                    extra,
                 )
                 # parse extra properties
                 extra_properties = {}
