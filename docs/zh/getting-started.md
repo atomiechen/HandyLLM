@@ -64,3 +64,29 @@ result_prompt = my_prompt.run(var_map=VM(
     instructions='Write a poem.'
 ))
 ```
+
+## 工具调用
+
+首先在frontmatter中指定 `tools`：
+
+````hprompt
+{! ../docs_src/tool.hprompt [ln:1-22] !}
+````
+
+然后运行hprompt等待结果，此时assistant返回的结果将会是tool类型、以YAML格式展示：
+
+````hprompt
+{! ../docs_src/tool.hprompt [ln:24-39] !}
+````
+
+如果要进一步调用，则需要先按id给出各个工具调用的结果，与原messages拼接：
+
+````hprompt
+{! ../docs_src/tool.hprompt [ln:42-46] !}
+````
+
+上述内容的完整hprompt：
+
+````hprompt
+{! ../docs_src/tool.hprompt !}
+````

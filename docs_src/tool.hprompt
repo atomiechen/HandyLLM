@@ -1,0 +1,46 @@
+---
+model: gpt-4o
+tools:
+- function:
+    description: Get the current weather in a given location
+    name: get_current_weather
+    parameters:
+      properties:
+        location:
+          description: The city and state, e.g. San Francisco, CA
+          type: string
+        unit:
+          enum:
+          - celsius
+          - fahrenheit
+          type: string
+      required:
+      - location
+      - unit
+      type: object
+  type: function
+---
+
+$user$
+Please tell me the weathers in SF and NY.
+
+$assistant$ {tool}
+- function:
+    arguments: '{"location": "San Francisco, CA", "unit": "celsius"}'
+    name: get_current_weather
+  id: call_fwXuTQZSjPr966yMrrzymHb3
+  index: 0
+  type: function
+- function:
+    arguments: '{"location": "New York, NY", "unit": "fahrenheit"}'
+    name: get_current_weather
+  id: call_bHFVWmtBk0z8wsEn3k6VHzOo
+  index: 1
+  type: function
+
+
+$tool$ {tool_call_id="call_fwXuTQZSjPr966yMrrzymHb3"}
+24
+
+$tool$ {tool_call_id="call_bHFVWmtBk0z8wsEn3k6VHzOo"}
+75
