@@ -3,6 +3,11 @@ site_url: https://atomiechen.github.io/handyllm
 repo_url: https://github.com/atomiechen/HandyLLM
 repo_name: atomiechen/HandyLLM
 copyright: Copyright &copy; 2024 Atomie CHEN
+
+watch:
+  - docs_src
+  - docs_overrides
+
 extra:
   social:
     - icon: fontawesome/brands/github
@@ -11,6 +16,7 @@ extra:
       link: https://pypi.org/project/HandyLLM/
     - icon: material/microsoft-visual-studio-code
       link: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
+
 theme:
   name: material
   custom_dir: docs_overrides
@@ -45,6 +51,7 @@ theme:
     # - navigation.tabs.sticky
     - content.code.copy
     - announce.dismiss
+    - navigation.top
 
 markdown_extensions:
   - mdx_include:
