@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block announce %}
+  {% if config.extra.announcement %}
+    <div align="middle" class="custom-announce">
+      {{ config.extra.announcement }}
+    </div>
+  {% else %}
+    <script>
+        var banner = document.querySelector('.md-banner');
+        if (banner) {
+          banner.remove();
+        }
+    </script>
+  {% endif %}
+{% endblock %}

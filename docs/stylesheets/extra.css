@@ -1,0 +1,11 @@
+/* ref: https://github.com/ultrabug/mkdocs-static-i18n/issues/276#issuecomment-1785900709 */
+/* remove margin of banner (for blank contant) */
+.md-banner__inner {
+    margin: 0 auto;
+}
+/* for custom announcement */
+.custom-announce {
+    margin: 0.6em auto;
+    font-weight: 700;
+    display: table;
+}

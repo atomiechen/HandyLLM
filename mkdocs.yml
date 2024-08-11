@@ -13,6 +13,7 @@ extra:
       link: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
 theme:
   name: material
+  custom_dir: docs_overrides
   logo: assets/icon_round.svg
   favicon: assets/icon_round.svg
   icon:
@@ -43,6 +44,7 @@ theme:
     - navigation.tabs
     # - navigation.tabs.sticky
     - content.code.copy
+    - announce.dismiss
 
 markdown_extensions:
   - mdx_include:
@@ -59,6 +61,7 @@ markdown_extensions:
 extra_css:
   - stylesheets/theme.css
   - stylesheets/code.css
+  - stylesheets/extra.css
 
 plugins:
   - search
@@ -70,11 +73,15 @@ plugins:
           default: true
           name: en - English
           build: true
+          extra:
+            announcement: <b>Support us!</b><a href="https://github.com/atomiechen/HandyLLM"> 🌟 Star HandyLLM</a> to help it spread and improve!
         - locale: zh
           name: zh - 简体中文
           build: true
           nav_translations:
             Getting Started: 快速上手
+          extra:
+            announcement: <b>支持我们！</b><a href="https://github.com/atomiechen/HandyLLM">给HandyLLM小星星🌟</a> 来帮它传播改进！
 
 nav:
   - HandyLLM: index.md
