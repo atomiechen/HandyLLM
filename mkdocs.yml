@@ -2,6 +2,15 @@ site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
 repo_url: https://github.com/atomiechen/HandyLLM
 repo_name: atomiechen/HandyLLM
+copyright: Copyright &copy; 2024 Atomie CHEN
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/atomiechen/HandyLLM
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/HandyLLM/
+    - icon: material/microsoft-visual-studio-code
+      link: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
 theme:
   name: material
   logo: assets/icon_round.svg
