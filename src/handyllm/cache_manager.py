@@ -187,3 +187,51 @@ class CacheManager:
                 return cast(R, results)
 
             return cast(Callable[P, R], sync_wrapped_func)
+
+    def ensure_dumped(
+        self,
+        func: Callable[P, R],
+        out: Union[PathType, Iterable[PathType]],
+        dump_method: Optional[
+            Union[Collection[Optional[StringifyHandler]], StringifyHandler]
+        ] = None,
+        infer_from_suffix: bool = True,
+    ) -> Callable[P, None]:
+        """
+        Ensure the output of the original function is cached. Will not
+        call the original function and will not load the files if they
+        exist. The decorated function returns None.
+
+        Example scenario:
+
+        The decorated function can be called multiple times, but we only
+        want to check files existence without loading them multiple times
+        (which is the case of `cache` method).
+        """
+        if isinstance(out, str) or isinstance(out, PathLike):
+            out = [out]
+        full_files = [Path(self.base_dir, file) for file in out]
+        if iscoroutinefunction(func):
+
+            @wraps(func)
+            async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
+                non_exist_files = [
+                    file for file in full_files if not Path(file).exists()
+                ]
+                if len(non_exist_files) > 0:
+                    results = await func(*args, **kwargs)
+                    _dump_files(results, full_files, dump_method, infer_from_suffix)
+
+            return cast(Callable[P, None], async_wrapped_func)
+        else:
+
+            @wraps(func)
+            def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
+                non_exist_files = [
+                    file for file in full_files if not Path(file).exists()
+                ]
+                if len(non_exist_files) > 0:
+                    results = func(*args, **kwargs)
+                    _dump_files(results, full_files, dump_method, infer_from_suffix)
+
+            return cast(Callable[P, None], sync_wrapped_func)
