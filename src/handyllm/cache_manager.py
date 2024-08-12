@@ -39,9 +39,6 @@ def _load_files(
     load_method: Optional[Union[Collection[Optional[StrHandler]], StrHandler]],
     infer_from_suffix: bool,
 ):
-    all_files_exist = all(Path(file).exists() for file in files)
-    if not all_files_exist:
-        return None
     if load_method is None:
         load_method = (None,) * len(files)
     if not isinstance(load_method, Collection):
@@ -100,11 +97,18 @@ R = TypeVar("R")
 
 class CacheManager:
     def __init__(
-        self, base_dir: PathType, enabled: bool = True, only_dump: bool = False
+        self,
+        base_dir: PathType,
+        enabled: bool = True,
+        only_dump: bool = False,
+        only_load: bool = False,
     ):
         self.base_dir = base_dir
         self.enabled = enabled
         self.only_dump = only_dump
+        self.only_load = only_load
+        if only_dump and only_load:
+            raise ValueError("only_dump and only_load cannot be True at the same time.")
 
     def cache(
         self,
@@ -112,6 +116,7 @@ class CacheManager:
         out: Union[PathType, Iterable[PathType]],
         enabled: Optional[bool] = None,
         only_dump: Optional[bool] = None,
+        only_load: Optional[bool] = None,
         dump_method: Optional[
             Union[Collection[Optional[StringifyHandler]], StringifyHandler]
         ] = None,
@@ -129,6 +134,10 @@ class CacheManager:
             enabled = self.enabled
         if only_dump is None:
             only_dump = self.only_dump
+        if only_load is None:
+            only_load = self.only_load
+        if only_dump and only_load:
+            raise ValueError("only_dump and only_load cannot be True at the same time.")
         if not enabled:
             return func
         if isinstance(out, str) or isinstance(out, PathLike):
@@ -139,9 +148,18 @@ class CacheManager:
             @wraps(func)
             async def async_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not only_dump:
-                    results = _load_files(full_files, load_method, infer_from_suffix)
-                    if results is not None:
+                    non_exist_files = [
+                        file for file in full_files if not Path(file).exists()
+                    ]
+                    if len(non_exist_files) == 0:
+                        results = _load_files(
+                            full_files, load_method, infer_from_suffix
+                        )
                         return cast(R, results)
+                    elif only_load:
+                        raise FileNotFoundError(
+                            f"Cache files not found: {non_exist_files}"
+                        )
                 results = await func(*args, **kwargs)
                 _dump_files(results, full_files, dump_method, infer_from_suffix)
                 return cast(R, results)
@@ -152,9 +170,18 @@ class CacheManager:
             @wraps(func)
             def sync_wrapped_func(*args: P.args, **kwargs: P.kwargs):
                 if not only_dump:
-                    results = _load_files(full_files, load_method, infer_from_suffix)
-                    if results is not None:
+                    non_exist_files = [
+                        file for file in full_files if not Path(file).exists()
+                    ]
+                    if len(non_exist_files) == 0:
+                        results = _load_files(
+                            full_files, load_method, infer_from_suffix
+                        )
                         return cast(R, results)
+                    elif only_load:
+                        raise FileNotFoundError(
+                            f"Cache files not found: {non_exist_files}"
+                        )
                 results = func(*args, **kwargs)
                 _dump_files(results, full_files, dump_method, infer_from_suffix)
                 return cast(R, results)
