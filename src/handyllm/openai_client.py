@@ -344,8 +344,8 @@ class OpenAIClient:
         if self.ensure_client_credentials:
             api_key = self.api_key
             organization = self.organization
-            api_base = self.api_base
-            api_type = self.api_type
+            api_base = self.api_base or API_BASE_OPENAI
+            api_type = self.api_type or API_TYPE_OPENAI
             api_version = self.api_version
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
