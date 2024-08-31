@@ -85,6 +85,10 @@ class OpenAIClient:
     # set this to your endpoint manager
     endpoint_manager: Optional[EndpointManager] = None
 
+    # ensure only client-wide credentials are used;
+    # API runtime credentials are ignored
+    ensure_client_credentials: bool = False
+
     def __init__(
         self,
         mode: Union[str, ClientMode] = ClientMode.SYNC,
@@ -336,6 +340,13 @@ class OpenAIClient:
                     else:
                         engine = model
         dest_url = kwargs.pop("dest_url", dest_url)
+
+        if self.ensure_client_credentials:
+            api_key = self.api_key
+            organization = self.organization
+            api_base = self.api_base
+            api_type = self.api_type
+            api_version = self.api_version
         return api_key, organization, api_base, api_type, api_version, engine, dest_url
 
     def _make_requestor(
