@@ -102,6 +102,7 @@ class OpenAIClient:
         endpoint_manager: Optional[EndpointManager] = None,
         endpoints: Optional[Iterable] = None,
         load_path: Optional[PathType] = None,
+        ensure_client_credentials: bool = False,
     ) -> None:
         self._sync_client = None
         self._async_client = None
@@ -133,6 +134,7 @@ class OpenAIClient:
         self.api_type = api_type
         self.api_version = api_version
         self.model_engine_map = model_engine_map
+        self.ensure_client_credentials = ensure_client_credentials
 
         if endpoint_manager:
             if not isinstance(endpoint_manager, EndpointManager):
@@ -162,6 +164,7 @@ class OpenAIClient:
         api_version = obj.get("api_version", None)
         model_engine_map = obj.get("model_engine_map", None)
         item = obj.get("endpoints", None)
+        ensure_client_credentials = obj.get("ensure_client_credentials", None)
         if api_base and (override or not self.api_base):
             self.api_base = api_base
         if api_key and (override or not self.api_key):
@@ -178,6 +181,8 @@ class OpenAIClient:
             if self.endpoint_manager is None:
                 self.endpoint_manager = EndpointManager()
             self.endpoint_manager.load_from_list(item, override=override)
+        if ensure_client_credentials is not None and override:
+            self.ensure_client_credentials = ensure_client_credentials
 
     def __enter__(self):
         return self
