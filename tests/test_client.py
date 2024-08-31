@@ -142,3 +142,15 @@ def test_chat_stream():
             ):
                 result += chunk.choices[0].delta["content"]
         assert result == "Hello"
+
+
+def test_ensure_client_credentials():
+    client = OpenAIClient()
+    client.api_key = "client_key"
+    assert (
+        client.chat(messages=[], api_key="should_be_used").api_key == "should_be_used"
+    )
+    client.ensure_client_credentials = True
+    assert (
+        client.chat(messages=[], api_key="should_not_be_used").api_key == "client_key"
+    )
