@@ -145,12 +145,55 @@ def test_chat_stream():
 
 
 def test_ensure_client_credentials():
-    client = OpenAIClient()
-    client.api_key = "client_key"
+    client = OpenAIClient(api_key="client_key")
     assert (
         client.chat(messages=[], api_key="should_be_used").api_key == "should_be_used"
     )
     client.ensure_client_credentials = True
     assert (
         client.chat(messages=[], api_key="should_not_be_used").api_key == "client_key"
+    )
+
+
+def test_ensure_client_credentials2():
+    client2 = OpenAIClient(ensure_client_credentials=True, api_key="client_key")
+    assert (
+        client2.chat(messages=[], api_key="should_not_be_used").api_key == "client_key"
+    )
+    client2.ensure_client_credentials = False
+    assert (
+        client2.chat(messages=[], api_key="should_be_used").api_key == "should_be_used"
+    )
+
+
+def test_ensure_client_credentials3():
+    client3 = OpenAIClient(
+        ensure_client_credentials=True,
+        endpoints=[
+            {
+                "api_key": "client_key1",
+            },
+            {
+                "api_key": "client_key2",
+            },
+            {
+                "api_key": "client_key3",
+            },
+        ],
+    )
+    assert (
+        client3.chat(messages=[], api_key="should_not_be_used").api_key == "client_key1"
+    )
+    assert (
+        client3.chat(messages=[], api_key="should_not_be_used").api_key == "client_key2"
+    )
+    assert (
+        client3.chat(messages=[], api_key="should_not_be_used").api_key == "client_key3"
+    )
+    assert (
+        client3.chat(messages=[], api_key="should_not_be_used").api_key == "client_key1"
+    )
+    client3.ensure_client_credentials = False
+    assert (
+        client3.chat(messages=[], api_key="should_be_used").api_key == "should_be_used"
     )
