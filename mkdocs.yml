@@ -77,7 +77,6 @@ plugins:
   - search
   - i18n:
       docs_structure: folder
-      fallback_to_default: false
       languages:
         - locale: en
           default: true
@@ -88,8 +87,6 @@ plugins:
         - locale: zh
           name: zh - 简体中文
           build: true
-          nav_translations:
-            Getting Started: 快速上手
           extra:
             announcement: <b>支持我们！</b><a href="https://github.com/atomiechen/HandyLLM">给HandyLLM小星星🌟</a> 来帮它传播改进！
 
