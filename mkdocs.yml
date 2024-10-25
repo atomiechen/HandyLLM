@@ -54,6 +54,8 @@ theme:
     - navigation.top
 
 markdown_extensions:
+  - toc:
+      permalink: true
   - mdx_include:
       base_path: docs
   - pymdownx.highlight:
@@ -62,6 +64,7 @@ markdown_extensions:
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.superfences
+  - pymdownx.blocks.details
   - attr_list
   - md_in_html
 
