@@ -251,7 +251,7 @@ class Requestor(Generic[ResponseType, YieldType]):
             data=self.data,
             json=self.json_data,
             files=self.files,
-            params=self.params,
+            params=self.params or None,
             stream=self._stream,
             timeout=self.timeout,
         )
@@ -367,7 +367,7 @@ class Requestor(Generic[ResponseType, YieldType]):
             data=self.data,
             json=self.json_data,
             files=self.files,
-            params=self.params,
+            params=self.params or None,
             timeout=self.timeout,
         )
         response = await self._async_client.send(
