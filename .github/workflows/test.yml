@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [ "main" ]
   workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        required: false
 
 jobs:
   build:
@@ -15,6 +19,12 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+    - name: Checkout to release tag if provided
+      if: ${{ inputs.release_tag }}
+      run: |
+        echo "Checking out to release tag ${{ inputs.release_tag }}"
+        git fetch --prune --unshallow --tags
+        git checkout ${{ inputs.release_tag }}
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:

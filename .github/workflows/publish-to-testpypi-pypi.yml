@@ -32,6 +32,8 @@ on:
 jobs:
   test:
     uses: ./.github/workflows/test.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
   build-n-publish:
     needs: test
     uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@main
