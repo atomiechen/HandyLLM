@@ -49,6 +49,9 @@ from .openai_client import ClientMode, OpenAIClient
 from .utils import (
     astream_chat_all,
     astream_completions,
+    content_part_audio,
+    content_part_image,
+    content_part_text,
     echo_consumer,
     trans_stream_chat,
     file_uri_to_base64,
@@ -833,13 +836,58 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
     def add_message(
         self,
         role: str = "user",
-        content: Optional[str] = None,
+        content: Optional[Union[str, list]] = None,
         tool_calls: Optional[list] = None,
     ):
         msg = {"role": role, "content": content}
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
         self.messages.append(msg)
+
+    def add_content_part_to_message(
+        self,
+        *,
+        content_part: Union[str, dict],
+        message_index: int = -1,
+    ):
+        target_msg = self.messages[message_index]
+        if isinstance(target_msg["content"], str):
+            target_msg["content"] = [content_part_text(target_msg["content"])]
+        if isinstance(content_part, str):
+            content_part = content_part_text(content_part)
+        target_msg["content"].append(content_part)
+
+    def add_text_to_message(
+        self,
+        *,
+        text: str,
+        message_index: int = -1,
+    ):
+        self.add_content_part_to_message(content_part=text, message_index=message_index)
+
+    def add_image_url_to_message(
+        self,
+        *,
+        url_or_base64: str,
+        detail: Optional[str] = None,
+        message_index: int = -1,
+    ):
+        self.add_content_part_to_message(
+            content_part=content_part_image(url_or_base64, detail),
+            message_index=message_index,
+        )
+
+    def add_input_audio_to_message(
+        self,
+        *,
+        url_or_base64: str,
+        format: str,
+        message_index: int = -1,
+    ):
+        self.add_content_part_to_message(
+            content_part=content_part_audio(url_or_base64, format),
+            message_index=message_index,
+        )
 
 
 class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk]):

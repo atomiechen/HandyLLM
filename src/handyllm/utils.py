@@ -244,3 +244,21 @@ def file_uri_to_base64_image(url: str, base_path: Optional[PathType]):
     Convert a file URI like `file:///path/to/file` to a base64 string for an image.
     """
     return f"data:image/jpeg;base64,{file_uri_to_base64(url, base_path)}"
+
+
+def content_part_text(text: str):
+    return {"type": "text", "content": text}
+
+
+def content_part_image(url_or_base64: str, detail: Optional[str] = None):
+    ret = {"type": "image_url", "image_url": {"url": url_or_base64}}
+    if detail:
+        ret["image_url"]["detail"] = detail
+    return ret
+
+
+def content_part_audio(url_or_base64: str, format: str):
+    return {
+        "type": "input_audio",
+        "input_audio": {"data": url_or_base64, "format": format},
+    }
