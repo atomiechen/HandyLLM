@@ -835,6 +835,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
 
     def add_message(
         self,
+        *,
         role: str = "user",
         content: Optional[Union[str, list]] = None,
         tool_calls: Optional[list] = None,
