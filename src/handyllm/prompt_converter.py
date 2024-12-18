@@ -1,5 +1,6 @@
 __all__ = ["PromptConverter"]
 
+from copy import deepcopy
 import re
 from typing import IO, Generator, MutableMapping, MutableSequence, Optional
 
@@ -161,7 +162,7 @@ class PromptConverter:
         else:
             new_msgs = []
             for message in msgs:
-                new_message = message.copy()
+                new_message = deepcopy(message)
                 new_msgs.append(new_message)
                 content = new_message.get("content")
                 if content:
