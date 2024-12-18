@@ -51,7 +51,8 @@ from .utils import (
     astream_completions,
     echo_consumer,
     trans_stream_chat,
-    local_path_to_base64,
+    file_uri_to_base64,
+    file_uri_to_base64_image,
     stream_chat_all,
     stream_completions,
 )
@@ -627,8 +628,15 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                             url = cast(str, item["image_url"]["url"])
                             if url and url.startswith("file://"):
                                 # replace the image URL with the actual image
-                                item["image_url"]["url"] = local_path_to_base64(
+                                item["image_url"]["url"] = file_uri_to_base64_image(
                                     url, self.base_path
+                                )
+                        elif item.get("type") == "input_audio":
+                            data = cast(str, item["input_audio"]["data"])
+                            if data and data.startswith("file://"):
+                                # replace the audio data with the actual audio
+                                item["input_audio"]["data"] = file_uri_to_base64(
+                                    data, self.base_path
                                 )
                     except (KeyError, TypeError):
                         pass

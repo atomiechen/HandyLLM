@@ -16,8 +16,9 @@ __all__ = [
     "astream_to_fd",
     "astream_to_file",
     "VM",
-    "encode_image",
-    "local_path_to_base64",
+    "encode_bin_file",
+    "file_uri_to_base64",
+    "file_uri_to_base64_image",
 ]
 
 import base64
@@ -217,17 +218,29 @@ def VM(**kwargs: str):
     return transformed_vm
 
 
-def encode_image(image_path: PathType):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+def encode_bin_file(local_path: PathType):
+    """
+    Convert a local binary file to a base64 string.
+    """
+    with open(local_path, "rb") as local_file:
+        return base64.b64encode(local_file.read()).decode("utf-8")
 
 
-def local_path_to_base64(url: str, base_path: Optional[PathType]):
-    # replace the image URL with the actual image
+def file_uri_to_base64(url: str, base_path: Optional[PathType]):
+    """
+    Convert a file URI like `file:///path/to/file` to a base64 string.
+    """
     parsed = urlparse(url)
     local_path = Path(url2pathname(parsed.netloc + parsed.path))
     if base_path:
         # support relative path
         local_path = base_path / local_path
-    base64_image = encode_image(local_path.resolve())
-    return f"data:image/jpeg;base64,{base64_image}"
+    base64_image = encode_bin_file(local_path.resolve())
+    return base64_image
+
+
+def file_uri_to_base64_image(url: str, base_path: Optional[PathType]):
+    """
+    Convert a file URI like `file:///path/to/file` to a base64 string for an image.
+    """
+    return f"data:image/jpeg;base64,{file_uri_to_base64(url, base_path)}"
