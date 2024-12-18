@@ -1,0 +1,11 @@
+---
+model: gpt-4o-audio-preview
+---
+
+$user$ {type="content_array"}
+- type: text
+  text: repeat after me
+- type: input_audio
+  input_audio: 
+    data: file://audio.mp3
+    format: mp3
