@@ -8,7 +8,7 @@
 # HandyLLM
 
 [![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)][0]
-[![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white)][1]
+[![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white&color=brown)][1]
 [![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)][2]
 [![sublimepackage](https://img.shields.io/github/v/tag/atomiechen/Sublime-HandyLLM?logo=sublimetext&label=ST%20Package)][3]
 
