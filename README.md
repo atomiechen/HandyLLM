@@ -20,12 +20,13 @@ A handy toolkit for using LLM, with both ***development support ([Python][1])***
 
 📃 **Handy Prompt**: self-containing prompt in a human-friendly mark-up format `.hprompt`. 
 
-- **Easy write**: mark-up format, placeholder variables, request arguments, output logs... And most importantly VSCode syntax highlight!
+- **Easy write**: mark-up format, placeholder variables, request arguments, output logs... And most importantly syntax highlight!
 - **Easy run**: both CLI and APIs available for parsing and running; run it with the CLI tool *WITHOUT* any code! 
 - **Easy chain**: You can chain `hprompt` files to construct dynamic logic.
 
 <p float="left" align="center">
-  <img src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.png" width="70%" />
+  <img width="50%" alt="screenshot_vscode" src="https://raw.githubusercontent.com/atomiechen/vscode-handyllm/main/demo/example.png" />
+  <img width="49%" alt="screenshot_st" src="https://github.com/user-attachments/assets/1649511d-67a5-4534-bcc4-8a654257dff5" />
 </p>
 
 
