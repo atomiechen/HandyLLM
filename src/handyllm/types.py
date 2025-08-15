@@ -1,16 +1,3 @@
-__all__ = [
-    "PathType",
-    "VarMapType",
-    "SyncHandlerChat",
-    "SyncHandlerCompletions",
-    "AsyncHandlerChat",
-    "AsyncHandlerCompletions",
-    "OnChunkType",
-    "StrHandler",
-    "StringifyHandler",
-    "ShortChatChunk",
-]
-
 import sys
 from typing import (
     Any,
@@ -110,6 +97,7 @@ class ChatChunkDelta(TypedDict):
 
     role: NotRequired[str]
     content: NotRequired[Optional[str]]
+    reasoning_content: NotRequired[Optional[str]]
     tool_calls: NotRequired[List[ToolCallDelta]]
 
 
@@ -195,16 +183,16 @@ class InputMessage(TypedDict):
     ]
 
 
-class ChatChunkDict(TypedDict):
+class ChatChunkUnified(TypedDict):
     role: str
     content: Optional[str]
     reasoning_content: Optional[str]
     tool_call: ToolCallDelta
 
 
-SyncHandlerChat = Callable[[ChatChunkDict], Any]
+SyncHandlerChat = Callable[[ChatChunkUnified], Any]
 SyncHandlerCompletions = Callable[[str], Any]
-AsyncHandlerChat = Callable[[ChatChunkDict], Awaitable[Any]]
+AsyncHandlerChat = Callable[[ChatChunkUnified], Awaitable[Any]]
 AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
 OnChunkType = Union[
     SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions

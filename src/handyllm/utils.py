@@ -1,28 +1,3 @@
-__all__ = [
-    "get_filename_from_url",
-    "download_binary",
-    "trans_stream_chat",
-    "echo_consumer",
-    "stream_chat_all",
-    "stream_chat_with_role",
-    "stream_chat_with_reasoning",
-    "stream_chat",
-    "stream_completions",
-    "astream_chat_all",
-    "astream_chat_with_role",
-    "astream_chat_with_reasoning",
-    "astream_chat",
-    "astream_completions",
-    "stream_to_fd",
-    "stream_to_file",
-    "astream_to_fd",
-    "astream_to_file",
-    "VM",
-    "encode_bin_file",
-    "file_uri_to_base64",
-    "file_uri_to_base64_image",
-]
-
 import base64
 import copy
 from pathlib import Path
@@ -44,7 +19,7 @@ import time
 
 from .types import (
     AudioContentPart,
-    ChatChunkDict,
+    ChatChunkUnified,
     ImageContentPart,
     PathType,
     ShortChatChunk,
@@ -149,7 +124,7 @@ def echo_consumer():
 
 def stream_chat_all(
     response: Iterable[ChatChunk],
-) -> Generator[ChatChunkDict, None, None]:
+) -> Generator[ChatChunkUnified, None, None]:
     producer = trans_stream_chat(
         cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
     )
@@ -203,7 +178,7 @@ def stream_completions(response: Iterable[CompletionsChunk]):
 
 async def astream_chat_all(
     response: AsyncIterable[ChatChunk],
-) -> AsyncGenerator[ChatChunkDict, None]:
+) -> AsyncGenerator[ChatChunkUnified, None]:
     producer = trans_stream_chat(
         cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
     )
