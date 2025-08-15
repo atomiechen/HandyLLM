@@ -13,10 +13,11 @@ from handyllm.utils import VM
 
 
 tests_dir = Path(__file__).parent
+assets_dir = tests_dir / "assets"
 
 
 def test_load_dump_no_frontmatter_prompt():
-    prompt_file = tests_dir / "assets" / "no_frontmatter.hprompt"
+    prompt_file = assets_dir / "no_frontmatter.hprompt"
     prompt = load_from(prompt_file)
     # auto detect prompt type
     assert isinstance(prompt, ChatPrompt)
@@ -29,13 +30,13 @@ def test_load_dump_no_frontmatter_prompt():
 
 
 def test_load_completions_prompt():
-    prompt_file = tests_dir / "assets" / "completions.hprompt"
+    prompt_file = assets_dir / "completions.hprompt"
     prompt = load_from(prompt_file)
     assert isinstance(prompt, CompletionsPrompt)
 
 
 def test_load_dump_chat_prompt(tmp_path):
-    prompt_file = tests_dir / "assets" / "chat.hprompt"
+    prompt_file = assets_dir / "chat.hprompt"
     prompt = load_from(prompt_file)
     assert isinstance(prompt, ChatPrompt)
     assert r"%extras%" in dumps(prompt)
@@ -53,7 +54,7 @@ def test_load_dump_chat_prompt(tmp_path):
 
 
 def test_var_map():
-    prompt_file = tests_dir / "assets" / "chat.hprompt"
+    prompt_file = assets_dir / "chat.hprompt"
     prompt = load_from(prompt_file)
     evaled_prompt = prompt.eval(
         var_map=VM(
@@ -63,9 +64,7 @@ def test_var_map():
     raw = evaled_prompt.dumps()
     assert "We are having dinner now." in raw
 
-    evaled_prompt = prompt.eval(
-        run_config=RC(var_map_path=tests_dir / "assets" / "var_map.yml")
-    )
+    evaled_prompt = prompt.eval(run_config=RC(var_map_path=assets_dir / "var_map.yml"))
     raw = evaled_prompt.dumps()
     assert r"%extras%" not in raw
     assert "Substituted text from YAML file." in raw
@@ -103,3 +102,11 @@ def test_add_completions_prompt():
     assert (
         prompt.prompt == "This is a test.This is indeed a test.Let's see if this works."
     )
+
+
+def test_extra_properties():
+    prompt = assets_dir / "extra_properties.hprompt"
+    loaded_prompt = load_from(prompt, cls=ChatPrompt)
+    assert loaded_prompt.messages[0]["key1"] == "cont'en{\"'t}\n1"
+    assert loaded_prompt.messages[0]["key2"] == 'co"nt\'en"t2'
+    assert loaded_prompt.messages[0]["key3"] == "con{te{{nt}3"
