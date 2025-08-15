@@ -94,7 +94,7 @@ def trans_stream_chat(
                                 )
                             # reset the tool call
                             tool_call = copy.deepcopy(chunk)
-                elif content:
+                elif content or reasoning_content:
                     ret = consumer.send(
                         (
                             role,
