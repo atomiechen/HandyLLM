@@ -29,6 +29,8 @@ from typing import (
     Dict,
     Generator,
     Generic,
+    Iterable,
+    List,
     MutableMapping,
     Optional,
     Tuple,
@@ -60,14 +62,29 @@ from .utils import (
     stream_completions,
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
-from .types import PathType, SyncHandlerChat, SyncHandlerCompletions, VarMapType
-from .response import ChatChunk, ChatResponse, CompletionsChunk, CompletionsResponse
+from .types import (
+    AudioContentPart,
+    ImageContentPart,
+    InputMessage,
+    PathType,
+    SyncHandlerChat,
+    SyncHandlerCompletions,
+    TextContentPart,
+    ToolCall,
+    VarMapType,
+    ChatChunk,
+    ChatResponse,
+    CompletionsChunk,
+    CompletionsResponse,
+    Message,
+)
 from ._io import MySafeDumper, json_load, yaml_load
 
 
 PromptType = TypeVar("PromptType", bound="HandyPrompt")
 ResponseType = TypeVar("ResponseType")
 YieldType = TypeVar("YieldType")
+DataType = TypeVar("DataType")
 
 
 converter = PromptConverter()
@@ -93,19 +110,19 @@ DEFAULT_BLACKLIST = (
 )
 
 
-class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
+class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
     TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
     TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
 
     def __init__(
         self,
-        data: Union[str, list],
+        data: DataType,
         request: Optional[MutableMapping] = None,
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
         response: Optional[ResponseType] = None,
     ):
-        self.data = data
+        self.data: DataType = data
         self.request = request or {}
         # parse meta to run_config
         if isinstance(meta, RunConfig):
@@ -131,7 +148,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         return str(self.data)
 
     @staticmethod
-    def _serialize_data(data) -> str:
+    def _serialize_data(data: DataType) -> str:
         """
         Serialize the data to a string.
         This method can be overridden by subclasses.
@@ -182,7 +199,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
             self.dump(fd, base_path=Path(path).parent.resolve())
 
     @abstractmethod
-    def _eval_data(self, var_map: MutableMapping) -> Union[str, list]: ...
+    def _eval_data(self, var_map: MutableMapping) -> DataType: ...
 
     def eval(
         self: PromptType,
@@ -590,10 +607,12 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
             yield fout
 
 
-class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
+class ChatPrompt(
+    HandyPrompt[ChatResponse, ChatChunk, List[Union[Message, InputMessage]]]
+):
     def __init__(
         self,
-        messages: list,
+        messages: List[Union[Message, InputMessage]],
         request: Optional[MutableMapping] = None,
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
@@ -602,24 +621,24 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         super().__init__(messages, request, meta, base_path, response)
 
     @property
-    def messages(self) -> list:
+    def messages(self):
         return self.data
 
     @messages.setter
-    def messages(self, value: list):
+    def messages(self, value):
         self.data = value
 
     @property
     def result_str(self) -> str:
         if len(self.messages) == 0:
             return ""
-        return self.messages[-1]["content"]
+        return cast(str, self.messages[-1]["content"])
 
     @staticmethod
-    def _serialize_data(data) -> str:
+    def _serialize_data(data: List[Union[Message, InputMessage]]) -> str:
         return converter.msgs2raw(data)
 
-    def _eval_data(self, var_map) -> list:
+    def _eval_data(self, var_map) -> List[Union[Message, InputMessage]]:
         replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False
         )
@@ -630,14 +649,16 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                 for item in content:
                     try:
                         if item.get("type") == "image_url":
-                            url = cast(str, item["image_url"]["url"])
+                            item = cast(ImageContentPart, item)
+                            url = item["image_url"]["url"]
                             if url and url.startswith("file://"):
                                 # replace the image URL with the actual image
                                 item["image_url"]["url"] = file_uri_to_base64_image(
                                     url, self.base_path
                                 )
                         elif item.get("type") == "input_audio":
-                            data = cast(str, item["input_audio"]["data"])
+                            item = cast(AudioContentPart, item)
+                            data = item["input_audio"]["data"]
                             if data and data.startswith("file://"):
                                 # replace the audio data with the actual audio
                                 item["input_audio"]["data"] = file_uri_to_base64(
@@ -666,7 +687,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
             role = ""
             content = ""
             reasoning_content = ""
-            tool_calls = []
+            tool_calls: List[ToolCall] = []
             for chunk in stream_chat_all(
                 cls._stream_with_client(client, evaled_prompt)
             ):
@@ -678,22 +699,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            if not tool_calls:
-                # should return None if no tool calls
-                tool_calls = None
-            messages = [
-                {
-                    "role": role,
-                    "content": content,
-                    "reasoning_content": reasoning_content,
-                    "tool_calls": tool_calls,
-                }
-            ]
+            msg: Message = {
+                "role": role,
+                "content": content,
+            }
+            if tool_calls:
+                msg["tool_calls"] = tool_calls
+            if reasoning_content:
+                msg["reasoning_content"] = reasoning_content
         else:
             response = cls._fetch_with_client(client, evaled_prompt)
-            messages = [response["choices"][0]["message"]]
+            msg = response["choices"][0]["message"]
         return ChatPrompt(
-            messages, evaled_prompt.request, run_config, base_path, response=response
+            [msg], evaled_prompt.request, run_config, base_path, response=response
         )
 
     @classmethod
@@ -714,7 +732,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
             role = ""
             content = ""
             reasoning_content = ""
-            tool_calls = []
+            tool_calls: List[ToolCall] = []
             async for chunk in astream_chat_all(
                 cls._astream_with_client(client, evaled_prompt)
             ):
@@ -726,22 +744,19 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            if not tool_calls:
-                # should return None if no tool calls
-                tool_calls = None
-            messages = [
-                {
-                    "role": role,
-                    "content": content,
-                    "reasoning_content": reasoning_content,
-                    "tool_calls": tool_calls,
-                }
-            ]
+            msg: Message = {
+                "role": role,
+                "content": content,
+            }
+            if tool_calls:
+                msg["tool_calls"] = tool_calls
+            if reasoning_content:
+                msg["reasoning_content"] = reasoning_content
         else:
             response = await cls._afetch_with_client(client, evaled_prompt)
-            messages = [response["choices"][0]["message"]]
+            msg = response["choices"][0]["message"]
         return ChatPrompt(
-            messages, evaled_prompt.request, run_config, base_path, response=response
+            [msg], evaled_prompt.request, run_config, base_path, response=response
         )
 
     @classmethod
@@ -876,21 +891,38 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         )
         return response
 
-    def __add__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
+    def __add__(
+        self: ChatPrompt,
+        other: Union[
+            str,
+            Message,
+            InputMessage,
+            Iterable[Union[Message, InputMessage]],
+            ChatPrompt,
+        ],
+    ):
         # support concatenation with string, list, dict or another ChatPrompt
         new_prompt = copy.deepcopy(self)
         new_prompt += other
         return new_prompt
 
-    def __iadd__(self: ChatPrompt, other: Union[str, dict, list, ChatPrompt]):
+    def __iadd__(
+        self: ChatPrompt,
+        other: Union[
+            str,
+            Message,
+            InputMessage,
+            Iterable[Union[Message, InputMessage]],
+            ChatPrompt,
+        ],
+    ):
         # support concatenation with string, list, dict or another ChatPrompt
         if isinstance(other, str):
             self.add_message(content=other)
         elif isinstance(other, dict):
-            self.messages.append(other)
-        elif isinstance(other, list):
-            for item in other:
-                self.messages.append(item)
+            self.messages.append(cast(Union[Message, InputMessage], other))
+        elif isinstance(other, Iterable):
+            self.messages.extend(other)
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
             self += other.messages
@@ -905,21 +937,23 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         self,
         *,
         role: str = "user",
-        content: Optional[Union[str, list]] = None,
-        tool_calls: Optional[list] = None,
+        content: Optional[
+            Union[str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]]
+        ] = None,
+        tool_calls: Optional[List[ToolCall]] = None,
     ):
         msg = {"role": role, "content": content}
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
-        self.messages.append(msg)
+        self.messages.append(cast(Union[Message, InputMessage], msg))
 
     def add_content_part_to_message(
         self,
         *,
-        content_part: Union[str, dict],
+        content_part: Union[str, TextContentPart, ImageContentPart, AudioContentPart],
         message_index: int = -1,
     ):
-        target_msg = self.messages[message_index]
+        target_msg = cast(InputMessage, self.messages[message_index])
         if isinstance(target_msg["content"], str):
             target_msg["content"] = [content_part_text(target_msg["content"])]
         if isinstance(content_part, str):
@@ -959,7 +993,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         )
 
 
-class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk]):
+class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str]):
     def __init__(
         self,
         prompt: str,

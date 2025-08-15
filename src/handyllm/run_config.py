@@ -2,7 +2,7 @@ from __future__ import annotations
 import sys
 from enum import auto
 from pathlib import Path
-from typing import IO, List, Mapping, Optional
+from typing import IO, Dict, List, Mapping, Optional
 from dataclasses import dataclass, asdict, fields, replace
 
 from mergedeep import merge as merge_dict, Strategy
@@ -143,7 +143,7 @@ class RunConfig:
 
     def to_dict(
         self, retain_object=False, base_path: Optional[PathType] = None
-    ) -> dict:
+    ) -> Dict:
         # record and remove file descriptors
         tmp_output_fd = self.output_fd
         tmp_output_evaled_prompt_fd = self.output_evaled_prompt_fd

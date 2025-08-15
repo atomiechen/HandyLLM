@@ -12,10 +12,11 @@ from typing import (
     MutableMapping,
     MutableSequence,
     Optional,
+    Union,
     cast,
 )
 
-from .types import PathType, ShortChatChunk
+from .types import InputMessage, PathType, ShortChatChunk, Message
 from ._io import yaml_dump, yaml_load
 
 
@@ -50,7 +51,7 @@ class PromptConverter:
             value = blocks[idx + 1]
             self.substitute_map[key] = value.strip()
 
-    def raw2msgs(self, raw_prompt: str):
+    def raw2msgs(self, raw_prompt: str) -> List[Union[Message, InputMessage]]:
         # substitute pre-defined variables
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
@@ -124,7 +125,7 @@ class PromptConverter:
         return self.raw2msgs(raw_prompt)
 
     @staticmethod
-    def msgs2raw(msgs: List[Dict]):
+    def msgs2raw(msgs: List[Union[Message, InputMessage]]):
         # convert messages format to plain text
         messages = []
         for message in msgs:
@@ -211,13 +212,18 @@ class PromptConverter:
             fout.write(raw_prompt)
 
     @classmethod
-    def msgs_replace_variables(cls, msgs, variable_map: MutableMapping, inplace=False):
+    def msgs_replace_variables(
+        cls,
+        msgs: List[Union[Message, InputMessage]],
+        variable_map: MutableMapping,
+        inplace=False,
+    ):
         # replace every variable in messages content
         if inplace:
             for message in msgs:
                 content = message.get("content")
                 if content:
-                    message["content"] = cls._replace_deep(content, variable_map)
+                    message["content"] = cls._replace_deep(content, variable_map)  # type: ignore
             return msgs
         else:
             new_msgs = []
@@ -226,7 +232,7 @@ class PromptConverter:
                 new_msgs.append(new_message)
                 content = new_message.get("content")
                 if content:
-                    new_message["content"] = cls._replace_deep(content, variable_map)
+                    new_message["content"] = cls._replace_deep(content, variable_map)  # type: ignore
             return new_msgs
 
     @classmethod

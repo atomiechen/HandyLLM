@@ -42,8 +42,18 @@ from urllib.request import url2pathname
 import os
 import time
 
-from .types import ChatChunkDict, PathType, ShortChatChunk
-from .response import ChatChunk, CompletionsChunk, ToolCallDelta
+from .types import (
+    AudioContentPart,
+    ChatChunkDict,
+    ImageContentPart,
+    PathType,
+    ShortChatChunk,
+    ChatChunk,
+    CompletionsChunk,
+    TextContentPart,
+    ToolCallDelta,
+)
+
 
 YieldType = TypeVar("YieldType")
 
@@ -300,18 +310,20 @@ def file_uri_to_base64_image(url: str, base_path: Optional[PathType]):
     return f"data:image/jpeg;base64,{file_uri_to_base64(url, base_path)}"
 
 
-def content_part_text(text: str):
-    return {"type": "text", "content": text}
+def content_part_text(text: str) -> TextContentPart:
+    return {"type": "text", "text": text}
 
 
-def content_part_image(url_or_base64: str, detail: Optional[str] = None):
-    ret = {"type": "image_url", "image_url": {"url": url_or_base64}}
+def content_part_image(
+    url_or_base64: str, detail: Optional[str] = None
+) -> ImageContentPart:
+    ret: ImageContentPart = {"type": "image_url", "image_url": {"url": url_or_base64}}
     if detail:
         ret["image_url"]["detail"] = detail
     return ret
 
 
-def content_part_audio(url_or_base64: str, format: str):
+def content_part_audio(url_or_base64: str, format: str) -> AudioContentPart:
     return {
         "type": "input_audio",
         "input_audio": {"data": url_or_base64, "format": format},

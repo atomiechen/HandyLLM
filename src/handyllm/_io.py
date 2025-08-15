@@ -15,7 +15,7 @@ MySafeDumper.add_multi_representer(
 
 
 @wraps(yaml.dump)
-def yaml_dump(*args, **kwargs):
+def yaml_dump(*args, **kwargs) -> str:
     kwargs.setdefault("Dumper", MySafeDumper)
     kwargs.setdefault("allow_unicode", True)
     return yaml.dump(*args, **kwargs)

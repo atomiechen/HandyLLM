@@ -27,7 +27,7 @@ import requests
 import httpx
 
 from ._constants import API_TYPES_AZURE
-from .response import (
+from .types import (
     ChatChunk,
     CompletionsChunk,
     ChatResponse,
