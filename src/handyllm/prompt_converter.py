@@ -12,6 +12,7 @@ from typing import (
     MutableMapping,
     MutableSequence,
     Optional,
+    cast,
 )
 
 from .types import PathType, ShortChatChunk
@@ -148,8 +149,10 @@ class PromptConverter:
                 extra = " {" + " ".join(extras) + "}"
             else:
                 extra = ""
+            content = cast(str, content).strip()
             if reasoning_content is not None:
-                raw = f"${role}${extra}\n$$reasoning_content$$\n{reasoning_content}\n$$content$$\n{content}"
+                reasoning_content = reasoning_content.strip()
+                raw = f"${role}${extra}\n$$reasoning_content$$\n{reasoning_content}\n\n$$content$$\n{content}"
             else:
                 raw = f"${role}${extra}\n{content}"
             messages.append(raw)
@@ -197,7 +200,7 @@ class PromptConverter:
                     fd.write("\n")
                     role_completed = True
                 if content_state == 1:
-                    fd.write("$$content$$\n")
+                    fd.write("\n\n$$content$$\n")
                     content_state = 2
                 fd.write(text)
 
