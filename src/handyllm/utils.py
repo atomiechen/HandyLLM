@@ -76,7 +76,7 @@ def trans_stream_chat(
 ) -> Generator[Optional[YieldType], Optional[ChatChunk], None]:
     next(consumer)  # prime the generator
     role = ""
-    tool_call = ToolCallDelta()
+    tool_call = None
     ret = None
     try:
         while True:
@@ -97,7 +97,7 @@ def trans_stream_chat(
                 )
                 if tool_calls:
                     for chunk in tool_calls:
-                        if chunk["index"] == tool_call.get("index"):
+                        if tool_call and chunk["index"] == tool_call["index"]:
                             tool_call["function"]["arguments"] += chunk["function"][
                                 "arguments"
                             ]
@@ -110,7 +110,14 @@ def trans_stream_chat(
                             # reset the tool call
                             tool_call = copy.deepcopy(chunk)
                 elif content:
-                    ret = consumer.send((role, content, reasoning_content, tool_call))
+                    ret = consumer.send(
+                        (
+                            role,
+                            content,
+                            reasoning_content,
+                            cast(ToolCallDelta, tool_call),
+                        )
+                    )
             except (KeyError, IndexError):
                 pass
         if tool_call:

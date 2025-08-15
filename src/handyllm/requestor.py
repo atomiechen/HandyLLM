@@ -9,10 +9,12 @@ __all__ = [
 ]
 
 from typing import (
+    Any,
     AsyncGenerator,
     Callable,
     Generator,
     Generic,
+    Mapping,
     Optional,
     TypeVar,
     Union,
@@ -28,7 +30,6 @@ from ._constants import API_TYPES_AZURE
 from .response import (
     ChatChunk,
     CompletionsChunk,
-    DictProxy,
     ChatResponse,
     CompletionsResponse,
 )
@@ -40,8 +41,8 @@ module_logger.addHandler(logging.NullHandler())
 
 ResponseType = TypeVar("ResponseType")
 YieldType = TypeVar("YieldType")
-DictResponseType = TypeVar("DictResponseType", bound="DictProxy")
-DictYieldType = TypeVar("DictYieldType", bound="DictProxy")
+DictResponseType = TypeVar("DictResponseType", bound="Mapping[str, Any]")
+DictYieldType = TypeVar("DictYieldType", bound="Mapping[str, Any]")
 
 
 class Requestor(Generic[ResponseType, YieldType]):
@@ -460,11 +461,11 @@ class DictRequestor(
 
             def gen_wrapper(response):
                 for data in response:
-                    yield DictProxy(data)
+                    yield data
 
             return cast(Generator[DictYieldType, None, None], gen_wrapper(response))
         else:
-            return cast(DictResponseType, DictProxy(response))
+            return cast(DictResponseType, response)
 
     async def acall(
         self,
@@ -474,11 +475,11 @@ class DictRequestor(
 
             async def agen_wrapper(response):
                 async for data in response:
-                    yield DictProxy(data)
+                    yield data
 
             return cast(AsyncGenerator[DictYieldType, None], agen_wrapper(response))
         else:
-            return cast(DictResponseType, DictProxy(response))
+            return cast(DictResponseType, response)
 
 
 class BinRequestor(Requestor[bytes, bytes]):

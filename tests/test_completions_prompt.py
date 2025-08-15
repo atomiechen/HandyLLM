@@ -49,7 +49,7 @@ def test_completions_fetch():
     prompt_file = tests_dir / "assets" / "completions.hprompt"
     prompt = load_from(prompt_file, cls=CompletionsPrompt)
     response = prompt.fetch(api_key="fake-key")
-    assert response.choices[0].text == "\n\nThis is indeed a test"
+    assert response["choices"][0]["text"] == "\n\nThis is indeed a test"
 
 
 @pytest.mark.asyncio
@@ -59,7 +59,7 @@ async def test_async_completions_fetch():
     prompt_file = tests_dir / "assets" / "completions.hprompt"
     prompt = load_from(prompt_file, cls=CompletionsPrompt)
     response = await prompt.afetch(api_key="fake-key")
-    assert response.choices[0].text == "\n\nThis is indeed a test"
+    assert response["choices"][0]["text"] == "\n\nThis is indeed a test"
 
 
 @responses.activate

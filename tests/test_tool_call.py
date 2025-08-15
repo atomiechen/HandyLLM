@@ -527,21 +527,21 @@ def test_tool_call():
     prompt_file = tests_dir / "assets" / "chat_tool.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
     response = prompt.fetch(api_key="fake-key")
-    assert "tool_calls" in response.choices[0].message
+    assert "tool_calls" in response["choices"][0]["message"]
     assert (
-        response.choices[0].message["tool_calls"][0]["function"]["name"]
+        response["choices"][0]["message"]["tool_calls"][0]["function"]["name"]
         == "get_current_weather"
     )
     assert (
-        response.choices[0].message["tool_calls"][0]["function"]["arguments"]
+        response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
         == '{"location": "San Francisco, CA", "unit": "celsius"}'
     )
     assert (
-        response.choices[0].message["tool_calls"][1]["function"]["name"]
+        response["choices"][0]["message"]["tool_calls"][1]["function"]["name"]
         == "get_current_weather"
     )
     assert (
-        response.choices[0].message["tool_calls"][1]["function"]["arguments"]
+        response["choices"][0]["message"]["tool_calls"][1]["function"]["arguments"]
         == '{"location": "New York, NY", "unit": "celsius"}'
     )
 

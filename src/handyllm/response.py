@@ -1,5 +1,4 @@
 __all__ = [
-    "DictProxy",
     "Message",
     "ChatChoice",
     "ChatResponse",
@@ -20,40 +19,16 @@ __all__ = [
     "CompletionLogprobs",
 ]
 
-from typing import List, MutableMapping, Optional, Sequence, TypedDict
+from typing import List, Optional, TypedDict
 from typing_extensions import NotRequired
 
 
-class DictProxy(dict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for key, value in self.items():
-            self[key] = self._wrap(value)
-
-    def __getattr__(self, attr):
-        if attr in self:
-            return self[attr]
-        raise AttributeError(f"Attribute {attr} not found")
-
-    def __setattr__(self, attr, value):
-        self[attr] = self._wrap(value)
-
-    def _wrap(self, value):
-        if isinstance(value, DictProxy):
-            return value
-        elif isinstance(value, MutableMapping):
-            return DictProxy(value)
-        elif isinstance(value, Sequence) and not isinstance(value, str):
-            return [self._wrap(v) for v in value]
-        return value
-
-
-class Function(DictProxy):
+class Function(TypedDict):
     name: str
     arguments: str
 
 
-class ToolCall(DictProxy):
+class ToolCall(TypedDict):
     id: str
     type: str
     function: Function
@@ -65,37 +40,37 @@ class Message(TypedDict):
     tool_calls: NotRequired[List[ToolCall]]
 
 
-class TopLogProbItem(DictProxy):
+class TopLogProbItem(TypedDict):
     token: str
     logprob: float
     bytes: Optional[List[int]]
 
 
-class LogProbItem(DictProxy):
+class LogProbItem(TypedDict):
     token: str
     logprob: float
     bytes: Optional[List[int]]
     top_logprobs: List[TopLogProbItem]
 
 
-class Logprobs(DictProxy):
+class Logprobs(TypedDict):
     content: Optional[List[LogProbItem]]
 
 
-class ChatChoice(DictProxy):
+class ChatChoice(TypedDict):
     index: int
     message: Message
     logprob: Optional[Logprobs]
     finish_reason: str
 
 
-class Usage(DictProxy):
+class Usage(TypedDict):
     completion_tokens: int
     prompt_tokens: int
     total_tokens: int
 
 
-class ChatResponse(DictProxy):
+class ChatResponse(TypedDict):
     id: str
     choices: List[ChatChoice]
     created: int
@@ -106,7 +81,7 @@ class ChatResponse(DictProxy):
     usage: Usage
 
 
-class ToolCallDelta(DictProxy):
+class ToolCallDelta(TypedDict):
     index: int
     id: str
     type: str
@@ -123,14 +98,14 @@ class ChatChunkDelta(TypedDict):
     tool_calls: NotRequired[List[ToolCallDelta]]
 
 
-class ChatChunkChoice(DictProxy):
+class ChatChunkChoice(TypedDict):
     delta: ChatChunkDelta
     logprobs: Optional[Logprobs]
     finish_reason: Optional[str]
     index: int
 
 
-class ChatChunk(DictProxy):
+class ChatChunk(TypedDict):
     id: str
     choices: List[ChatChunkChoice]
     created: int
@@ -141,21 +116,21 @@ class ChatChunk(DictProxy):
     usage: Optional[Usage]
 
 
-class CompletionLogprobs(DictProxy):
+class CompletionLogprobs(TypedDict):
     text_offset: list
     token_logprobs: list
     tokens: list
     top_logprobs: list
 
 
-class CompletionChoice(DictProxy):
+class CompletionChoice(TypedDict):
     finish_reason: str
     index: int
     logprobs: Optional[CompletionLogprobs]
     text: str
 
 
-class CompletionsResponse(DictProxy):
+class CompletionsResponse(TypedDict):
     id: str
     choices: List[CompletionChoice]
     created: int
@@ -165,9 +140,9 @@ class CompletionsResponse(DictProxy):
     usage: Usage
 
 
-class CompletionsChunkChoice(DictProxy):
+class CompletionsChunkChoice(TypedDict):
     text: str
 
 
-class CompletionsChunk(DictProxy):
+class CompletionsChunk(TypedDict):
     choices: List[CompletionsChunkChoice]

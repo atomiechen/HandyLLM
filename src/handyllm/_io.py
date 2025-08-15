@@ -3,8 +3,6 @@ from pathlib import Path
 import yaml
 from functools import wraps
 
-from .response import DictProxy
-
 
 # add multi representer for Path, for YAML serialization
 class MySafeDumper(yaml.SafeDumper):
@@ -13,9 +11,6 @@ class MySafeDumper(yaml.SafeDumper):
 
 MySafeDumper.add_multi_representer(
     Path, lambda dumper, data: dumper.represent_str(str(data))
-)
-MySafeDumper.add_multi_representer(
-    DictProxy, lambda dumper, data: dumper.represent_dict(data)
 )
 
 
