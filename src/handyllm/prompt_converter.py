@@ -103,7 +103,7 @@ class PromptConverter:
             extras = []
             for key in message:
                 if key not in ["role", "content", "tool_calls"]:
-                    extras.append(f"{key}={message[key]}")
+                    extras.append(f'{key}="{message[key]}"')
             if tool_calls:
                 extras.append("tool")
                 content = yaml_dump(tool_calls)
