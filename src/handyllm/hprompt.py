@@ -325,7 +325,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         cls,
         client: OpenAIClient,
         evaled_prompt: HandyPrompt,
-    ) -> Generator[YieldType, None, None]: ...
+    ) -> Generator[YieldType, None, None]:
+        yield ...
 
     def stream(
         self,
@@ -345,7 +346,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType]):
         cls,
         client: OpenAIClient,
         evaled_prompt: HandyPrompt,
-    ) -> AsyncGenerator[YieldType, None]: ...
+    ) -> AsyncGenerator[YieldType, None]:
+        yield ...
 
     async def astream(
         self,
