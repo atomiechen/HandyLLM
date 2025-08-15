@@ -148,7 +148,7 @@ class PromptConverter:
                 extra = " {" + " ".join(extras) + "}"
             else:
                 extra = ""
-            if reasoning_content is None:
+            if reasoning_content is not None:
                 raw = f"${role}${extra}\n$$reasoning_content$$\n{reasoning_content}\n$$content$$\n{content}"
             else:
                 raw = f"${role}${extra}\n{content}"
