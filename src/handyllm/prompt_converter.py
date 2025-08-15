@@ -108,7 +108,9 @@ class PromptConverter:
             extras = []
             for key in message:
                 if key not in ["role", "content", "tool_calls"]:
-                    escaped = json.dumps(message[key])  # ensure quote/newline escaping
+                    escaped = json.dumps(
+                        message[key], ensure_ascii=False
+                    )  # ensure quote/newline escaping
                     extras.append(f"{key}={escaped}")
             if tool_calls:
                 extras.append("tool")
