@@ -5,10 +5,12 @@ __all__ = [
     "echo_consumer",
     "stream_chat_all",
     "stream_chat_with_role",
+    "stream_chat_with_reasoning",
     "stream_chat",
     "stream_completions",
     "astream_chat_all",
     "astream_chat_with_role",
+    "astream_chat_with_reasoning",
     "astream_chat",
     "astream_completions",
     "stream_to_fd",
@@ -40,7 +42,7 @@ from urllib.request import url2pathname
 import os
 import time
 
-from .types import PathType, ShortChatChunk
+from .types import ChatChunkDict, PathType, ShortChatChunk
 from .response import ChatChunk, CompletionsChunk, ToolCallDelta
 
 YieldType = TypeVar("YieldType")
@@ -87,6 +89,9 @@ def trans_stream_chat(
                 if "role" in message:
                     role = cast(str, message["role"])
                 content = cast(Optional[str], message.get("content"))
+                reasoning_content = cast(
+                    Optional[str], message.get("reasoning_content")
+                )
                 tool_calls = cast(
                     Optional[List[ToolCallDelta]], message.get("tool_calls")
                 )
@@ -99,16 +104,18 @@ def trans_stream_chat(
                         else:
                             if tool_call:
                                 # this is a new tool call, yield the previous one
-                                ret = consumer.send((role, content, tool_call))
+                                ret = consumer.send(
+                                    (role, content, reasoning_content, tool_call)
+                                )
                             # reset the tool call
                             tool_call = copy.deepcopy(chunk)
                 elif content:
-                    ret = consumer.send((role, content, tool_call))
+                    ret = consumer.send((role, content, reasoning_content, tool_call))
             except (KeyError, IndexError):
                 pass
         if tool_call:
             # yield the last tool call
-            ret = consumer.send((role, None, tool_call))
+            ret = consumer.send((role, None, None, tool_call))
             yield ret
         else:
             yield None
@@ -125,23 +132,43 @@ def echo_consumer():
 
 def stream_chat_all(
     response: Iterable[ChatChunk],
-) -> Generator[ShortChatChunk, None, None]:
-    producer = trans_stream_chat(echo_consumer())
+) -> Generator[ChatChunkDict, None, None]:
+    producer = trans_stream_chat(
+        cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
+    )
     next(producer)  # prime the generator
     for data in response:
         ret = producer.send(data)
         if ret is not None:
-            yield ret
+            role, content, reasoning_content, tool_call = ret
+            yield {
+                "role": role,
+                "content": content,
+                "reasoning_content": reasoning_content,
+                "tool_call": tool_call,
+            }
     ret = producer.send(None)  # signal the end of the stream
     if ret is not None:
-        yield ret
+        role, content, reasoning_content, tool_call = ret
+        yield {
+            "role": role,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "tool_call": tool_call,
+        }
     producer.close()
 
 
 def stream_chat_with_role(response: Iterable[ChatChunk]):
-    for role, text, _ in stream_chat_all(response):
-        if text:
-            yield role, text
+    for chunk in stream_chat_all(response):
+        if chunk["content"]:
+            yield chunk["role"], chunk["content"]
+
+
+def stream_chat_with_reasoning(response: Iterable[ChatChunk]):
+    for chunk in stream_chat_all(response):
+        if chunk["reasoning_content"] or chunk["content"]:
+            yield chunk["reasoning_content"], chunk["content"]
 
 
 def stream_chat(response: Iterable[ChatChunk]):
@@ -159,23 +186,43 @@ def stream_completions(response: Iterable[CompletionsChunk]):
 
 async def astream_chat_all(
     response: AsyncIterable[ChatChunk],
-) -> AsyncGenerator[ShortChatChunk, None]:
-    producer = trans_stream_chat(echo_consumer())
+) -> AsyncGenerator[ChatChunkDict, None]:
+    producer = trans_stream_chat(
+        cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
+    )
     next(producer)  # prime the generator
     async for data in response:
         ret = producer.send(data)
         if ret is not None:
-            yield ret
+            role, content, reasoning_content, tool_call = ret
+            yield {
+                "role": role,
+                "content": content,
+                "reasoning_content": reasoning_content,
+                "tool_call": tool_call,
+            }
     ret = producer.send(None)  # signal the end of the stream
     if ret is not None:
-        yield ret
+        role, content, reasoning_content, tool_call = ret
+        yield {
+            "role": role,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "tool_call": tool_call,
+        }
     producer.close()
 
 
 async def astream_chat_with_role(response: AsyncIterable[ChatChunk]):
-    async for role, text, _ in astream_chat_all(response):
-        if text:
-            yield role, text
+    async for chunk in astream_chat_all(response):
+        if chunk["content"]:
+            yield chunk["role"], chunk["content"]
+
+
+async def astream_chat_with_reasoning(response: AsyncIterable[ChatChunk]):
+    async for chunk in astream_chat_all(response):
+        if chunk["reasoning_content"] or chunk["content"]:
+            yield chunk["reasoning_content"], chunk["content"]
 
 
 async def astream_chat(response: AsyncIterable[ChatChunk]):

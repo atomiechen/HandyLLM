@@ -665,20 +665,30 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         if stream:
             role = ""
             content = ""
+            reasoning_content = ""
             tool_calls = []
-            for r, text, tool_call in stream_chat_all(
+            for chunk in stream_chat_all(
                 cls._stream_with_client(client, evaled_prompt)
             ):
-                if r != role:
-                    role = r
-                if tool_call:
-                    tool_calls.append(tool_call)
-                elif text:
-                    content += text
+                if chunk["role"] != role:
+                    role = chunk["role"]
+                if chunk["tool_call"]:
+                    tool_calls.append(chunk["tool_call"])
+                elif chunk["reasoning_content"]:
+                    reasoning_content += chunk["reasoning_content"]
+                elif chunk["content"]:
+                    content += chunk["content"]
             if not tool_calls:
                 # should return None if no tool calls
                 tool_calls = None
-            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
+            messages = [
+                {
+                    "role": role,
+                    "content": content,
+                    "reasoning_content": reasoning_content,
+                    "tool_calls": tool_calls,
+                }
+            ]
         else:
             response = cls._fetch_with_client(client, evaled_prompt)
             messages = [response["choices"][0]["message"]]
@@ -703,20 +713,30 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
         if stream:
             role = ""
             content = ""
+            reasoning_content = ""
             tool_calls = []
-            async for r, text, tool_call in astream_chat_all(
+            async for chunk in astream_chat_all(
                 cls._astream_with_client(client, evaled_prompt)
             ):
-                if r != role:
-                    role = r
-                if tool_call:
-                    tool_calls.append(tool_call)
-                elif text:
-                    content += text
+                if chunk["role"] != role:
+                    role = chunk["role"]
+                if chunk["tool_call"]:
+                    tool_calls.append(chunk["tool_call"])
+                elif chunk["reasoning_content"]:
+                    reasoning_content += chunk["reasoning_content"]
+                elif chunk["content"]:
+                    content += chunk["content"]
             if not tool_calls:
                 # should return None if no tool calls
                 tool_calls = None
-            messages = [{"role": role, "content": content, "tool_calls": tool_calls}]
+            messages = [
+                {
+                    "role": role,
+                    "content": content,
+                    "reasoning_content": reasoning_content,
+                    "tool_calls": tool_calls,
+                }
+            ]
         else:
             response = await cls._afetch_with_client(client, evaled_prompt)
             messages = [response["choices"][0]["message"]]
@@ -742,12 +762,28 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
                 ret = producer.send(chat_chunk)
                 if run_config.on_chunk and ret:
                     run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                    run_config.on_chunk(*ret)
+                    role, content, reasoning_content, tool_call = ret
+                    run_config.on_chunk(
+                        {
+                            "role": role,
+                            "content": content,
+                            "reasoning_content": reasoning_content,
+                            "tool_call": tool_call,
+                        }
+                    )
                 yield chat_chunk
             ret = producer.send(None)  # signal the end of the stream
             if run_config.on_chunk and ret:
                 run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                run_config.on_chunk(*ret)
+                role, content, reasoning_content, tool_call = ret
+                run_config.on_chunk(
+                    {
+                        "role": role,
+                        "content": content,
+                        "reasoning_content": reasoning_content,
+                        "tool_call": tool_call,
+                    }
+                )
             producer.close()
 
     @classmethod
@@ -767,19 +803,49 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk]):
             async for chat_chunk in response:
                 ret = producer.send(chat_chunk)
                 if run_config.on_chunk and ret:
+                    role, content, reasoning_content, tool_call = ret
                     if inspect.iscoroutinefunction(run_config.on_chunk):
-                        await run_config.on_chunk(*ret)
+                        await run_config.on_chunk(
+                            {
+                                "role": role,
+                                "content": content,
+                                "reasoning_content": reasoning_content,
+                                "tool_call": tool_call,
+                            }
+                        )
                     else:
                         run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                        run_config.on_chunk(*ret)
+                        run_config.on_chunk(
+                            {
+                                "role": role,
+                                "content": content,
+                                "reasoning_content": reasoning_content,
+                                "tool_call": tool_call,
+                            }
+                        )
                 yield chat_chunk
             ret = producer.send(None)  # signal the end of the stream
             if run_config.on_chunk and ret:
+                role, content, reasoning_content, tool_call = ret
                 if inspect.iscoroutinefunction(run_config.on_chunk):
-                    await run_config.on_chunk(*ret)
+                    await run_config.on_chunk(
+                        {
+                            "role": role,
+                            "content": content,
+                            "reasoning_content": reasoning_content,
+                            "tool_call": tool_call,
+                        }
+                    )
                 else:
                     run_config.on_chunk = cast(SyncHandlerChat, run_config.on_chunk)
-                    run_config.on_chunk(*ret)
+                    run_config.on_chunk(
+                        {
+                            "role": role,
+                            "content": content,
+                            "reasoning_content": reasoning_content,
+                            "tool_call": tool_call,
+                        }
+                    )
             producer.close()
 
     @classmethod

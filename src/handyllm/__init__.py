@@ -11,9 +11,13 @@ from .endpoint_manager import EndpointManager as EndpointManager, Endpoint as En
 from .prompt_converter import PromptConverter as PromptConverter
 from .utils import (
     stream_chat_all as stream_chat_all,
+    stream_chat_with_role as stream_chat_with_role,
+    stream_chat_with_reasoning as stream_chat_with_reasoning,
     stream_chat as stream_chat,
     stream_completions as stream_completions,
     astream_chat_all as astream_chat_all,
+    astream_chat_with_role as astream_chat_with_role,
+    astream_chat_with_reasoning as astream_chat_with_reasoning,
     astream_chat as astream_chat,
     astream_completions as astream_completions,
     stream_to_file as stream_to_file,

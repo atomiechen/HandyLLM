@@ -16,10 +16,10 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Dict,
     MutableMapping,
     Optional,
     Tuple,
+    TypedDict,
     Union,
 )
 from os import PathLike
@@ -34,9 +34,17 @@ else:
 
 VarMapType = MutableMapping[str, str]
 
-SyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Any]
+
+class ChatChunkDict(TypedDict):
+    role: str
+    content: Optional[str]
+    reasoning_content: Optional[str]
+    tool_call: ToolCallDelta
+
+
+SyncHandlerChat = Callable[[ChatChunkDict], Any]
 SyncHandlerCompletions = Callable[[str], Any]
-AsyncHandlerChat = Callable[[str, Optional[str], Optional[Dict]], Awaitable[Any]]
+AsyncHandlerChat = Callable[[ChatChunkDict], Awaitable[Any]]
 AsyncHandlerCompletions = Callable[[str], Awaitable[Any]]
 OnChunkType = Union[
     SyncHandlerChat, SyncHandlerCompletions, AsyncHandlerChat, AsyncHandlerCompletions
@@ -45,4 +53,4 @@ OnChunkType = Union[
 StrHandler = Callable[[str], Any]
 StringifyHandler = Callable[[Any], str]
 
-ShortChatChunk = Tuple[str, Optional[str], ToolCallDelta]
+ShortChatChunk = Tuple[str, Optional[str], Optional[str], ToolCallDelta]

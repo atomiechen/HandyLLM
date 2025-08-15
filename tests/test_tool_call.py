@@ -554,10 +554,10 @@ def test_tool_call_stream(capsys: CaptureFixture[str]):
     response = prompt.stream(api_key="fake-key")
     tool_calls = []
     for chunk in stream_chat_all(response):
-        role, content, tool_call = chunk
-        tool_calls.append(tool_call)
-        assert role == "assistant"
-        assert content is None
+        tool_calls.append(chunk["tool_call"])
+        assert chunk["role"] == "assistant"
+        assert chunk["content"] is None
+        assert chunk["reasoning_content"] is None
     assert len(tool_calls) == 2
     assert tool_calls[0]["function"]["name"] == "get_current_weather"
     assert (
@@ -584,15 +584,17 @@ async def test_on_chunk_tool_call():
     prompt_file = tests_dir / "assets" / "chat_tool.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
 
-    def on_chunk(role, content, tool_call):
-        assert role == "assistant"
-        assert content is None
-        state.append(tool_call)
+    def on_chunk(chunk):
+        assert chunk["role"] == "assistant"
+        assert chunk["content"] is None
+        assert chunk["reasoning_content"] is None
+        state.append(chunk["tool_call"])
 
-    async def aon_chunk(role, content, tool_call):
-        assert role == "assistant"
-        assert content is None
-        state.append(tool_call)
+    async def aon_chunk(chunk):
+        assert chunk["role"] == "assistant"
+        assert chunk["content"] is None
+        assert chunk["reasoning_content"] is None
+        state.append(chunk["tool_call"])
 
     sync_run_config = RunConfig(on_chunk=on_chunk)
     async_run_config = RunConfig(on_chunk=aon_chunk)

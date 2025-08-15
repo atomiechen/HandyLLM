@@ -3,7 +3,16 @@ __all__ = ["PromptConverter"]
 from copy import deepcopy
 import json
 import re
-from typing import IO, Generator, MutableMapping, MutableSequence, Optional
+from typing import (
+    IO,
+    Dict,
+    Generator,
+    List,
+    Literal,
+    MutableMapping,
+    MutableSequence,
+    Optional,
+)
 
 from .types import PathType, ShortChatChunk
 from ._io import yaml_dump, yaml_load
@@ -52,9 +61,8 @@ class PromptConverter:
             role = blocks[idx]
             extra = blocks[idx + 1]
             content = blocks[idx + 2]
-            if content:
-                content = content.strip()
-            msg = {"role": role, "content": content}
+            obj = self.parse_content(content)
+            msg = {"role": role, **obj}
             if extra:
                 key_values_pairs = re.findall(
                     r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
@@ -91,6 +99,23 @@ class PromptConverter:
 
         return msgs
 
+    @staticmethod
+    def parse_content(content: str):
+        content = content.strip()
+        blocks = re.split(
+            r"^\$\$(\w+)\$\$[^\S\r\n]*$",
+            content,
+            flags=re.MULTILINE,
+        )
+        if len(blocks) == 1:
+            return {"content": content}
+        ret: Dict[str, str] = {}
+        for idx in range(1, len(blocks), 2):
+            key = blocks[idx]
+            value = blocks[idx + 1]
+            ret[key] = value.strip()
+        return ret
+
     def rawfile2msgs(self, raw_prompt_path: PathType):
         with open(raw_prompt_path, "r", encoding="utf-8") as fin:
             raw_prompt = fin.read()
@@ -98,16 +123,17 @@ class PromptConverter:
         return self.raw2msgs(raw_prompt)
 
     @staticmethod
-    def msgs2raw(msgs):
+    def msgs2raw(msgs: List[Dict]):
         # convert messages format to plain text
         messages = []
         for message in msgs:
             role = message.get("role")
             content = message.get("content")
+            reasoning_content = message.get("reasoning_content")
             tool_calls = message.get("tool_calls")
             extras = []
             for key in message:
-                if key not in ["role", "content", "tool_calls"]:
+                if key not in ["role", "content", "tool_calls", "reasoning_content"]:
                     escaped = json.dumps(
                         message[key], ensure_ascii=False
                     )  # ensure quote/newline escaping
@@ -122,7 +148,11 @@ class PromptConverter:
                 extra = " {" + " ".join(extras) + "}"
             else:
                 extra = ""
-            messages.append(f"${role}${extra}\n{content}")
+            if reasoning_content is None:
+                raw = f"${role}${extra}\n$$reasoning_content$$\n{reasoning_content}\n$$content$$\n{content}"
+            else:
+                raw = f"${role}${extra}\n{content}"
+            messages.append(raw)
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
 
@@ -133,10 +163,18 @@ class PromptConverter:
         # stream response to fd
         role = ""
         role_completed = False
+
+        content_state: Literal[0, 1, 2, 3] = 0
+        """
+        0: initial state
+        1: in reasoning text region
+        2: in content text region
+        """
+
         data = None
         while True:
             data = yield data
-            r, text, tool_call = data
+            r, text, reasoning_text, tool_call = data
             if r != role:
                 role = r
                 fd.write(f"${role}$")  # do not add newline
@@ -146,10 +184,21 @@ class PromptConverter:
                     role_completed = True
                 # dump tool calls
                 fd.write(yaml_dump([tool_call]))
+            elif reasoning_text:
+                if not role_completed:
+                    fd.write("\n")
+                    role_completed = True
+                if content_state == 0:
+                    fd.write("$$reasoning_content$$\n")
+                    content_state = 1
+                fd.write(reasoning_text)
             elif text:
                 if not role_completed:
                     fd.write("\n")
                     role_completed = True
+                if content_state == 1:
+                    fd.write("$$content$$\n")
+                    content_state = 2
                 fd.write(text)
 
     @classmethod
