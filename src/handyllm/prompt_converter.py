@@ -1,6 +1,7 @@
 __all__ = ["PromptConverter"]
 
 from copy import deepcopy
+import json
 import re
 from typing import IO, Generator, MutableMapping, MutableSequence, Optional
 
@@ -18,9 +19,7 @@ class PromptConverter:
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
         return (
-            r"^\$("
-            + "|".join(self.role_keys)
-            + r")\$[^\S\r\n]*(?:{([^{}]*?)})?[^\S\r\n]*$"
+            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*(?:{(.*)})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -58,7 +57,7 @@ class PromptConverter:
             msg = {"role": role, "content": content}
             if extra:
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
+                    r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
                     extra,
                 )
                 # parse extra properties
@@ -70,8 +69,14 @@ class PromptConverter:
                     elif array:
                         extra_properties["type"] = "content_array"
                     else:
-                        # remove quotes of the value
-                        extra_properties[key] = value[1:-1]
+                        # convert single quoted to double quoted
+                        if value.startswith("'"):
+                            inner = value[1:-1]
+                            inner = inner.replace(r"\'", "'")
+                            inner = inner.replace('"', r"\"")
+                            value = f'"{inner}"'
+                        # decode escaped string
+                        extra_properties[key] = json.loads(value)
                 if "type" in extra_properties:
                     type_of_msg = extra_properties.pop("type")
                     if type_of_msg == "tool_calls":
@@ -103,7 +108,8 @@ class PromptConverter:
             extras = []
             for key in message:
                 if key not in ["role", "content", "tool_calls"]:
-                    extras.append(f'{key}="{message[key]}"')
+                    escaped = json.dumps(message[key])  # ensure quote/newline escaping
+                    extras.append(f"{key}={escaped}")
             if tool_calls:
                 extras.append("tool")
                 content = yaml_dump(tool_calls)
