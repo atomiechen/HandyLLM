@@ -60,6 +60,8 @@ class RunConfig:
     # output the evaluated prompt to a file or a file descriptor
     output_evaled_prompt_path: Optional[PathType] = None
     output_evaled_prompt_fd: Optional[IO[str]] = None
+    # if output path exists, overwrite it
+    overwrite_if_exists: Optional[bool] = None  # default: False
     # credential file path
     credential_path: Optional[PathType] = None
     # credential type: env, json, yaml

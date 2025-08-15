@@ -95,8 +95,9 @@ DEFAULT_BLACKLIST = (
 
 
 class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
-    TEMPLATE_OUTPUT_FILENAME = "result.%Y%m%d-%H%M%S.hprompt"
-    TEMPLATE_OUTPUT_EVAL_FILENAME = "evaled.%Y%m%d-%H%M%S.hprompt"
+    TEMPLATE_TIMESTAMP = "%Y%m%d_%H%M%S"
+    TEMPLATE_OUTPUT_FILENAME = f"result_{TEMPLATE_TIMESTAMP}.hprompt"
+    TEMPLATE_OUTPUT_EVAL_FILENAME = f"evaled_{TEMPLATE_TIMESTAMP}.hprompt"
 
     def __init__(
         self,
@@ -227,13 +228,17 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         start_time = datetime.now()
         if run_config.output_path:
             run_config.output_path = cls._prepare_output_path(
-                run_config.output_path, start_time, cls.TEMPLATE_OUTPUT_FILENAME
+                run_config.output_path,
+                start_time,
+                cls.TEMPLATE_OUTPUT_FILENAME,
+                run_config.overwrite_if_exists or False,
             )
         if run_config.output_evaled_prompt_path:
             run_config.output_evaled_prompt_path = cls._prepare_output_path(
                 run_config.output_evaled_prompt_path,
                 start_time,
                 cls.TEMPLATE_OUTPUT_EVAL_FILENAME,
+                run_config.overwrite_if_exists or False,
             )
 
         if run_config.credential_path:
@@ -403,10 +408,14 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         async with cls.ensure_async_client(client) as client:
             return await cls._afetch_with_client(client, evaled_prompt)
 
-    @staticmethod
+    @classmethod
     def _prepare_output_path(
-        output_path: PathType, start_time: datetime, template_filename: str
-    ) -> str:
+        cls,
+        output_path: PathType,
+        start_time: datetime,
+        template_filename: str,
+        overwrite: bool,
+    ):
         output_path = str(output_path).strip()
         p = Path(output_path)
         if p.is_dir() or output_path.endswith(("/")):
@@ -414,6 +423,17 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
             output_path = Path(output_path, template_filename)
         # format output_path with the current time
         output_path = start_time.strftime(str(output_path))
+        output_path = Path(output_path)
+        if not overwrite:
+            org_path = output_path
+            # append suffix until unique
+            i = 1
+            while output_path.exists():
+                output_path = (
+                    output_path.parent
+                    / f"{org_path.stem}_{start_time.strftime(cls.TEMPLATE_TIMESTAMP)}_{i}{org_path.suffix}"
+                )
+                i += 1
         return output_path
 
     def _prepare_run(
