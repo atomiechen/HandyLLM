@@ -169,6 +169,9 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
                 fout.write(cls._serialize_data(data))
 
     def dumps(self, base_path: Optional[PathType] = None) -> str:
+        """
+        Dump this HandyPrompt to a string.
+        """
         serialized_data = self._serialize_data(self.data)
         base_path = base_path or self.base_path
         return (
@@ -177,10 +180,16 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         )
 
     def dump(self, fd: IO[str], base_path: Optional[PathType] = None) -> None:
+        """
+        Dump this HandyPrompt to an `IO[str]` (e.g., file descriptor) (must support `write()`).
+        """
         text = self.dumps(base_path=base_path)
         fd.write(text)
 
     def dump_to(self, path: PathType, mkdir: bool = False) -> None:
+        """
+        Dump this HandyPrompt to a file.
+        """
         if mkdir:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as fd:
@@ -629,6 +638,9 @@ class ChatPrompt(
 
     @property
     def messages(self):
+        """
+        The underlying message data.
+        """
         return self.data
 
     @messages.setter
@@ -1224,6 +1236,9 @@ def loads(
     base_path: Optional[PathType] = None,
     cls: type[PromptType] = HandyPrompt,
 ) -> PromptType:
+    """
+    Load a HandyPrompt from a string.
+    """
     if handler.detect(text):
         metadata, data = frontmatter.parse(text, encoding, handler)
         meta = metadata.pop("meta", None)
@@ -1259,6 +1274,10 @@ def load(
     base_path: Optional[PathType] = None,
     cls: type[PromptType] = HandyPrompt,
 ) -> PromptType:
+    """
+    Load a HandyPrompt from an `IO[str]`
+    (e.g., file descriptor) (must support `read()`).
+    """
     text = fd.read()
     return loads(text, encoding, base_path=base_path, cls=cls)
 
@@ -1268,17 +1287,30 @@ def load_from(
     encoding: str = "utf-8",
     cls: type[PromptType] = HandyPrompt,
 ) -> PromptType:
+    """
+    Load a HandyPrompt for a path.
+    """
     with open(path, "r", encoding=encoding) as fd:
         return load(fd, encoding, base_path=Path(path).parent.resolve(), cls=cls)
 
 
 def dumps(prompt: HandyPrompt, base_path: Optional[PathType] = None) -> str:
+    """
+    Dump a HandyPrompt to a string.
+
+    This is the same as calling `prompt.dumps()`.
+    """
     return prompt.dumps(base_path)
 
 
 def dump(
     prompt: HandyPrompt, fd: IO[str], base_path: Optional[PathType] = None
 ) -> None:
+    """
+    Dump a HandyPrompt to an `IO[str]` (e.g., file descriptor) (must support `write()`).
+
+    This is the same as calling `prompt.dump()`.
+    """
     return prompt.dump(fd, base_path)
 
 
@@ -1287,6 +1319,11 @@ def dump_to(
     path: PathType,
     mkdir: bool = False,
 ) -> None:
+    """
+    Dump a HandyPrompt to a path.
+
+    This is the same as calling `prompt.dump_to()`.
+    """
     return prompt.dump_to(path, mkdir=mkdir)
 
 
