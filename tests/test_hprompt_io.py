@@ -10,6 +10,7 @@ from handyllm.hprompt import (
     RunConfig as RC,
 )
 from handyllm.utils import VM
+from handyllm.types import Message
 
 
 tests_dir = Path(__file__).parent
@@ -87,7 +88,8 @@ def test_add_chat_prompt():
     prompt = prompt1 + prompt2
     assert len(prompt.messages) == 4
 
-    prompt += {"role": "assistant", "content": "What can I do for you?"}
+    new: Message = {"role": "assistant", "content": "What can I do for you?"}
+    prompt += new
     prompt += "I want to know more about the product."
     assert len(prompt.messages) == 6
 
@@ -107,6 +109,6 @@ def test_add_completions_prompt():
 def test_extra_properties():
     prompt = assets_dir / "extra_properties.hprompt"
     loaded_prompt = load_from(prompt, cls=ChatPrompt)
-    assert loaded_prompt.messages[0]["key1"] == "cont'en{\"'t}\n1"
-    assert loaded_prompt.messages[0]["key2"] == 'co"nt\'en"t2'
-    assert loaded_prompt.messages[0]["key3"] == "con{te{{nt}3"
+    assert loaded_prompt.messages[0]["key1"] == "cont'en{\"'t}\n1"  # type: ignore
+    assert loaded_prompt.messages[0]["key2"] == 'co"nt\'en"t2'  # type: ignore
+    assert loaded_prompt.messages[0]["key3"] == "con{te{{nt}3"  # type: ignore

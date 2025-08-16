@@ -929,7 +929,7 @@ class ChatPrompt(
             self.messages.extend(other)
         elif isinstance(other, ChatPrompt):
             # merge two ChatPrompt objects
-            self += other.messages
+            self.messages.extend(other.messages)
             self._merge_non_data(other, inplace=True)
         else:
             raise TypeError(
