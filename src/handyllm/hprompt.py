@@ -130,6 +130,9 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
 
     @property
     def result_str(self) -> str:
+        """
+        Get the result string from the data.
+        """
         return str(self.data)
 
     @staticmethod
@@ -634,6 +637,11 @@ class ChatPrompt(
 
     @property
     def result_str(self) -> str:
+        """
+        Get the content string from the last message. If the content is
+        a list, return the text part if it exists. Otherwise, return
+        an empty string.
+        """
         if len(self.messages) == 0:
             return ""
         content = self.messages[-1]["content"]
@@ -646,6 +654,20 @@ class ChatPrompt(
             return ""
         else:
             return content
+
+    @property
+    def result_reasoning(self) -> str:
+        """
+        Get the reasoning content string from the last message. If it
+        does not exist, return an empty string.
+        """
+        if len(self.messages) == 0:
+            return ""
+        elif "reasoning_content" in self.messages[-1]:
+            content = self.messages[-1]["reasoning_content"]
+            if content:
+                return content
+        return ""
 
     @staticmethod
     def _serialize_data(data: List[Union[Message, InputMessage]]) -> str:
