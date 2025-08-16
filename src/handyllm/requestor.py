@@ -136,11 +136,11 @@ class Requestor(Generic[ResponseType, YieldType]):
         log_strs.append(f"API request {self.url}")
         log_strs.append(f"api_type: {self.api_type}")
         log_strs.append(
-            f"api_key: {self.api_key[:plaintext_len]}{'*'*(len(self.api_key)-plaintext_len)}"
+            f"api_key: {self.api_key[:plaintext_len]}{'*' * (len(self.api_key) - plaintext_len)}"
         )
         if self.organization is not None:
             log_strs.append(
-                f"organization: {self.organization[:plaintext_len]}{'*'*(len(self.organization)-plaintext_len)}"
+                f"organization: {self.organization[:plaintext_len]}{'*' * (len(self.organization) - plaintext_len)}"
             )
         log_strs.append(f"timeout: {self.timeout}")
         module_logger.info("\n".join(log_strs))
