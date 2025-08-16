@@ -5,6 +5,13 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.9.3] - 2024-12-18
+
+### Fixed
+
+- Due to the change in `httpx==0.28.0` (see its [CHANGELOG](https://github.com/encode/httpx/blob/master/CHANGELOG.md)), the request `params` cannot be `{}` as it will override the original query params. This will cause errors like 404 Resource Not Found, when the `api-version` parameter in Azure endpoint is overridden. Now when `params` is an empty dictionary, it will be passed as the default `None`. See httpx [PR 3364](https://github.com/encode/httpx/pull/3364) and [Issue 3433](https://github.com/encode/httpx/issues/3433). 
+
+
 ## [0.9.2] - 2024-08-09
 
 ### Fixed

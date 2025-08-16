@@ -2,8 +2,6 @@
 legacy OpenAIAPI support
 """
 
-__all__ = ["OpenAIAPI"]
-
 from typing import Union
 from .openai_client import OpenAIClient, ClientMode
 from .requestor import Requestor

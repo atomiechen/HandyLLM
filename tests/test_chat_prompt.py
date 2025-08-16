@@ -97,7 +97,7 @@ def test_chat_fetch():
     prompt_file = tests_dir / "assets" / "chat.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
     response = prompt.fetch(api_key="fake-key")
-    assert response.choices[0].message["role"] == "assistant"
+    assert response["choices"][0]["message"]["role"] == "assistant"
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_async_chat_fetch():
     prompt_file = tests_dir / "assets" / "chat.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
     response = await prompt.afetch(api_key="fake-key")
-    assert response.choices[0].message["role"] == "assistant"
+    assert response["choices"][0]["message"]["role"] == "assistant"
 
 
 @responses.activate
@@ -116,12 +116,13 @@ def test_chat_stream():
     prompt_file = tests_dir / "assets" / "chat.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
-    for role, text, tool_call in stream_chat_all(prompt.stream(api_key="fake-key")):
-        print(role, text, tool_call)
-        assert role == "assistant"
-        assert not tool_call
-        assert text
-        content += text
+    for chunk in stream_chat_all(prompt.stream(api_key="fake-key")):
+        print(chunk)
+        assert chunk["role"] == "assistant"
+        assert not chunk["tool_call"]
+        assert chunk["content"]
+        assert chunk["reasoning_content"] is None
+        content += chunk["content"]
     assert content == "Hello world!"
 
 
@@ -132,14 +133,13 @@ async def test_async_chat_stream():
     prompt_file = tests_dir / "assets" / "chat.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
     content = ""
-    async for role, text, tool_call in astream_chat_all(
-        prompt.astream(api_key="fake-key")
-    ):
-        print(role, text, tool_call)
-        assert role == "assistant"
-        assert not tool_call
-        assert text
-        content += text
+    async for chunk in astream_chat_all(prompt.astream(api_key="fake-key")):
+        print(chunk)
+        assert chunk["role"] == "assistant"
+        assert not chunk["tool_call"]
+        assert chunk["content"]
+        assert chunk["reasoning_content"] is None
+        content += chunk["content"]
     assert content == "Hello world!"
 
 
@@ -179,15 +179,17 @@ async def test_on_chunk_chat():
     prompt_file = tests_dir / "assets" / "chat.hprompt"
     prompt = load_from(prompt_file, cls=ChatPrompt)
 
-    def on_chunk(role, content, tool_call):
-        state["role"] = role
-        state["content"] += content
-        state["tool_call"] = tool_call
+    def on_chunk(chunk):
+        state["role"] = chunk["role"]
+        state["content"] += chunk["content"]
+        assert chunk["reasoning_content"] is None
+        state["tool_call"] = chunk["tool_call"]
 
-    async def aon_chunk(role, content, tool_call):
-        state["role"] = role
-        state["content"] += content
-        state["tool_call"] = tool_call
+    async def aon_chunk(chunk):
+        state["role"] = chunk["role"]
+        state["content"] += chunk["content"]
+        assert chunk["reasoning_content"] is None
+        state["tool_call"] = chunk["tool_call"]
 
     sync_run_config = RunConfig(on_chunk=on_chunk)
     async_run_config = RunConfig(on_chunk=aon_chunk)

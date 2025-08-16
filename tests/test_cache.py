@@ -90,3 +90,16 @@ def test_custom_load_dump(tmp_path: Path):
 
     out2 = wrapped_func()
     assert out2 == 1
+
+
+def test_ensure_dumped(tmp_path: Path, capsys: CaptureFixture[str]):
+    cm = CacheManager(base_dir=tmp_path)
+    wrapped_func = cm.ensure_dumped(func=func, out="test.txt", dump_method=str)
+    out = wrapped_func()
+    assert (tmp_path / "test.txt").read_text() == "1"
+    assert out is None
+    assert capsys.readouterr().out == "In func\n"
+
+    out2 = wrapped_func()
+    assert out2 is None
+    assert capsys.readouterr().out == ""

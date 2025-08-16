@@ -30,8 +30,39 @@ on:
         required: false
 
 jobs:
+  get-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.set_release_tag.outputs.tag }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    - name: Fetch all tags
+      run: |
+        git fetch --prune --unshallow --tags
+    - name: Verify and set release tag
+      id: set_release_tag
+      run: |
+        release_tag=${{ inputs.release_tag }}
+        if [ -z "$release_tag" ]; then
+          echo "Input tag is empty. Fetching latest tag."
+          release_tag=$(git describe --tags $(git rev-list --tags --max-count=1))
+          if [ -z "$release_tag" ]; then
+            echo "No latest tag available. Exiting workflow."
+            exit 1
+          fi
+        else
+          if ! git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            echo "Invalid tag '$release_tag'. Exiting workflow."
+            exit 1
+          fi
+        fi
+        echo "::set-output name=tag::$release_tag"
   test:
+    needs: get-tag
     uses: ./.github/workflows/test.yml
+    with:
+      release_tag: ${{ needs.get-tag.outputs.release_tag }}
   build-n-publish:
     needs: test
     uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@main
@@ -41,7 +72,7 @@ jobs:
       publish_gh_release: ${{ inputs.publish_gh_release }}
       use_changelog: ${{ inputs.use_changelog }}
       changelog_file: ${{ inputs.changelog_file }}
-      release_tag: ${{ inputs.release_tag }}
+      release_tag: ${{ needs.get-tag.outputs.release_tag }}
     secrets:
       TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

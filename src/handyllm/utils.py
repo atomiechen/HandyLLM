@@ -1,25 +1,3 @@
-__all__ = [
-    "get_filename_from_url",
-    "download_binary",
-    "trans_stream_chat",
-    "echo_consumer",
-    "stream_chat_all",
-    "stream_chat_with_role",
-    "stream_chat",
-    "stream_completions",
-    "astream_chat_all",
-    "astream_chat_with_role",
-    "astream_chat",
-    "astream_completions",
-    "stream_to_fd",
-    "stream_to_file",
-    "astream_to_fd",
-    "astream_to_file",
-    "VM",
-    "encode_image",
-    "local_path_to_base64",
-]
-
 import base64
 import copy
 from pathlib import Path
@@ -39,8 +17,18 @@ from urllib.request import url2pathname
 import os
 import time
 
-from .types import PathType, ShortChatChunk
-from .response import ChatChunk, CompletionsChunk, ToolCallDelta
+from .types import (
+    AudioContentPart,
+    ChatChunkUnified,
+    ImageContentPart,
+    PathType,
+    ShortChatChunk,
+    ChatChunk,
+    CompletionsChunk,
+    TextContentPart,
+    ToolCallDelta,
+)
+
 
 YieldType = TypeVar("YieldType")
 
@@ -73,7 +61,7 @@ def trans_stream_chat(
 ) -> Generator[Optional[YieldType], Optional[ChatChunk], None]:
     next(consumer)  # prime the generator
     role = ""
-    tool_call = ToolCallDelta()
+    tool_call = None
     ret = None
     try:
         while True:
@@ -86,28 +74,40 @@ def trans_stream_chat(
                 if "role" in message:
                     role = cast(str, message["role"])
                 content = cast(Optional[str], message.get("content"))
+                reasoning_content = cast(
+                    Optional[str], message.get("reasoning_content")
+                )
                 tool_calls = cast(
                     Optional[List[ToolCallDelta]], message.get("tool_calls")
                 )
                 if tool_calls:
                     for chunk in tool_calls:
-                        if chunk["index"] == tool_call.get("index"):
+                        if tool_call and chunk["index"] == tool_call["index"]:
                             tool_call["function"]["arguments"] += chunk["function"][
                                 "arguments"
                             ]
                         else:
                             if tool_call:
                                 # this is a new tool call, yield the previous one
-                                ret = consumer.send((role, content, tool_call))
+                                ret = consumer.send(
+                                    (role, content, reasoning_content, tool_call)
+                                )
                             # reset the tool call
                             tool_call = copy.deepcopy(chunk)
-                elif content:
-                    ret = consumer.send((role, content, tool_call))
+                elif content or reasoning_content:
+                    ret = consumer.send(
+                        (
+                            role,
+                            content,
+                            reasoning_content,
+                            cast(ToolCallDelta, tool_call),
+                        )
+                    )
             except (KeyError, IndexError):
                 pass
         if tool_call:
             # yield the last tool call
-            ret = consumer.send((role, None, tool_call))
+            ret = consumer.send((role, None, None, tool_call))
             yield ret
         else:
             yield None
@@ -124,23 +124,43 @@ def echo_consumer():
 
 def stream_chat_all(
     response: Iterable[ChatChunk],
-) -> Generator[ShortChatChunk, None, None]:
-    producer = trans_stream_chat(echo_consumer())
+) -> Generator[ChatChunkUnified, None, None]:
+    producer = trans_stream_chat(
+        cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
+    )
     next(producer)  # prime the generator
     for data in response:
         ret = producer.send(data)
         if ret is not None:
-            yield ret
+            role, content, reasoning_content, tool_call = ret
+            yield {
+                "role": role,
+                "content": content,
+                "reasoning_content": reasoning_content,
+                "tool_call": tool_call,
+            }
     ret = producer.send(None)  # signal the end of the stream
     if ret is not None:
-        yield ret
+        role, content, reasoning_content, tool_call = ret
+        yield {
+            "role": role,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "tool_call": tool_call,
+        }
     producer.close()
 
 
 def stream_chat_with_role(response: Iterable[ChatChunk]):
-    for role, text, _ in stream_chat_all(response):
-        if text:
-            yield role, text
+    for chunk in stream_chat_all(response):
+        if chunk["content"]:
+            yield chunk["role"], chunk["content"]
+
+
+def stream_chat_with_reasoning(response: Iterable[ChatChunk]):
+    for chunk in stream_chat_all(response):
+        if chunk["reasoning_content"] or chunk["content"]:
+            yield chunk["reasoning_content"], chunk["content"]
 
 
 def stream_chat(response: Iterable[ChatChunk]):
@@ -158,23 +178,43 @@ def stream_completions(response: Iterable[CompletionsChunk]):
 
 async def astream_chat_all(
     response: AsyncIterable[ChatChunk],
-) -> AsyncGenerator[ShortChatChunk, None]:
-    producer = trans_stream_chat(echo_consumer())
+) -> AsyncGenerator[ChatChunkUnified, None]:
+    producer = trans_stream_chat(
+        cast(Generator[Optional[ShortChatChunk], ShortChatChunk, None], echo_consumer())
+    )
     next(producer)  # prime the generator
     async for data in response:
         ret = producer.send(data)
         if ret is not None:
-            yield ret
+            role, content, reasoning_content, tool_call = ret
+            yield {
+                "role": role,
+                "content": content,
+                "reasoning_content": reasoning_content,
+                "tool_call": tool_call,
+            }
     ret = producer.send(None)  # signal the end of the stream
     if ret is not None:
-        yield ret
+        role, content, reasoning_content, tool_call = ret
+        yield {
+            "role": role,
+            "content": content,
+            "reasoning_content": reasoning_content,
+            "tool_call": tool_call,
+        }
     producer.close()
 
 
 async def astream_chat_with_role(response: AsyncIterable[ChatChunk]):
-    async for role, text, _ in astream_chat_all(response):
-        if text:
-            yield role, text
+    async for chunk in astream_chat_all(response):
+        if chunk["content"]:
+            yield chunk["role"], chunk["content"]
+
+
+async def astream_chat_with_reasoning(response: AsyncIterable[ChatChunk]):
+    async for chunk in astream_chat_all(response):
+        if chunk["reasoning_content"] or chunk["content"]:
+            yield chunk["reasoning_content"], chunk["content"]
 
 
 async def astream_chat(response: AsyncIterable[ChatChunk]):
@@ -217,17 +257,49 @@ def VM(**kwargs: str):
     return transformed_vm
 
 
-def encode_image(image_path: PathType):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+def encode_bin_file(local_path: PathType):
+    """
+    Convert a local binary file to a base64 string.
+    """
+    with open(local_path, "rb") as local_file:
+        return base64.b64encode(local_file.read()).decode("utf-8")
 
 
-def local_path_to_base64(url: str, base_path: Optional[PathType]):
-    # replace the image URL with the actual image
+def file_uri_to_base64(url: str, base_path: Optional[PathType]):
+    """
+    Convert a file URI like `file:///path/to/file` to a base64 string.
+    """
     parsed = urlparse(url)
     local_path = Path(url2pathname(parsed.netloc + parsed.path))
     if base_path:
         # support relative path
         local_path = base_path / local_path
-    base64_image = encode_image(local_path.resolve())
-    return f"data:image/jpeg;base64,{base64_image}"
+    base64_image = encode_bin_file(local_path.resolve())
+    return base64_image
+
+
+def file_uri_to_base64_image(url: str, base_path: Optional[PathType]):
+    """
+    Convert a file URI like `file:///path/to/file` to a base64 string for an image.
+    """
+    return f"data:image/jpeg;base64,{file_uri_to_base64(url, base_path)}"
+
+
+def content_part_text(text: str) -> TextContentPart:
+    return {"type": "text", "text": text}
+
+
+def content_part_image(
+    url_or_base64: str, detail: Optional[str] = None
+) -> ImageContentPart:
+    ret: ImageContentPart = {"type": "image_url", "image_url": {"url": url_or_base64}}
+    if detail:
+        ret["image_url"]["detail"] = detail
+    return ret
+
+
+def content_part_audio(url_or_base64: str, format: str) -> AudioContentPart:
+    return {
+        "type": "input_audio",
+        "input_audio": {"data": url_or_base64, "format": format},
+    }
