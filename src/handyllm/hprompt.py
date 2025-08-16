@@ -636,7 +636,16 @@ class ChatPrompt(
     def result_str(self) -> str:
         if len(self.messages) == 0:
             return ""
-        return cast(str, self.messages[-1]["content"])
+        content = self.messages[-1]["content"]
+        if not content:
+            return ""
+        elif isinstance(content, list):
+            for item in content:
+                if "text" in item:
+                    return item["text"]
+            return ""
+        else:
+            return content
 
     @staticmethod
     def _serialize_data(data: List[Union[Message, InputMessage]]) -> str:
