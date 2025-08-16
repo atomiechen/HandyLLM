@@ -40,3 +40,8 @@ htmlcov
 # ruff output
 .ruff_cache
 
+# docs output
+site
+
+# vscode
+.vscode
