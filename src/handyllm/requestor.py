@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-__all__ = [
-    "Requestor",
-    "DictRequestor",
-    "BinRequestor",
-    "ChatRequestor",
-    "CompletionsRequestor",
-]
-
 from typing import (
+    Any,
     AsyncGenerator,
     Callable,
     Generator,
     Generic,
+    Mapping,
     Optional,
     TypeVar,
     Union,
@@ -25,10 +19,9 @@ import requests
 import httpx
 
 from ._constants import API_TYPES_AZURE
-from .response import (
+from .types import (
     ChatChunk,
     CompletionsChunk,
-    DictProxy,
     ChatResponse,
     CompletionsResponse,
 )
@@ -40,8 +33,8 @@ module_logger.addHandler(logging.NullHandler())
 
 ResponseType = TypeVar("ResponseType")
 YieldType = TypeVar("YieldType")
-DictResponseType = TypeVar("DictResponseType", bound="DictProxy")
-DictYieldType = TypeVar("DictYieldType", bound="DictProxy")
+DictResponseType = TypeVar("DictResponseType", bound="Mapping[str, Any]")
+DictYieldType = TypeVar("DictYieldType", bound="Mapping[str, Any]")
 
 
 class Requestor(Generic[ResponseType, YieldType]):
@@ -143,11 +136,11 @@ class Requestor(Generic[ResponseType, YieldType]):
         log_strs.append(f"API request {self.url}")
         log_strs.append(f"api_type: {self.api_type}")
         log_strs.append(
-            f"api_key: {self.api_key[:plaintext_len]}{'*'*(len(self.api_key)-plaintext_len)}"
+            f"api_key: {self.api_key[:plaintext_len]}{'*' * (len(self.api_key) - plaintext_len)}"
         )
         if self.organization is not None:
             log_strs.append(
-                f"organization: {self.organization[:plaintext_len]}{'*'*(len(self.organization)-plaintext_len)}"
+                f"organization: {self.organization[:plaintext_len]}{'*' * (len(self.organization) - plaintext_len)}"
             )
         log_strs.append(f"timeout: {self.timeout}")
         module_logger.info("\n".join(log_strs))
@@ -453,32 +446,6 @@ class DictRequestor(
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.raw = False
-
-    def call(self) -> Union[DictResponseType, Generator[DictYieldType, None, None]]:
-        response = super().call()
-        if self._stream:
-
-            def gen_wrapper(response):
-                for data in response:
-                    yield DictProxy(data)
-
-            return cast(Generator[DictYieldType, None, None], gen_wrapper(response))
-        else:
-            return cast(DictResponseType, DictProxy(response))
-
-    async def acall(
-        self,
-    ) -> Union[DictResponseType, AsyncGenerator[DictYieldType, None]]:
-        response = await super().acall()
-        if self._stream:
-
-            async def agen_wrapper(response):
-                async for data in response:
-                    yield DictProxy(data)
-
-            return cast(AsyncGenerator[DictYieldType, None], agen_wrapper(response))
-        else:
-            return cast(DictResponseType, DictProxy(response))
 
 
 class BinRequestor(Requestor[bytes, bytes]):

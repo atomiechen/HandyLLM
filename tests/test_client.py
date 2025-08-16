@@ -66,8 +66,8 @@ def test_chat_fetch():
             ]
         ).fetch()
         print(response)
-        assert response.choices[0].message["role"] == "assistant"
-        assert response.usage.total_tokens == 21
+        assert response["choices"][0]["message"]["role"] == "assistant"
+        assert response["usage"]["total_tokens"] == 21
 
 
 @responses.activate
@@ -134,13 +134,13 @@ def test_chat_stream():
         result = ""
         for chunk in response:
             print(chunk)
-            if "role" in chunk.choices[0].delta:
-                assert chunk.choices[0].delta["role"] == "assistant"
+            if "role" in chunk["choices"][0]["delta"]:
+                assert chunk["choices"][0]["delta"]["role"] == "assistant"
             if (
-                "content" in chunk.choices[0].delta
-                and chunk.choices[0].delta["content"]
+                "content" in chunk["choices"][0]["delta"]
+                and chunk["choices"][0]["delta"]["content"]
             ):
-                result += chunk.choices[0].delta["content"]
+                result += chunk["choices"][0]["delta"]["content"]
         assert result == "Hello"
 
 

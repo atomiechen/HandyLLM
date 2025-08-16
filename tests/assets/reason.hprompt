@@ -1,0 +1,10 @@
+---
+meta:
+  output_path: tmp-out/%Y-%m-%d/reason.%H-%M-%S.hprompt
+api_base: https://api.deepseek.com
+model: deepseek-reasoner
+temperature: 0.2
+---
+
+$user$
+Please imagine a place in the universe where math and art intersect, but not physics. Answer me in one sentence, no explanation, think as little as possible.

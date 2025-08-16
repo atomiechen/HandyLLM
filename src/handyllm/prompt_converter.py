@@ -1,9 +1,20 @@
-__all__ = ["PromptConverter"]
-
+from copy import deepcopy
+import json
 import re
-from typing import IO, Generator, MutableMapping, MutableSequence, Optional
+from typing import (
+    IO,
+    Dict,
+    Generator,
+    List,
+    Literal,
+    MutableMapping,
+    MutableSequence,
+    Optional,
+    Union,
+    cast,
+)
 
-from .types import PathType, ShortChatChunk
+from .types import InputMessage, PathType, ShortChatChunk, Message
 from ._io import yaml_dump, yaml_load
 
 
@@ -17,9 +28,7 @@ class PromptConverter:
     def split_pattern(self):
         # build a regex pattern to split the prompt by role keys
         return (
-            r"^\$("
-            + "|".join(self.role_keys)
-            + r")\$[^\S\r\n]*(?:{([^{}]*?)})?[^\S\r\n]*$"
+            r"^\$(" + "|".join(self.role_keys) + r")\$[^\S\r\n]*(?:{(.*)})?[^\S\r\n]*$"
         )
 
     def detect(self, raw_prompt: str):
@@ -40,7 +49,7 @@ class PromptConverter:
             value = blocks[idx + 1]
             self.substitute_map[key] = value.strip()
 
-    def raw2msgs(self, raw_prompt: str):
+    def raw2msgs(self, raw_prompt: str) -> List[Union[Message, InputMessage]]:
         # substitute pre-defined variables
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
@@ -52,12 +61,11 @@ class PromptConverter:
             role = blocks[idx]
             extra = blocks[idx + 1]
             content = blocks[idx + 2]
-            if content:
-                content = content.strip()
-            msg = {"role": role, "content": content}
+            obj = self.parse_content(content)
+            msg = {"role": role, **obj}
             if extra:
                 key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("[^"]*"|\'[^\']*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
+                    r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
                     extra,
                 )
                 # parse extra properties
@@ -69,8 +77,14 @@ class PromptConverter:
                     elif array:
                         extra_properties["type"] = "content_array"
                     else:
-                        # remove quotes of the value
-                        extra_properties[key] = value[1:-1]
+                        # convert single quoted to double quoted
+                        if value.startswith("'"):
+                            inner = value[1:-1]
+                            inner = inner.replace(r"\'", "'")
+                            inner = inner.replace('"', r"\"")
+                            value = f'"{inner}"'
+                        # decode escaped string
+                        extra_properties[key] = json.loads(value)
                 if "type" in extra_properties:
                     type_of_msg = extra_properties.pop("type")
                     if type_of_msg == "tool_calls":
@@ -85,6 +99,23 @@ class PromptConverter:
 
         return msgs
 
+    @staticmethod
+    def parse_content(content: str):
+        content = content.strip()
+        blocks = re.split(
+            r"^\$\$(\w+)\$\$[^\S\r\n]*$",
+            content,
+            flags=re.MULTILINE,
+        )
+        if len(blocks) == 1:
+            return {"content": content}
+        ret: Dict[str, str] = {}
+        for idx in range(1, len(blocks), 2):
+            key = blocks[idx]
+            value = blocks[idx + 1]
+            ret[key] = value.strip()
+        return ret
+
     def rawfile2msgs(self, raw_prompt_path: PathType):
         with open(raw_prompt_path, "r", encoding="utf-8") as fin:
             raw_prompt = fin.read()
@@ -92,17 +123,21 @@ class PromptConverter:
         return self.raw2msgs(raw_prompt)
 
     @staticmethod
-    def msgs2raw(msgs):
+    def msgs2raw(msgs: List[Union[Message, InputMessage]]):
         # convert messages format to plain text
         messages = []
         for message in msgs:
             role = message.get("role")
             content = message.get("content")
+            reasoning_content = message.get("reasoning_content")
             tool_calls = message.get("tool_calls")
             extras = []
             for key in message:
-                if key not in ["role", "content", "tool_calls"]:
-                    extras.append(f"{key}={message[key]}")
+                if key not in ["role", "content", "tool_calls", "reasoning_content"]:
+                    escaped = json.dumps(
+                        message[key], ensure_ascii=False
+                    )  # ensure quote/newline escaping
+                    extras.append(f"{key}={escaped}")
             if tool_calls:
                 extras.append("tool")
                 content = yaml_dump(tool_calls)
@@ -113,7 +148,13 @@ class PromptConverter:
                 extra = " {" + " ".join(extras) + "}"
             else:
                 extra = ""
-            messages.append(f"${role}${extra}\n{content}")
+            content = cast(str, content).strip()
+            if reasoning_content is not None:
+                reasoning_content = reasoning_content.strip()
+                raw = f"${role}${extra}\n$$reasoning_content$$\n{reasoning_content}\n\n$$content$$\n{content}"
+            else:
+                raw = f"${role}${extra}\n{content}"
+            messages.append(raw)
         raw_prompt = "\n\n".join(messages)
         return raw_prompt
 
@@ -124,10 +165,18 @@ class PromptConverter:
         # stream response to fd
         role = ""
         role_completed = False
+
+        content_state: Literal[0, 1, 2, 3] = 0
+        """
+        0: initial state
+        1: in reasoning text region
+        2: in content text region
+        """
+
         data = None
         while True:
             data = yield data
-            r, text, tool_call = data
+            r, text, reasoning_text, tool_call = data
             if r != role:
                 role = r
                 fd.write(f"${role}$")  # do not add newline
@@ -137,10 +186,21 @@ class PromptConverter:
                     role_completed = True
                 # dump tool calls
                 fd.write(yaml_dump([tool_call]))
+            elif reasoning_text:
+                if not role_completed:
+                    fd.write("\n")
+                    role_completed = True
+                if content_state == 0:
+                    fd.write("$$reasoning_content$$\n")
+                    content_state = 1
+                fd.write(reasoning_text)
             elif text:
                 if not role_completed:
                     fd.write("\n")
                     role_completed = True
+                if content_state == 1:
+                    fd.write("\n\n$$content$$\n")
+                    content_state = 2
                 fd.write(text)
 
     @classmethod
@@ -150,22 +210,27 @@ class PromptConverter:
             fout.write(raw_prompt)
 
     @classmethod
-    def msgs_replace_variables(cls, msgs, variable_map: MutableMapping, inplace=False):
+    def msgs_replace_variables(
+        cls,
+        msgs: List[Union[Message, InputMessage]],
+        variable_map: MutableMapping,
+        inplace=False,
+    ):
         # replace every variable in messages content
         if inplace:
             for message in msgs:
                 content = message.get("content")
                 if content:
-                    message["content"] = cls._replace_deep(content, variable_map)
+                    message["content"] = cls._replace_deep(content, variable_map)  # type: ignore
             return msgs
         else:
             new_msgs = []
             for message in msgs:
-                new_message = message.copy()
+                new_message = deepcopy(message)
                 new_msgs.append(new_message)
                 content = new_message.get("content")
                 if content:
-                    new_message["content"] = cls._replace_deep(content, variable_map)
+                    new_message["content"] = cls._replace_deep(content, variable_map)  # type: ignore
             return new_msgs
 
     @classmethod
