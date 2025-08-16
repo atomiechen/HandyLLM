@@ -447,32 +447,6 @@ class DictRequestor(
         super().__init__(*args, **kwargs)
         self.raw = False
 
-    def call(self) -> Union[DictResponseType, Generator[DictYieldType, None, None]]:
-        response = super().call()
-        if self._stream:
-
-            def gen_wrapper(response):
-                for data in response:
-                    yield data
-
-            return cast(Generator[DictYieldType, None, None], gen_wrapper(response))
-        else:
-            return cast(DictResponseType, response)
-
-    async def acall(
-        self,
-    ) -> Union[DictResponseType, AsyncGenerator[DictYieldType, None]]:
-        response = await super().acall()
-        if self._stream:
-
-            async def agen_wrapper(response):
-                async for data in response:
-                    yield data
-
-            return cast(AsyncGenerator[DictYieldType, None], agen_wrapper(response))
-        else:
-            return cast(DictResponseType, response)
-
 
 class BinRequestor(Requestor[bytes, bytes]):
     def __init__(self, *args, **kwargs):
