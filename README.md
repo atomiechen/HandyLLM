@@ -11,6 +11,7 @@
 [![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white&color=brown)][1]
 [![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)][2]
 [![sublimepackage](https://img.shields.io/github/v/tag/atomiechen/Sublime-HandyLLM?logo=sublimetext&label=ST%20Package)][3]
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/atomiechen/HandyLLM)
 
 A handy toolkit for using LLM, with both ***development support ([Python][1])*** and ***editor support ([VSCode][2] & [Sublime Text][3])***.
 
