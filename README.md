@@ -13,7 +13,7 @@
 [![sublimepackage](https://img.shields.io/github/v/tag/atomiechen/Sublime-HandyLLM?logo=sublimetext&label=ST%20Package)][3]
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/atomiechen/HandyLLM)
 
-A handy toolkit for using LLM, with both ***development support ([Python][1])*** and ***editor support ([VSCode][2] & [Sublime Text][3])***.
+A handy toolkit for using LLM, with both ***development support ([Python][1])*** and ***editor support ([VSCode][2] • [VSCode Compatible Editors][4] • [Sublime Text][3])***.
 
 
 
@@ -53,7 +53,7 @@ or, install from the Github repo to get latest updates:
 pip3 install git+https://github.com/atomiechen/handyllm.git
 ```
 
-Please check HandyLLM [VSCode extension][2] or [Sublime Text Package][3] for editor support.
+For editor support, check the HandyLLM VSCode extension from [marketplace][2] or [Open VSX][4], or the [Sublime Text Package][3].
 
 
 
@@ -72,4 +72,5 @@ Please check out our [wiki](https://github.com/atomiechen/HandyLLM/wiki) for com
 [1]: https://pypi.org/project/HandyLLM/
 [2]: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
 [3]: https://packagecontrol.io/packages/HandyLLM
+[4]: https://open-vsx.org/extension/atomiechen/handyllm
 
