@@ -7,13 +7,14 @@
 
 # HandyLLM
 
-[![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)][0]
-[![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white&color=brown)][1]
-[![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)][2]
-[![sublimepackage](https://img.shields.io/github/v/tag/atomiechen/Sublime-HandyLLM?logo=sublimetext&label=ST%20Package)][3]
+[![GitHub](https://img.shields.io/badge/github-HandyLLM-blue?logo=github)][handyllm-github]
+[![PyPI](https://img.shields.io/pypi/v/HandyLLM?logo=pypi&logoColor=white&color=brown)][pypi]
+[![vsmarketplace](https://vsmarketplacebadges.dev/version-short/atomiechen.handyllm.svg)][vsmarketplace]
+[![Open VSX Version](https://img.shields.io/open-vsx/v/atomiechen/handyllm)][openvsx]
+[![sublimepackage](https://img.shields.io/github/v/tag/atomiechen/Sublime-HandyLLM?logo=sublimetext&label=ST%20Package)][sublime]
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/atomiechen/HandyLLM)
 
-A handy toolkit for using LLM, with both ***development support ([Python][1])*** and ***editor support ([VSCode][2] • [VSCode Compatible Editors][4] • [Sublime Text][3])***.
+A handy toolkit for using LLM, with both ***development support ([Python][pypi])*** and ***editor support ([VSCode][vsmarketplace] • [VSCode Compatible Editors][openvsx] • [Sublime Text][sublime])***.
 
 
 
@@ -53,7 +54,7 @@ or, install from the Github repo to get latest updates:
 pip3 install git+https://github.com/atomiechen/handyllm.git
 ```
 
-For editor support, check the HandyLLM VSCode extension from [marketplace][2] or [Open VSX][4], or the [Sublime Text Package][3].
+For editor support, check the HandyLLM VSCode extension from [marketplace][vsmarketplace] or [Open VSX][openvsx], or the [Sublime Text Package][sublime].
 
 
 
@@ -65,12 +66,12 @@ Please check out our [wiki](https://github.com/atomiechen/HandyLLM/wiki) for com
 
 ## License
 
-[HandyLLM][0] © 2024 by [Atomie CHEN](https://github.com/atomiechen) is licensed under the MIT License - see the [LICENSE](https://github.com/atomiechen/HandyLLM/blob/main/LICENSE) file for details.
+[HandyLLM][handyllm-github] © 2024 by [Atomie CHEN](https://github.com/atomiechen) is licensed under the MIT License - see the [LICENSE](https://github.com/atomiechen/HandyLLM/blob/main/LICENSE) file for details.
 
 
-[0]: https://github.com/atomiechen/HandyLLM
-[1]: https://pypi.org/project/HandyLLM/
-[2]: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
-[3]: https://packagecontrol.io/packages/HandyLLM
-[4]: https://open-vsx.org/extension/atomiechen/handyllm
+[handyllm-github]: https://github.com/atomiechen/HandyLLM
+[pypi]: https://pypi.org/project/HandyLLM/
+[vsmarketplace]: https://marketplace.visualstudio.com/items?itemName=atomiechen.handyllm
+[sublime]: https://packagecontrol.io/packages/HandyLLM
+[openvsx]: https://open-vsx.org/extension/atomiechen/handyllm
 
