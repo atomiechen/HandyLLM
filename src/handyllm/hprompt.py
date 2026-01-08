@@ -137,19 +137,45 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
 
     @classmethod
     def loads(
-        cls,
+        cls: Type[PromptType],
         text: str,
         encoding: str = "utf-8",
         base_path: Optional[PathType] = None,
-    ):
+    ) -> PromptType:
         """
         Load a HandyPrompt from a string.
 
         The returned prompt type depends on the following rules:
-        - If called from HandyPrompt, the prompt type is *auto detected*.
-        - If called from a subclass, the specified subclass is used.
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
         """
-        return loads(text=text, encoding=encoding, base_path=base_path, cls=cls)
+        if handler.detect(text):
+            metadata, data = frontmatter.parse(text, encoding, handler)
+            meta = metadata.pop("meta", None)
+            if not isinstance(meta, dict):
+                meta = {}
+            request = metadata
+        else:
+            data = text
+            request = {}
+            meta = {}
+        if cls == HandyPrompt:
+            # get specific prompt class
+            api: str = meta.get("api", "")
+            if api:
+                api = api.lower()
+                if api.startswith("chat"):
+                    cls = cast(Type[PromptType], ChatPrompt)
+                else:
+                    cls = cast(Type[PromptType], CompletionsPrompt)
+            else:
+                if converter.detect(data):
+                    cls = cast(Type[PromptType], ChatPrompt)
+                else:
+                    cls = cast(Type[PromptType], CompletionsPrompt)
+        if cls == ChatPrompt:
+            data = converter.raw2msgs(data)
+        return cls(data, request, meta, base_path)
 
     @classmethod
     def load(
@@ -162,10 +188,11 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         Load a HandyPrompt from an `IO[str]` (e.g., file descriptor) (must support `read()`).
 
         The returned prompt type depends on the following rules:
-        - If called from HandyPrompt, the prompt type is *auto detected*.
-        - If called from a subclass, the specified subclass is used.
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
         """
-        return load(fd=fd, encoding=encoding, base_path=base_path, cls=cls)
+        text = fd.read()
+        return cls.loads(text, encoding, base_path=base_path)
 
     @classmethod
     def load_from(
@@ -177,10 +204,11 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         Load a HandyPrompt from a path.
 
         The returned prompt type depends on the following rules:
-        - If called from HandyPrompt, the prompt type is *auto detected*.
-        - If called from a subclass, the specified subclass is used.
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
         """
-        return load_from(path=path, encoding=encoding, cls=cls)
+        with open(path, "r", encoding=encoding) as fd:
+            return cls.load(fd, encoding, base_path=Path(path).parent.resolve())
 
     @staticmethod
     def _serialize_data(data: DataType) -> str:
@@ -1286,33 +1314,7 @@ def loads(
     """
     Load a HandyPrompt from a string, defaulting to a ChatPrompt.
     """
-    if handler.detect(text):
-        metadata, data = frontmatter.parse(text, encoding, handler)
-        meta = metadata.pop("meta", None)
-        if not isinstance(meta, dict):
-            meta = {}
-        request = metadata
-    else:
-        data = text
-        request = {}
-        meta = {}
-    if cls == HandyPrompt:
-        # get specific prompt class
-        api: str = meta.get("api", "")
-        if api:
-            api = api.lower()
-            if api.startswith("chat"):
-                cls = cast(Type[PromptType], ChatPrompt)
-            else:
-                cls = cast(Type[PromptType], CompletionsPrompt)
-        else:
-            if converter.detect(data):
-                cls = cast(Type[PromptType], ChatPrompt)
-            else:
-                cls = cast(Type[PromptType], CompletionsPrompt)
-    if cls == ChatPrompt:
-        data = converter.raw2msgs(data)
-    return cls(data, request, meta, base_path)
+    return cls.loads(text, encoding, base_path)
 
 
 def load(
@@ -1327,8 +1329,7 @@ def load(
 
     By default, assumes a ChatPrompt.
     """
-    text = fd.read()
-    return loads(text, encoding, base_path=base_path, cls=cls)
+    return cls.load(fd, encoding, base_path)
 
 
 def load_from(
@@ -1339,8 +1340,7 @@ def load_from(
     """
     Load a HandyPrompt from a path, defaulting to a ChatPrompt.
     """
-    with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding, base_path=Path(path).parent.resolve(), cls=cls)
+    return cls.load_from(path, encoding)
 
 
 def dumps(prompt: HandyPrompt, base_path: Optional[PathType] = None) -> str:
