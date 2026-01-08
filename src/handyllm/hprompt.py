@@ -1234,10 +1234,10 @@ def loads(
     text: str,
     encoding: str = "utf-8",
     base_path: Optional[PathType] = None,
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
-    Load a HandyPrompt from a string.
+    Load a HandyPrompt from a string, defaulting to a ChatPrompt.
     """
     if handler.detect(text):
         metadata, data = frontmatter.parse(text, encoding, handler)
@@ -1272,11 +1272,13 @@ def load(
     fd: IO[str],
     encoding: str = "utf-8",
     base_path: Optional[PathType] = None,
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
     Load a HandyPrompt from an `IO[str]`
     (e.g., file descriptor) (must support `read()`).
+
+    By default, assumes a ChatPrompt.
     """
     text = fd.read()
     return loads(text, encoding, base_path=base_path, cls=cls)
@@ -1285,10 +1287,10 @@ def load(
 def load_from(
     path: PathType,
     encoding: str = "utf-8",
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
-    Load a HandyPrompt for a path.
+    Load a HandyPrompt from a path, defaulting to a ChatPrompt.
     """
     with open(path, "r", encoding=encoding) as fd:
         return load(fd, encoding, base_path=Path(path).parent.resolve(), cls=cls)
