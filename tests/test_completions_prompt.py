@@ -4,7 +4,6 @@ import re
 
 from handyllm import (
     CompletionsPrompt,
-    load_from,
     stream_completions,
     astream_completions,
     RunConfig,
@@ -47,7 +46,7 @@ stream_body = "\n".join(tmp)
 def test_completions_fetch():
     responses.add(responses.POST, url=re.compile(r".*"), json=mock_fetch_data)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     response = prompt.fetch(api_key="fake-key")
     assert response["choices"][0]["text"] == "\n\nThis is indeed a test"
 
@@ -57,7 +56,7 @@ def test_completions_fetch():
 async def test_async_completions_fetch():
     respx.post(re.compile(r".*")).respond(json=mock_fetch_data)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     response = await prompt.afetch(api_key="fake-key")
     assert response["choices"][0]["text"] == "\n\nThis is indeed a test"
 
@@ -66,7 +65,7 @@ async def test_async_completions_fetch():
 def test_completions_stream():
     responses.add(responses.POST, url=re.compile(r".*"), body=stream_body)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     response = prompt.stream(api_key="fake-key")
     content = ""
     for text in stream_completions(response):
@@ -79,7 +78,7 @@ def test_completions_stream():
 async def test_async_completions_stream():
     respx.post(re.compile(r".*")).respond(text=stream_body)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     response = prompt.astream(api_key="fake-key")
     content = ""
     async for text in astream_completions(response):
@@ -91,7 +90,7 @@ async def test_async_completions_stream():
 def test_completions_run():
     responses.add(responses.POST, url=re.compile(r".*"), json=mock_fetch_data)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     result_prompt = prompt.run(api_key="fake-key")
     assert result_prompt.result_str == "\n\nThis is indeed a test"
 
@@ -105,7 +104,7 @@ def test_completions_run():
 async def test_async_completions_run():
     respx.post(re.compile(r".*")).respond(json=mock_fetch_data)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     result_prompt = await prompt.arun(api_key="fake-key")
     assert result_prompt.result_str == "\n\nThis is indeed a test"
 
@@ -121,7 +120,7 @@ async def test_on_chunk_completions():
     responses.add(responses.POST, url=re.compile(r".*"), body=stream_body)
     respx.post(re.compile(r".*")).respond(text=stream_body)
     prompt_file = tests_dir / "assets" / "completions.hprompt"
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
 
     def on_chunk(data):
         state["content"] += data
