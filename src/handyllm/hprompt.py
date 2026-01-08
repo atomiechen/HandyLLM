@@ -135,6 +135,53 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         """
         return str(self.data)
 
+    @classmethod
+    def loads(
+        cls,
+        text: str,
+        encoding: str = "utf-8",
+        base_path: Optional[PathType] = None,
+    ):
+        """
+        Load a HandyPrompt from a string.
+
+        The returned prompt type depends on the following rules:
+        - If called from HandyPrompt, the prompt type is *auto detected*.
+        - If called from a subclass, the specified subclass is used.
+        """
+        return loads(text=text, encoding=encoding, base_path=base_path, cls=cls)
+
+    @classmethod
+    def load(
+        cls,
+        fd: IO[str],
+        encoding: str = "utf-8",
+        base_path: Optional[PathType] = None,
+    ):
+        """
+        Load a HandyPrompt from an `IO[str]` (e.g., file descriptor) (must support `read()`).
+
+        The returned prompt type depends on the following rules:
+        - If called from HandyPrompt, the prompt type is *auto detected*.
+        - If called from a subclass, the specified subclass is used.
+        """
+        return load(fd=fd, encoding=encoding, base_path=base_path, cls=cls)
+
+    @classmethod
+    def load_from(
+        cls,
+        path: PathType,
+        encoding: str = "utf-8",
+    ):
+        """
+        Load a HandyPrompt from a path.
+
+        The returned prompt type depends on the following rules:
+        - If called from HandyPrompt, the prompt type is *auto detected*.
+        - If called from a subclass, the specified subclass is used.
+        """
+        return load_from(path=path, encoding=encoding, cls=cls)
+
     @staticmethod
     def _serialize_data(data: DataType) -> str:
         """
