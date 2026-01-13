@@ -39,9 +39,9 @@ def register_hprompt_command(subparsers: argparse._SubParsersAction):
 
 
 def hprompt_command(args):
-    from handyllm import hprompt
+    from handyllm import HandyPrompt, RunConfig
 
-    run_config = hprompt.RunConfig()
+    run_config = RunConfig()
     if args.var_map:
         var_map = {}
         for pair in args.var_map.split("|"):
@@ -50,7 +50,7 @@ def hprompt_command(args):
         run_config.var_map = var_map
     if args.var_map_path:
         run_config.var_map_path = args.var_map_path
-    prompt = hprompt.load_from(args.path[0])
+    prompt = HandyPrompt.load_from(args.path[0])
     if args.output:
         run_config.output_path = args.output
     else:
@@ -67,7 +67,7 @@ def hprompt_command(args):
     result_prompt = prompt.run(run_config=run_config)
     for next_path in args.path[1:]:
         prompt += result_prompt
-        prompt += hprompt.load_from(next_path)
+        prompt += HandyPrompt.load_from(next_path)
         result_prompt = prompt.run(run_config=run_config)
 
 
