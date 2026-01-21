@@ -150,10 +150,16 @@ def test_chat_run():
     prompt = load_from(prompt_file, cls=ChatPrompt)
     result_prompt = prompt.run(api_key="fake-key")
     assert result_prompt.result_str == "\n\nHello there, how may I assist you today?"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/chat/completions"
 
     responses.replace(responses.POST, url=re.compile(r".*"), body=stream_body)
     result_prompt = prompt.run(api_key="fake-key", stream=True)
     assert result_prompt.result_str == "Hello world!"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/chat/completions"
 
 
 @pytest.mark.asyncio
@@ -164,10 +170,16 @@ async def test_async_chat_run():
     prompt = load_from(prompt_file, cls=ChatPrompt)
     result_prompt = await prompt.arun(api_key="fake-key")
     assert result_prompt.result_str == "\n\nHello there, how may I assist you today?"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/chat/completions"
 
     respx.post(re.compile(r".*")).respond(text=stream_body)
     result_prompt = await prompt.arun(api_key="fake-key", stream=True)
     assert result_prompt.result_str == "Hello world!"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/chat/completions"
 
 
 @pytest.mark.asyncio

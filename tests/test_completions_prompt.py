@@ -93,10 +93,16 @@ def test_completions_run():
     prompt = CompletionsPrompt.load_from(prompt_file)
     result_prompt = prompt.run(api_key="fake-key")
     assert result_prompt.result_str == "\n\nThis is indeed a test"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/completions"
 
     responses.replace(responses.POST, url=re.compile(r".*"), body=stream_body)
     result_prompt = prompt.run(api_key="fake-key", stream=True)
     assert result_prompt.result_str == "This is indeed a test"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/completions"
 
 
 @pytest.mark.asyncio
@@ -107,10 +113,16 @@ async def test_async_completions_run():
     prompt = CompletionsPrompt.load_from(prompt_file)
     result_prompt = await prompt.arun(api_key="fake-key")
     assert result_prompt.result_str == "\n\nThis is indeed a test"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/completions"
 
     respx.post(re.compile(r".*")).respond(text=stream_body)
     result_prompt = await prompt.arun(api_key="fake-key", stream=True)
     assert result_prompt.result_str == "This is indeed a test"
+    assert result_prompt.requestor
+    assert result_prompt.requestor.api_key == "fake-key"
+    assert result_prompt.requestor.url == "https://api.openai.com/v1/completions"
 
 
 @pytest.mark.asyncio
