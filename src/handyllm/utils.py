@@ -20,6 +20,8 @@ import time
 from .types import (
     AudioContentPart,
     ChatChunkUnified,
+    FileContentPart,
+    FileObject,
     ImageContentPart,
     PathType,
     ShortChatChunk,
@@ -302,4 +304,22 @@ def content_part_audio(url_or_base64: str, format: str) -> AudioContentPart:
     return {
         "type": "input_audio",
         "input_audio": {"data": url_or_base64, "format": format},
+    }
+
+
+def content_part_file(
+    file_data: Optional[str] = None,
+    file_id: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> FileContentPart:
+    file_obj: FileObject = {}
+    if file_data is not None:
+        file_obj["file_data"] = file_data
+    if file_id is not None:
+        file_obj["file_id"] = file_id
+    if filename is not None:
+        file_obj["filename"] = filename
+    return {
+        "type": "file",
+        "file": file_obj,
     }

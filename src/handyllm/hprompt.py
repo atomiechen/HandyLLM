@@ -38,6 +38,7 @@ from .utils import (
     astream_chat_all,
     astream_completions,
     content_part_audio,
+    content_part_file,
     content_part_image,
     content_part_text,
     echo_consumer,
@@ -1153,6 +1154,22 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
     ):
         self.add_content_part_to_message(
             content_part=content_part_audio(url_or_base64, format),
+            message_index=message_index,
+        )
+
+    def add_file_to_message(
+        self,
+        file_data: Optional[str] = None,
+        file_id: Optional[str] = None,
+        filename: Optional[str] = None,
+        message_index: int = -1,
+    ):
+        self.add_content_part_to_message(
+            content_part=content_part_file(
+                file_data=file_data,
+                file_id=file_id,
+                filename=filename,
+            ),
             message_index=message_index,
         )
 
