@@ -1102,7 +1102,6 @@ class ChatPrompt(
 
     def add_content_part_to_message(
         self,
-        *,
         content_part: Union[str, TextContentPart, ImageContentPart, AudioContentPart],
         message_index: int = -1,
     ):
@@ -1115,7 +1114,6 @@ class ChatPrompt(
 
     def add_text_to_message(
         self,
-        *,
         text: str,
         message_index: int = -1,
     ):
@@ -1123,7 +1121,6 @@ class ChatPrompt(
 
     def add_image_url_to_message(
         self,
-        *,
         url_or_base64: str,
         detail: Optional[str] = None,
         message_index: int = -1,
@@ -1135,7 +1132,6 @@ class ChatPrompt(
 
     def add_input_audio_to_message(
         self,
-        *,
         url_or_base64: str,
         format: str,
         message_index: int = -1,
