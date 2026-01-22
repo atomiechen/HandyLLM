@@ -751,15 +751,13 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
         if len(self.messages) == 0:
             return ""
         content = self.messages[-1]["content"]
-        if not content:
-            return ""
-        elif isinstance(content, list):
+        if isinstance(content, str):
+            return content
+        elif content:
             for item in content:
                 if "text" in item:
                     return item["text"]
-            return ""
-        else:
-            return content
+        return ""
 
     @property
     def result_reasoning(self) -> str:
