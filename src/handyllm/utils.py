@@ -268,11 +268,11 @@ def encode_bin_file(local_path: PathType):
         return base64.b64encode(local_file.read()).decode("utf-8")
 
 
-def get_mime_type(url):
+def get_mime_type(filename: str):
     """
-    Get the mime type of a file based on its url.
+    Get the mime type of a file based on its name.
     """
-    mime_type, _ = mimetypes.guess_type(url)
+    mime_type, _ = mimetypes.guess_type(filename)
     if mime_type is None:
         return "application/octet-stream"
     return mime_type
@@ -295,8 +295,8 @@ def file_uri_to_base64_mime(url: str, base_path: Optional[PathType]):
     """
     Convert a file URI like `file:///path/to/file` to a base64 string with mime type prefix.
     """
-    mime_type = get_mime_type(url)
     base64_str, local_path = file_uri_to_base64(url, base_path)
+    mime_type = get_mime_type(local_path.name)
     return f"data:{mime_type};base64,{base64_str}", local_path
 
 
