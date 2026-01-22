@@ -15,6 +15,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     MutableMapping,
     Optional,
     Tuple,
@@ -1089,15 +1090,18 @@ class ChatPrompt(
 
     def add_message(
         self,
-        role: str = "user",
+        role: Union[Literal["system", "user", "assistant", "tool", "developer"], str] = "user",
         content: Optional[
             Union[str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]]
         ] = None,
         tool_calls: Optional[List[ToolCall]] = None,
+        tool_call_id: Optional[str] = None,
     ):
         msg = {"role": role, "content": content}
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
+        if tool_call_id is not None:
+            msg["tool_call_id"] = tool_call_id
         self.messages.append(cast(Union[Message, InputMessage], msg))
 
     def add_content_part_to_message(
