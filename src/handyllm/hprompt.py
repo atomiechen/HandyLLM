@@ -1089,7 +1089,6 @@ class ChatPrompt(
 
     def add_message(
         self,
-        *,
         role: str = "user",
         content: Optional[
             Union[str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]]
