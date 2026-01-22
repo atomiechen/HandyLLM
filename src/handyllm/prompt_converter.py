@@ -10,11 +10,10 @@ from typing import (
     MutableMapping,
     MutableSequence,
     Optional,
-    Union,
     cast,
 )
 
-from .types import InputMessage, PathType, ShortChatChunk, Message
+from .types import PathType, ShortChatChunk, Message
 from ._io import yaml_dump, yaml_load
 
 
@@ -49,7 +48,7 @@ class PromptConverter:
             value = blocks[idx + 1]
             self.substitute_map[key] = value.strip()
 
-    def raw2msgs(self, raw_prompt: str) -> List[Union[Message, InputMessage]]:
+    def raw2msgs(self, raw_prompt: str) -> List[Message]:
         # substitute pre-defined variables
         for key, value in self.substitute_map.items():
             raw_prompt = raw_prompt.replace(key, value)
@@ -123,7 +122,7 @@ class PromptConverter:
         return self.raw2msgs(raw_prompt)
 
     @staticmethod
-    def msgs2raw(msgs: List[Union[Message, InputMessage]]):
+    def msgs2raw(msgs: List[Message]):
         # convert messages format to plain text
         messages = []
         for message in msgs:
@@ -212,7 +211,7 @@ class PromptConverter:
     @classmethod
     def msgs_replace_variables(
         cls,
-        msgs: List[Union[Message, InputMessage]],
+        msgs: List[Message],
         variable_map: MutableMapping,
         inplace=False,
     ):

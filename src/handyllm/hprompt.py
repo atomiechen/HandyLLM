@@ -50,9 +50,12 @@ from .utils import (
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import (
     AudioContentPart,
+    FileContentPart,
     ImageContentPart,
     InputMessage,
     PathType,
+    RefusalContentPart,
+    ResponseMessage,
     SyncHandlerChat,
     SyncHandlerCompletions,
     TextContentPart,
@@ -714,12 +717,10 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
             yield fout
 
 
-class ChatPrompt(
-    HandyPrompt[ChatResponse, ChatChunk, List[Union[Message, InputMessage]]]
-):
+class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
     def __init__(
         self,
-        messages: List[Union[Message, InputMessage]],
+        messages: List[Message],
         request: Optional[MutableMapping] = None,
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
@@ -774,10 +775,10 @@ class ChatPrompt(
         return ""
 
     @staticmethod
-    def _serialize_data(data: List[Union[Message, InputMessage]]) -> str:
+    def _serialize_data(data: List[Message]) -> str:
         return converter.msgs2raw(data)
 
-    def _eval_data(self, var_map) -> List[Union[Message, InputMessage]]:
+    def _eval_data(self, var_map) -> List[Message]:
         replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False
         )
@@ -847,7 +848,7 @@ class ChatPrompt(
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            msg: Message = {
+            msg: ResponseMessage = {
                 "role": role,
                 "content": content,
             }
@@ -898,7 +899,7 @@ class ChatPrompt(
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            msg: Message = {
+            msg: ResponseMessage = {
                 "role": role,
                 "content": content,
             }
@@ -1051,8 +1052,7 @@ class ChatPrompt(
         other: Union[
             str,
             Message,
-            InputMessage,
-            Iterable[Union[Message, InputMessage]],
+            Iterable[Message],
             ChatPrompt,
         ],
     ):
@@ -1066,8 +1066,7 @@ class ChatPrompt(
         other: Union[
             str,
             Message,
-            InputMessage,
-            Iterable[Union[Message, InputMessage]],
+            Iterable[Message],
             ChatPrompt,
         ],
     ):
@@ -1075,7 +1074,7 @@ class ChatPrompt(
         if isinstance(other, str):
             self.add_message(content=other)
         elif isinstance(other, dict):
-            self.messages.append(cast(Union[Message, InputMessage], other))
+            self.messages.append(cast(Message, other))
         elif isinstance(other, Iterable):
             self.messages.extend(other)
         elif isinstance(other, ChatPrompt):
@@ -1090,7 +1089,9 @@ class ChatPrompt(
 
     def add_message(
         self,
-        role: Union[Literal["system", "user", "assistant", "tool", "developer"], str] = "user",
+        role: Union[
+            Literal["system", "user", "assistant", "tool", "developer"], str
+        ] = "user",
         content: Optional[
             Union[str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]]
         ] = None,
@@ -1102,19 +1103,29 @@ class ChatPrompt(
             msg["tool_calls"] = tool_calls
         if tool_call_id is not None:
             msg["tool_call_id"] = tool_call_id
-        self.messages.append(cast(Union[Message, InputMessage], msg))
+        self.messages.append(cast(Message, msg))
 
     def add_content_part_to_message(
         self,
-        content_part: Union[str, TextContentPart, ImageContentPart, AudioContentPart],
+        content_part: Union[
+            str,
+            TextContentPart,
+            ImageContentPart,
+            AudioContentPart,
+            FileContentPart,
+            RefusalContentPart,
+        ],
         message_index: int = -1,
     ):
         target_msg = cast(InputMessage, self.messages[message_index])
+        assert target_msg["role"] != "tool", "cannot add content part to a tool message"
         if isinstance(target_msg["content"], str):
-            target_msg["content"] = [content_part_text(target_msg["content"])]
+            old_content_part = content_part_text(target_msg["content"])
+            target_msg["content"] = []
+            target_msg["content"].append(old_content_part)
         if isinstance(content_part, str):
             content_part = content_part_text(content_part)
-        target_msg["content"].append(content_part)
+        target_msg["content"].append(content_part)  # type: ignore
 
     def add_text_to_message(
         self,
