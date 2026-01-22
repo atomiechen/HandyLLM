@@ -42,9 +42,9 @@ from .utils import (
     content_part_image,
     content_part_text,
     echo_consumer,
-    trans_stream_chat,
     file_uri_to_base64,
-    file_uri_to_base64_image,
+    file_uri_to_base64_mime,
+    trans_stream_chat,
     stream_chat_all,
     stream_completions,
 )
@@ -794,7 +794,7 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
                             url = item["image_url"]["url"]
                             if url and url.startswith("file://"):
                                 # replace the image URL with the actual image
-                                item["image_url"]["url"] = file_uri_to_base64_image(
+                                item["image_url"]["url"], _ = file_uri_to_base64_mime(
                                     url, self.base_path
                                 )
                         elif item.get("type") == "input_audio":
@@ -802,9 +802,20 @@ class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
                             data = item["input_audio"]["data"]
                             if data and data.startswith("file://"):
                                 # replace the audio data with the actual audio
-                                item["input_audio"]["data"] = file_uri_to_base64(
+                                item["input_audio"]["data"], _ = file_uri_to_base64(
                                     data, self.base_path
                                 )
+                        elif item.get("type") == "file":
+                            item = cast(FileContentPart, item)
+                            if "file_data" in item["file"]:
+                                data = item["file"]["file_data"]
+                                if data and data.startswith("file://"):
+                                    # replace the file data with the actual file
+                                    item["file"]["file_data"], local_path = (
+                                        file_uri_to_base64_mime(data, self.base_path)
+                                    )
+                                    if "filename" not in item["file"]:
+                                        item["file"]["filename"] = local_path.name
                     except (KeyError, TypeError):
                         pass
 
