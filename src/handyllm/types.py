@@ -35,15 +35,15 @@ class FunctionToolCall(TypedDict):
     function: Function
 
 
-class CustomFunction(TypedDict):
-    input: str
+class CustomTool(TypedDict):
     name: str
+    input: str
 
 
 class CustomToolCall(TypedDict):
     id: str
     type: Literal["custom"]
-    custom: CustomFunction
+    custom: CustomTool
 
 
 ToolCall = Union[FunctionToolCall, CustomToolCall]
@@ -97,11 +97,21 @@ class ChatResponse(TypedDict):
     usage: Usage
 
 
-class ToolCallDelta(TypedDict):
+class FunctionToolCallDelta(TypedDict):
     index: int
     id: str
     type: str
     function: Function
+
+
+class CustomToolCallDelta(TypedDict):
+    index: int
+    id: str
+    type: str
+    custom: CustomTool
+
+
+ToolCallDelta = Union[FunctionToolCallDelta, CustomToolCallDelta]
 
 
 class ChatChunkDelta(TypedDict):

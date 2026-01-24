@@ -21,8 +21,10 @@ import time
 from .types import (
     AudioContentPart,
     ChatChunkUnified,
+    CustomToolCallDelta,
     FileContentPart,
     FileObject,
+    FunctionToolCallDelta,
     ImageContentPart,
     PathType,
     ShortChatChunk,
@@ -86,9 +88,14 @@ def trans_stream_chat(
                 if tool_calls:
                     for chunk in tool_calls:
                         if tool_call and chunk["index"] == tool_call["index"]:
-                            tool_call["function"]["arguments"] += chunk["function"][
-                                "arguments"
-                            ]
+                            if "function" in tool_call:
+                                tool_call["function"]["arguments"] += cast(
+                                    FunctionToolCallDelta, chunk
+                                )["function"]["arguments"]
+                            elif "custom" in tool_call:
+                                tool_call["custom"]["input"] += cast(
+                                    CustomToolCallDelta, chunk
+                                )["custom"]["input"]
                         else:
                             if tool_call:
                                 # this is a new tool call, yield the previous one
