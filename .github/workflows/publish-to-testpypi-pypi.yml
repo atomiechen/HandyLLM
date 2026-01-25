@@ -37,7 +37,7 @@ jobs:
     steps:
     - name: Verify and set release tag
       id: set_release_tag
-      uses: atomiechen/reusable-workflows/.github/actions/verify-tag@main
+      uses: atomiechen/reusable-workflows/.github/actions/verify-tag@v1
       with:
         tag: ${{ inputs.release_tag }}
   test:
@@ -47,7 +47,7 @@ jobs:
       release_tag: ${{ needs.get-tag.outputs.release_tag }}
   build-n-publish:
     needs: test
-    uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@main
+    uses: atomiechen/reusable-workflows/.github/workflows/publish-python-distributions.yml@v1
     with:
       publish_testpypi: ${{ inputs.publish_testpypi }}
       publish_pypi: ${{ inputs.publish_pypi }}
