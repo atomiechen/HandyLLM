@@ -16,7 +16,6 @@ from .requestor import (
 )
 from ._utils import (
     get_request_url,
-    join_url,
     _chat_log_response,
     _chat_log_exception,
     _completions_log_response,
@@ -354,11 +353,11 @@ class OpenAIClient:
         api_key, organization, api_base, api_type, api_version, engine, dest_url = (
             self._consume_kwargs(kwargs)
         )
-        url = join_url(api_base, request_url)
         filtered_kwargs = {k: v for k, v in kwargs.items() if not k.startswith("_")}
         requestor = requestor_cls(
             api_type,
-            url,
+            api_base,
+            request_url,
             api_key,
             organization=organization,
             dest_url=dest_url,

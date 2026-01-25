@@ -1,0 +1,11 @@
+---
+model: gpt-5
+---
+
+$user$ {array}
+- type: text
+  text: Tell me what's inside this file.
+- type: file
+  file: 
+    file_data: file://test.pdf
+    # filename: test.pdf

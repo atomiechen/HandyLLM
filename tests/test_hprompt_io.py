@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from handyllm.hprompt import (
+    HandyPrompt,
     load_from,
     dumps,
     dump_to,
@@ -26,13 +27,14 @@ def test_load_dump_no_frontmatter_prompt():
     raw = prompt.dumps()
     assert "---" not in raw
     # specify prompt type
-    prompt = load_from(prompt_file, cls=CompletionsPrompt)
+    prompt = CompletionsPrompt.load_from(prompt_file)
     assert isinstance(prompt, CompletionsPrompt)
 
 
 def test_load_completions_prompt():
     prompt_file = assets_dir / "completions.hprompt"
-    prompt = load_from(prompt_file)
+    # auto detect prompt type
+    prompt = HandyPrompt.load_from(prompt_file)
     assert isinstance(prompt, CompletionsPrompt)
 
 

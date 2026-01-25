@@ -15,6 +15,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     MutableMapping,
     Optional,
     Tuple,
@@ -32,25 +33,30 @@ from dotenv import load_dotenv
 
 from .prompt_converter import PromptConverter
 from .openai_client import ClientMode, OpenAIClient
+from .requestor import Requestor
 from .utils import (
     astream_chat_all,
     astream_completions,
     content_part_audio,
+    content_part_file,
     content_part_image,
     content_part_text,
     echo_consumer,
-    trans_stream_chat,
     file_uri_to_base64,
-    file_uri_to_base64_image,
+    file_uri_to_base64_mime,
+    trans_stream_chat,
     stream_chat_all,
     stream_completions,
 )
 from .run_config import RunConfig, RecordRequestMode, CredentialType, VarMapFileFormat
 from .types import (
     AudioContentPart,
+    FileContentPart,
     ImageContentPart,
     InputMessage,
     PathType,
+    RefusalContentPart,
+    ResponseMessage,
     SyncHandlerChat,
     SyncHandlerCompletions,
     TextContentPart,
@@ -106,6 +112,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
         response: Optional[ResponseType] = None,
+        requestor: Optional[Requestor] = None,
     ):
         self.data: DataType = data
         self.request = request or {}
@@ -116,6 +123,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
             self.run_config = RunConfig.from_dict(meta or {}, base_path=base_path)
         self.base_path = base_path
         self.response = response
+        self.requestor = requestor
 
     def __str__(self) -> str:
         return str(self.data)
@@ -134,6 +142,81 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         Get the result string from the data.
         """
         return str(self.data)
+
+    @classmethod
+    def loads(
+        cls: Type[PromptType],
+        text: str,
+        encoding: str = "utf-8",
+        base_path: Optional[PathType] = None,
+    ) -> PromptType:
+        """
+        Load a HandyPrompt from a string.
+
+        The returned prompt type depends on the following rules:
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
+        """
+        if handler.detect(text):
+            metadata, data = frontmatter.parse(text, encoding, handler)
+            meta = metadata.pop("meta", None)
+            if not isinstance(meta, dict):
+                meta = {}
+            request = metadata
+        else:
+            data = text
+            request = {}
+            meta = {}
+        if cls == HandyPrompt:
+            # get specific prompt class
+            api: str = meta.get("api", "")
+            if api:
+                api = api.lower()
+                if api.startswith("chat"):
+                    cls = cast(Type[PromptType], ChatPrompt)
+                else:
+                    cls = cast(Type[PromptType], CompletionsPrompt)
+            else:
+                if converter.detect(data):
+                    cls = cast(Type[PromptType], ChatPrompt)
+                else:
+                    cls = cast(Type[PromptType], CompletionsPrompt)
+        if cls == ChatPrompt:
+            data = converter.raw2msgs(data)
+        return cls(data, request, meta, base_path)
+
+    @classmethod
+    def load(
+        cls,
+        fd: IO[str],
+        encoding: str = "utf-8",
+        base_path: Optional[PathType] = None,
+    ):
+        """
+        Load a HandyPrompt from an `IO[str]` (e.g., file descriptor) (must support `read()`).
+
+        The returned prompt type depends on the following rules:
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
+        """
+        text = fd.read()
+        return cls.loads(text, encoding, base_path=base_path)
+
+    @classmethod
+    def load_from(
+        cls,
+        path: PathType,
+        encoding: str = "utf-8",
+    ):
+        """
+        Load a HandyPrompt from a path.
+
+        The returned prompt type depends on the following rules:
+        - If called from `HandyPrompt`, the prompt type is *auto* detected.
+        - If called from a subclass, the *specified* subclass is used.
+        """
+        with open(path, "r", encoding=encoding) as fd:
+            return cls.load(fd, encoding, base_path=Path(path).parent.resolve())
 
     @staticmethod
     def _serialize_data(data: DataType) -> str:
@@ -341,7 +424,7 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
     @abstractmethod
     def _stream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ) -> Generator[YieldType, None, None]:
         yield ...
@@ -356,16 +439,25 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         with cls.ensure_sync_client(client) as client:
-            yield from cls._stream_with_client(client, evaled_prompt)
+            requestor = cls.get_requestor(client, evaled_prompt)
+            yield from cls._stream_with_client(requestor, evaled_prompt)
 
     @classmethod
     @abstractmethod
     async def _astream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ) -> AsyncGenerator[YieldType, None]:
         yield ...
+
+    @classmethod
+    @abstractmethod
+    def get_requestor(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+    ) -> Requestor: ...
 
     async def astream(
         self,
@@ -377,14 +469,15 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         async with cls.ensure_async_client(client) as client:
-            async for item in cls._astream_with_client(client, evaled_prompt):
+            requestor = cls.get_requestor(client, evaled_prompt)
+            async for item in cls._astream_with_client(requestor, evaled_prompt):
                 yield item
 
     @classmethod
     @abstractmethod
     def _fetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ) -> ResponseType: ...
 
@@ -398,13 +491,14 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         with cls.ensure_sync_client(client) as client:
-            return cls._fetch_with_client(client, evaled_prompt)
+            requestor = cls.get_requestor(client, evaled_prompt)
+            return cls._fetch_with_client(requestor, evaled_prompt)
 
     @classmethod
     @abstractmethod
     async def _afetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ) -> ResponseType: ...
 
@@ -418,7 +512,8 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
         evaled_prompt, _ = self._prepare_run(run_config, var_map, kwargs)
         cls = type(self)
         async with cls.ensure_async_client(client) as client:
-            return await cls._afetch_with_client(client, evaled_prompt)
+            requestor = cls.get_requestor(client, evaled_prompt)
+            return await cls._afetch_with_client(requestor, evaled_prompt)
 
     @classmethod
     def _prepare_output_path(
@@ -623,18 +718,17 @@ class HandyPrompt(ABC, Generic[ResponseType, YieldType, DataType]):
             yield fout
 
 
-class ChatPrompt(
-    HandyPrompt[ChatResponse, ChatChunk, List[Union[Message, InputMessage]]]
-):
+class ChatPrompt(HandyPrompt[ChatResponse, ChatChunk, List[Message]]):
     def __init__(
         self,
-        messages: List[Union[Message, InputMessage]],
+        messages: List[Message],
         request: Optional[MutableMapping] = None,
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
         response: Optional[ChatResponse] = None,
+        requestor: Optional[Requestor] = None,
     ):
-        super().__init__(messages, request, meta, base_path, response)
+        super().__init__(messages, request, meta, base_path, response, requestor)
 
     @property
     def messages(self):
@@ -657,15 +751,13 @@ class ChatPrompt(
         if len(self.messages) == 0:
             return ""
         content = self.messages[-1]["content"]
-        if not content:
-            return ""
-        elif isinstance(content, list):
+        if isinstance(content, str):
+            return content
+        elif content:
             for item in content:
                 if "text" in item:
                     return item["text"]
-            return ""
-        else:
-            return content
+        return ""
 
     @property
     def result_reasoning(self) -> str:
@@ -682,10 +774,10 @@ class ChatPrompt(
         return ""
 
     @staticmethod
-    def _serialize_data(data: List[Union[Message, InputMessage]]) -> str:
+    def _serialize_data(data: List[Message]) -> str:
         return converter.msgs2raw(data)
 
-    def _eval_data(self, var_map) -> List[Union[Message, InputMessage]]:
+    def _eval_data(self, var_map) -> List[Message]:
         replaced = converter.msgs_replace_variables(
             self.messages, var_map, inplace=False
         )
@@ -700,7 +792,7 @@ class ChatPrompt(
                             url = item["image_url"]["url"]
                             if url and url.startswith("file://"):
                                 # replace the image URL with the actual image
-                                item["image_url"]["url"] = file_uri_to_base64_image(
+                                item["image_url"]["url"], _ = file_uri_to_base64_mime(
                                     url, self.base_path
                                 )
                         elif item.get("type") == "input_audio":
@@ -708,13 +800,32 @@ class ChatPrompt(
                             data = item["input_audio"]["data"]
                             if data and data.startswith("file://"):
                                 # replace the audio data with the actual audio
-                                item["input_audio"]["data"] = file_uri_to_base64(
+                                item["input_audio"]["data"], _ = file_uri_to_base64(
                                     data, self.base_path
                                 )
+                        elif item.get("type") == "file":
+                            item = cast(FileContentPart, item)
+                            if "file_data" in item["file"]:
+                                data = item["file"]["file_data"]
+                                if data and data.startswith("file://"):
+                                    # replace the file data with the actual file
+                                    item["file"]["file_data"], local_path = (
+                                        file_uri_to_base64_mime(data, self.base_path)
+                                    )
+                                    if "filename" not in item["file"]:
+                                        item["file"]["filename"] = local_path.name
                     except (KeyError, TypeError):
                         pass
 
         return replaced
+
+    @classmethod
+    def get_requestor(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+    ):
+        return client.chat(messages=evaled_prompt.data, **evaled_prompt.request)
 
     @classmethod
     def _run_with_client(
@@ -730,13 +841,14 @@ class ChatPrompt(
             else None
         )
         response = None
+        requestor = cls.get_requestor(client, evaled_prompt)
         if stream:
             role = ""
             content = ""
             reasoning_content = ""
             tool_calls: List[ToolCall] = []
             for chunk in stream_chat_all(
-                cls._stream_with_client(client, evaled_prompt)
+                cls._stream_with_client(requestor, evaled_prompt)
             ):
                 if chunk["role"] != role:
                     role = chunk["role"]
@@ -746,7 +858,7 @@ class ChatPrompt(
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            msg: Message = {
+            msg: ResponseMessage = {
                 "role": role,
                 "content": content,
             }
@@ -755,10 +867,15 @@ class ChatPrompt(
             if reasoning_content:
                 msg["reasoning_content"] = reasoning_content
         else:
-            response = cls._fetch_with_client(client, evaled_prompt)
+            response = cls._fetch_with_client(requestor, evaled_prompt)
             msg = response["choices"][0]["message"]
         return ChatPrompt(
-            [msg], evaled_prompt.request, run_config, base_path, response=response
+            [msg],
+            evaled_prompt.request,
+            run_config,
+            base_path,
+            response=response,
+            requestor=requestor,
         )
 
     @classmethod
@@ -775,13 +892,14 @@ class ChatPrompt(
             else None
         )
         response = None
+        requestor = cls.get_requestor(client, evaled_prompt)
         if stream:
             role = ""
             content = ""
             reasoning_content = ""
             tool_calls: List[ToolCall] = []
             async for chunk in astream_chat_all(
-                cls._astream_with_client(client, evaled_prompt)
+                cls._astream_with_client(requestor, evaled_prompt)
             ):
                 if chunk["role"] != role:
                     role = chunk["role"]
@@ -791,7 +909,7 @@ class ChatPrompt(
                     reasoning_content += chunk["reasoning_content"]
                 elif chunk["content"]:
                     content += chunk["content"]
-            msg: Message = {
+            msg: ResponseMessage = {
                 "role": role,
                 "content": content,
             }
@@ -800,20 +918,24 @@ class ChatPrompt(
             if reasoning_content:
                 msg["reasoning_content"] = reasoning_content
         else:
-            response = await cls._afetch_with_client(client, evaled_prompt)
+            response = await cls._afetch_with_client(requestor, evaled_prompt)
             msg = response["choices"][0]["message"]
         return ChatPrompt(
-            [msg], evaled_prompt.request, run_config, base_path, response=response
+            [msg],
+            evaled_prompt.request,
+            run_config,
+            base_path,
+            response=response,
+            requestor=requestor,
         )
 
     @classmethod
     def _stream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.chat(messages=evaled_prompt.data, **evaled_prompt.request)
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
             producer = trans_stream_chat(
@@ -851,11 +973,10 @@ class ChatPrompt(
     @classmethod
     async def _astream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.chat(messages=evaled_prompt.data, **evaled_prompt.request)
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
             producer = trans_stream_chat(
@@ -913,11 +1034,10 @@ class ChatPrompt(
     @classmethod
     def _fetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.chat(messages=evaled_prompt.data, **evaled_prompt.request)
         response = requestor.fetch()
         cls._dump_fd_if_set(
             run_config, evaled_prompt.request, (response["choices"][0]["message"],)
@@ -927,11 +1047,10 @@ class ChatPrompt(
     @classmethod
     async def _afetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.chat(messages=evaled_prompt.data, **evaled_prompt.request)
         response = await requestor.afetch()
         cls._dump_fd_if_set(
             run_config, evaled_prompt.request, (response["choices"][0]["message"],)
@@ -943,8 +1062,7 @@ class ChatPrompt(
         other: Union[
             str,
             Message,
-            InputMessage,
-            Iterable[Union[Message, InputMessage]],
+            Iterable[Message],
             ChatPrompt,
         ],
     ):
@@ -958,8 +1076,7 @@ class ChatPrompt(
         other: Union[
             str,
             Message,
-            InputMessage,
-            Iterable[Union[Message, InputMessage]],
+            Iterable[Message],
             ChatPrompt,
         ],
     ):
@@ -967,7 +1084,7 @@ class ChatPrompt(
         if isinstance(other, str):
             self.add_message(content=other)
         elif isinstance(other, dict):
-            self.messages.append(cast(Union[Message, InputMessage], other))
+            self.messages.append(cast(Message, other))
         elif isinstance(other, Iterable):
             self.messages.extend(other)
         elif isinstance(other, ChatPrompt):
@@ -982,34 +1099,46 @@ class ChatPrompt(
 
     def add_message(
         self,
-        *,
-        role: str = "user",
+        role: Union[
+            Literal["system", "user", "assistant", "tool", "developer"], str
+        ] = "user",
         content: Optional[
             Union[str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]]
         ] = None,
         tool_calls: Optional[List[ToolCall]] = None,
+        tool_call_id: Optional[str] = None,
     ):
         msg = {"role": role, "content": content}
         if tool_calls is not None:
             msg["tool_calls"] = tool_calls
-        self.messages.append(cast(Union[Message, InputMessage], msg))
+        if tool_call_id is not None:
+            msg["tool_call_id"] = tool_call_id
+        self.messages.append(cast(Message, msg))
 
     def add_content_part_to_message(
         self,
-        *,
-        content_part: Union[str, TextContentPart, ImageContentPart, AudioContentPart],
+        content_part: Union[
+            str,
+            TextContentPart,
+            ImageContentPart,
+            AudioContentPart,
+            FileContentPart,
+            RefusalContentPart,
+        ],
         message_index: int = -1,
     ):
         target_msg = cast(InputMessage, self.messages[message_index])
+        assert target_msg["role"] != "tool", "cannot add content part to a tool message"
         if isinstance(target_msg["content"], str):
-            target_msg["content"] = [content_part_text(target_msg["content"])]
+            old_content_part = content_part_text(target_msg["content"])
+            target_msg["content"] = []
+            target_msg["content"].append(old_content_part)
         if isinstance(content_part, str):
             content_part = content_part_text(content_part)
-        target_msg["content"].append(content_part)
+        target_msg["content"].append(content_part)  # type: ignore
 
     def add_text_to_message(
         self,
-        *,
         text: str,
         message_index: int = -1,
     ):
@@ -1017,7 +1146,6 @@ class ChatPrompt(
 
     def add_image_url_to_message(
         self,
-        *,
         url_or_base64: str,
         detail: Optional[str] = None,
         message_index: int = -1,
@@ -1029,13 +1157,28 @@ class ChatPrompt(
 
     def add_input_audio_to_message(
         self,
-        *,
         url_or_base64: str,
         format: str,
         message_index: int = -1,
     ):
         self.add_content_part_to_message(
             content_part=content_part_audio(url_or_base64, format),
+            message_index=message_index,
+        )
+
+    def add_file_to_message(
+        self,
+        file_data: Optional[str] = None,
+        file_id: Optional[str] = None,
+        filename: Optional[str] = None,
+        message_index: int = -1,
+    ):
+        self.add_content_part_to_message(
+            content_part=content_part_file(
+                file_data=file_data,
+                file_id=file_id,
+                filename=filename,
+            ),
             message_index=message_index,
         )
 
@@ -1048,8 +1191,9 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
         meta: Optional[Union[MutableMapping, RunConfig]] = None,
         base_path: Optional[PathType] = None,
         response: Optional[CompletionsResponse] = None,
+        requestor: Optional[Requestor] = None,
     ):
-        super().__init__(prompt, request, meta, base_path, response)
+        super().__init__(prompt, request, meta, base_path, response, requestor)
 
     @property
     def prompt(self) -> str:
@@ -1066,6 +1210,14 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
         return new_prompt
 
     @classmethod
+    def get_requestor(
+        cls,
+        client: OpenAIClient,
+        evaled_prompt: HandyPrompt,
+    ):
+        return client.completions(prompt=evaled_prompt.data, **evaled_prompt.request)
+
+    @classmethod
     def _run_with_client(
         cls,
         client: OpenAIClient,
@@ -1079,17 +1231,23 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
             else None
         )
         response = None
+        requestor = cls.get_requestor(client, evaled_prompt)
         if stream:
             content = ""
             for text in stream_completions(
-                cls._stream_with_client(client, evaled_prompt)
+                cls._stream_with_client(requestor, evaled_prompt)
             ):
                 content += text
         else:
-            response = cls._fetch_with_client(client, evaled_prompt)
+            response = cls._fetch_with_client(requestor, evaled_prompt)
             content = response["choices"][0]["text"]
         return CompletionsPrompt(
-            content, evaled_prompt.request, run_config, base_path, response=response
+            content,
+            evaled_prompt.request,
+            run_config,
+            base_path,
+            response=response,
+            requestor=requestor,
         )
 
     @classmethod
@@ -1106,29 +1264,32 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
             else None
         )
         response = None
+        requestor = cls.get_requestor(client, evaled_prompt)
         if stream:
             content = ""
             async for text in astream_completions(
-                cls._astream_with_client(client, evaled_prompt)
+                cls._astream_with_client(requestor, evaled_prompt)
             ):
                 content += text
         else:
-            response = await cls._afetch_with_client(client, evaled_prompt)
+            response = await cls._afetch_with_client(requestor, evaled_prompt)
             content = response["choices"][0]["text"]
         return CompletionsPrompt(
-            content, evaled_prompt.request, run_config, base_path, response=response
+            content,
+            evaled_prompt.request,
+            run_config,
+            base_path,
+            response=response,
+            requestor=requestor,
         )
 
     @classmethod
     def _stream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.completions(
-            prompt=evaled_prompt.data, **evaled_prompt.request
-        )
         response = requestor.stream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
             for chunk in response:
@@ -1148,13 +1309,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
     @classmethod
     async def _astream_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.completions(
-            prompt=evaled_prompt.data, **evaled_prompt.request
-        )
         response = await requestor.astream()
         with cls.open_and_dump_frontmatter(run_config, evaled_prompt.request) as fout:
             async for chunk in response:
@@ -1177,13 +1335,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
     @classmethod
     def _fetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.completions(
-            prompt=evaled_prompt.data, **evaled_prompt.request
-        )
         response = requestor.fetch()
         cls._dump_fd_if_set(
             run_config, evaled_prompt.request, response["choices"][0]["text"]
@@ -1193,13 +1348,10 @@ class CompletionsPrompt(HandyPrompt[CompletionsResponse, CompletionsChunk, str])
     @classmethod
     async def _afetch_with_client(
         cls,
-        client: OpenAIClient,
+        requestor: Requestor,
         evaled_prompt: HandyPrompt,
     ):
         run_config = evaled_prompt.run_config
-        requestor = client.completions(
-            prompt=evaled_prompt.data, **evaled_prompt.request
-        )
         response = await requestor.afetch()
         cls._dump_fd_if_set(
             run_config, evaled_prompt.request, response["choices"][0]["text"]
@@ -1234,64 +1386,38 @@ def loads(
     text: str,
     encoding: str = "utf-8",
     base_path: Optional[PathType] = None,
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
-    Load a HandyPrompt from a string.
+    Load a HandyPrompt from a string, defaulting to a ChatPrompt.
     """
-    if handler.detect(text):
-        metadata, data = frontmatter.parse(text, encoding, handler)
-        meta = metadata.pop("meta", None)
-        if not isinstance(meta, dict):
-            meta = {}
-        request = metadata
-    else:
-        data = text
-        request = {}
-        meta = {}
-    if cls == HandyPrompt:
-        # get specific prompt class
-        api: str = meta.get("api", "")
-        if api:
-            api = api.lower()
-            if api.startswith("chat"):
-                cls = cast(Type[PromptType], ChatPrompt)
-            else:
-                cls = cast(Type[PromptType], CompletionsPrompt)
-        else:
-            if converter.detect(data):
-                cls = cast(Type[PromptType], ChatPrompt)
-            else:
-                cls = cast(Type[PromptType], CompletionsPrompt)
-    if cls == ChatPrompt:
-        data = converter.raw2msgs(data)
-    return cls(data, request, meta, base_path)
+    return cls.loads(text, encoding, base_path)
 
 
 def load(
     fd: IO[str],
     encoding: str = "utf-8",
     base_path: Optional[PathType] = None,
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
     Load a HandyPrompt from an `IO[str]`
     (e.g., file descriptor) (must support `read()`).
+
+    By default, assumes a ChatPrompt.
     """
-    text = fd.read()
-    return loads(text, encoding, base_path=base_path, cls=cls)
+    return cls.load(fd, encoding, base_path)
 
 
 def load_from(
     path: PathType,
     encoding: str = "utf-8",
-    cls: type[PromptType] = HandyPrompt,
+    cls: type[PromptType] = ChatPrompt,
 ) -> PromptType:
     """
-    Load a HandyPrompt for a path.
+    Load a HandyPrompt from a path, defaulting to a ChatPrompt.
     """
-    with open(path, "r", encoding=encoding) as fd:
-        return load(fd, encoding, base_path=Path(path).parent.resolve(), cls=cls)
+    return cls.load_from(path, encoding)
 
 
 def dumps(prompt: HandyPrompt, base_path: Optional[PathType] = None) -> str:

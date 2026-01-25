@@ -1,5 +1,6 @@
 import base64
 import copy
+import mimetypes
 from pathlib import Path
 from typing import (
     IO,
@@ -20,6 +21,10 @@ import time
 from .types import (
     AudioContentPart,
     ChatChunkUnified,
+    CustomToolCallDelta,
+    FileContentPart,
+    FileObject,
+    FunctionToolCallDelta,
     ImageContentPart,
     PathType,
     ShortChatChunk,
@@ -83,9 +88,14 @@ def trans_stream_chat(
                 if tool_calls:
                     for chunk in tool_calls:
                         if tool_call and chunk["index"] == tool_call["index"]:
-                            tool_call["function"]["arguments"] += chunk["function"][
-                                "arguments"
-                            ]
+                            if "function" in tool_call:
+                                tool_call["function"]["arguments"] += cast(
+                                    FunctionToolCallDelta, chunk
+                                )["function"]["arguments"]
+                            elif "custom" in tool_call:
+                                tool_call["custom"]["input"] += cast(
+                                    CustomToolCallDelta, chunk
+                                )["custom"]["input"]
                         else:
                             if tool_call:
                                 # this is a new tool call, yield the previous one
@@ -265,6 +275,16 @@ def encode_bin_file(local_path: PathType):
         return base64.b64encode(local_file.read()).decode("utf-8")
 
 
+def get_mime_type(filename: str):
+    """
+    Get the mime type of a file based on its name.
+    """
+    mime_type, _ = mimetypes.guess_type(filename)
+    if mime_type is None:
+        return "application/octet-stream"
+    return mime_type
+
+
 def file_uri_to_base64(url: str, base_path: Optional[PathType]):
     """
     Convert a file URI like `file:///path/to/file` to a base64 string.
@@ -274,15 +294,17 @@ def file_uri_to_base64(url: str, base_path: Optional[PathType]):
     if base_path:
         # support relative path
         local_path = base_path / local_path
-    base64_image = encode_bin_file(local_path.resolve())
-    return base64_image
+    base64_str = encode_bin_file(local_path.resolve())
+    return base64_str, local_path
 
 
-def file_uri_to_base64_image(url: str, base_path: Optional[PathType]):
+def file_uri_to_base64_mime(url: str, base_path: Optional[PathType]):
     """
-    Convert a file URI like `file:///path/to/file` to a base64 string for an image.
+    Convert a file URI like `file:///path/to/file` to a base64 string with mime type prefix.
     """
-    return f"data:image/jpeg;base64,{file_uri_to_base64(url, base_path)}"
+    base64_str, local_path = file_uri_to_base64(url, base_path)
+    mime_type = get_mime_type(local_path.name)
+    return f"data:{mime_type};base64,{base64_str}", local_path
 
 
 def content_part_text(text: str) -> TextContentPart:
@@ -302,4 +324,22 @@ def content_part_audio(url_or_base64: str, format: str) -> AudioContentPart:
     return {
         "type": "input_audio",
         "input_audio": {"data": url_or_base64, "format": format},
+    }
+
+
+def content_part_file(
+    file_data: Optional[str] = None,
+    file_id: Optional[str] = None,
+    filename: Optional[str] = None,
+) -> FileContentPart:
+    file_obj: FileObject = {}
+    if file_data is not None:
+        file_obj["file_data"] = file_data
+    if file_id is not None:
+        file_obj["file_id"] = file_id
+    if filename is not None:
+        file_obj["filename"] = filename
+    return {
+        "type": "file",
+        "file": file_obj,
     }

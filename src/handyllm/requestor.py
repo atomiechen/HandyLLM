@@ -26,6 +26,7 @@ from .types import (
     CompletionsResponse,
 )
 from ._io import json_loads
+from ._utils import join_url
 
 
 module_logger = logging.getLogger(__name__)
@@ -41,7 +42,8 @@ class Requestor(Generic[ResponseType, YieldType]):
     def __init__(
         self,
         api_type,
-        url,
+        api_base,
+        request_url,
         api_key,
         *,
         organization=None,
@@ -64,10 +66,14 @@ class Requestor(Generic[ResponseType, YieldType]):
             raise Exception("OpenAI API type is not set")
         else:
             self.api_type = api_type
-        if url is None:
-            raise Exception("OpenAI API url is not set")
+        if api_base is None:
+            raise Exception("OpenAI API base is not set")
         else:
-            self.url = url
+            self.api_base = api_base
+        if request_url is None:
+            raise Exception("OpenAI API request URL is not set")
+        else:
+            self.request_url = request_url
         if api_key is None:
             raise Exception("OpenAI API key is not set")
         else:
@@ -104,6 +110,10 @@ class Requestor(Generic[ResponseType, YieldType]):
             else:  ## if files is not None, let httpx handle the content type
                 self.data = kwargs
         self._change_stream_mode(self._stream)
+
+    @property
+    def url(self):
+        return join_url(self.api_base, self.request_url)
 
     def _change_stream_mode(self, stream: bool):
         self._stream = stream

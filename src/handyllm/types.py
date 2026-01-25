@@ -29,13 +29,27 @@ class Function(TypedDict):
     arguments: str
 
 
-class ToolCall(TypedDict):
+class FunctionToolCall(TypedDict):
     id: str
-    type: str
+    type: Literal["function"]
     function: Function
 
 
-class Message(TypedDict):
+class CustomTool(TypedDict):
+    name: str
+    input: str
+
+
+class CustomToolCall(TypedDict):
+    id: str
+    type: Literal["custom"]
+    custom: CustomTool
+
+
+ToolCall = Union[FunctionToolCall, CustomToolCall]
+
+
+class ResponseMessage(TypedDict):
     role: str
     content: Optional[str]
     reasoning_content: NotRequired[Optional[str]]
@@ -61,7 +75,7 @@ class Logprobs(TypedDict):
 
 class ChatChoice(TypedDict):
     index: int
-    message: Message
+    message: ResponseMessage
     logprob: Optional[Logprobs]
     finish_reason: str
 
@@ -83,11 +97,21 @@ class ChatResponse(TypedDict):
     usage: Usage
 
 
-class ToolCallDelta(TypedDict):
+class FunctionToolCallDelta(TypedDict):
     index: int
     id: str
     type: str
     function: Function
+
+
+class CustomToolCallDelta(TypedDict):
+    index: int
+    id: str
+    type: str
+    custom: CustomTool
+
+
+ToolCallDelta = Union[FunctionToolCallDelta, CustomToolCallDelta]
 
 
 class ChatChunkDelta(TypedDict):
@@ -176,11 +200,63 @@ class AudioContentPart(TypedDict):
     input_audio: InputAudio
 
 
-class InputMessage(TypedDict):
-    role: str
+class FileObject(TypedDict):
+    file_data: NotRequired[str]
+    file_id: NotRequired[str]
+    filename: NotRequired[str]
+
+
+class FileContentPart(TypedDict):
+    type: Literal["file"]
+    file: FileObject
+
+
+class DeveloperMessage(TypedDict):
+    role: Literal["developer"]
+    content: Union[str, List[TextContentPart]]
+    name: NotRequired[str]
+
+
+class SystemMessage(TypedDict):
+    role: Literal["system"]
+    content: Union[str, List[TextContentPart]]
+    name: NotRequired[str]
+
+
+class UserMessage(TypedDict):
+    role: Literal["user"]
     content: Union[
-        str, List[Union[TextContentPart, ImageContentPart, AudioContentPart]]
+        str,
+        List[
+            Union[TextContentPart, ImageContentPart, AudioContentPart, FileContentPart]
+        ],
     ]
+    name: NotRequired[str]
+
+
+class RefusalContentPart(TypedDict):
+    type: Literal["refusal"]
+    refusal: str
+
+
+class AssistantMessage(TypedDict):
+    role: Literal["assistant"]
+    content: Union[str, List[Union[TextContentPart, RefusalContentPart]]]
+    name: NotRequired[str]
+    refusal: NotRequired[str]
+    tool_calls: NotRequired[List[ToolCall]]
+
+
+class ToolMessage(TypedDict):
+    role: Literal["tool"]
+    content: str
+    tool_call_id: str
+
+
+InputMessage = Union[
+    DeveloperMessage, SystemMessage, UserMessage, AssistantMessage, ToolMessage
+]
+Message = Union[InputMessage, ResponseMessage]
 
 
 class ChatChunkUnified(TypedDict):

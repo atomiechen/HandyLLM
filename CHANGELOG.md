@@ -5,6 +5,41 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [0.10.0] - 2026-01-25
+
+### Added
+
+- **Reasoning support** :
+  - support for reasoning sub-headers in hprompt files (`$$reasoning_content$$` / `$$content$$`) to store reasoning tokens separately from visible content.
+  - add `result_reasoning` on `ChatPrompt` to retrieve the reasoning content from the last message.
+  - add `stream_chat_with_reasoning` and `astream_chat_with_reasoning` for streaming responses that include reasoning tokens.
+- `PromptConverter`: introduce `tool` and `array` keywords for dumped `ChatPrompt`.
+- `hprompt`:
+  - store the `requestor` on the resulting prompt.
+  - support `input_audio` and `file` inputs, and also support loading from local paths.
+  - `ChatPrompt.add_message()` now suggests role literal types and accepts a `tool_call_id`.
+  - add methods to append content parts to an existing message (text, image, audio, file).
+- `Requestor`: store `api_base` and `request_url`, and compute full `url` on demand.
+- `OpenAIClient`: support `ensure_client_credentials` in the constructor and loaders to enforce client-wide credentials (ignore runtime API creds). Default is `False` for backward compatibility.
+- `RunConfig`: add `overwrite_if_exists`. Default is `False` to prevent overwriting existing output files, and will append suffixes if the file exists.
+- `CacheManager`: add `only_load` option and an `ensure_dumped()` helper to avoid repeated loads when checking files.
+  - Example: `ensure_dumped()` helps when a cached function (using `cache`) may be invoked multiple times but you only want to verify file existence without reloading the content.
+
+### Fixed
+
+- `PromptConverter`:
+  - escape quotes/newlines in headers.
+  - ensure `msgs_replace_variables()` returns a deep copy when `inplace=False`. The previous behavior returns a shallow list copy, which may cause unexpected behavior when modifying the returned object.
+- `ChatPrompt`: `result_str` always returns a `str`; if the last message content is a list, the text part is returned when present.
+
+### Changed
+
+- Global hprompt loaders now default to `ChatPrompt`. `HandyPrompt.load_from()`/`.load()`/`.loads()` will auto-detect prompt type; call `ChatPrompt.load_from()` or `CompletionsPrompt.load_from()` to explicitly request a type.
+- `PromptConverter.msgs2raw()` (ChatPrompt dump) now uses `tool` and `array` keywords by default (replacing the previous `type="tool_calls"` and `type="content_array"` markers).
+- Streaming chunk contract: `RunConfig.on_chunk()` now receives a typed dict `ChatChunkUnified` with keys `role`, `content`, `reasoning_content`, and `tool_call`; `stream_chat_all()` / `astream_chat_all()` yield the same structure.
+- Replace `DictProxy` usages with `TypedDict` for clearer typing and editor support.
+
+
 ## [0.9.3] - 2024-12-18
 
 ### Fixed
