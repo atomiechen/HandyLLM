@@ -2,7 +2,7 @@ site_name: HandyLLM
 site_url: https://atomiechen.github.io/handyllm
 repo_url: https://github.com/atomiechen/HandyLLM
 repo_name: atomiechen/HandyLLM
-copyright: Copyright &copy; 2024 Atomie CHEN
+copyright: Copyright &copy; 2026 Atomie CHEN
 
 watch:
   - docs_src
