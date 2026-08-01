@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from handyllm import PromptConverter
 from handyllm.hprompt import (
     HandyPrompt,
     load_from,
@@ -114,3 +115,74 @@ def test_extra_properties():
     assert loaded_prompt.messages[0]["key1"] == "cont'en{\"'t}\n1"  # type: ignore
     assert loaded_prompt.messages[0]["key2"] == 'co"nt\'en"t2'  # type: ignore
     assert loaded_prompt.messages[0]["key3"] == "con{te{{nt}3"  # type: ignore
+
+
+def test_extra_properties_json_round_trip():
+    messages = [
+        {
+            "role": "assistant",
+            "content": '{"answer": "ok"}',
+            "refusal": None,
+            "reasoning": "Used a tool and an array.",
+            "reasoning_details": [
+                {"type": "reasoning.text", "text": "Used the drawing tool safely."},
+                {"type": "reasoning.text", "text": "Built an array of blocks."},
+            ],
+            "metadata": {"enabled": True, "score": 1.5},
+        }
+    ]
+    converter = PromptConverter()
+    raw = converter.msgs2raw(messages)  # type: ignore
+    assert converter.raw2msgs(raw) == messages
+
+
+def test_message_type_keywords_round_trip():
+    messages = [
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_1",
+                    "type": "function",
+                    "function": {"name": "test", "arguments": "{}"},
+                }
+            ],
+        },
+        {
+            "role": "user",
+            "content": [{"type": "text", "text": "Hello"}],
+        },
+    ]
+    converter = PromptConverter()
+    raw = converter.msgs2raw(messages)  # type: ignore
+    assert converter.raw2msgs(raw) == messages
+
+
+def test_legacy_message_type_properties():
+    converter = PromptConverter()
+    tool_message = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": {"name": "test", "arguments": "{}"},
+            }
+        ],
+    }
+    array_message = {
+        "role": "user",
+        "content": [{"type": "text", "text": "Hello"}],
+    }
+
+    tool_raw = converter.msgs2raw([tool_message]).replace(  # type: ignore
+        "{tool}", '{type="tool_calls"}'
+    )
+    array_raw = converter.msgs2raw([array_message]).replace(  # type: ignore
+        "{array}", '{type="content_array"}'
+    )
+
+    assert converter.raw2msgs(tool_raw) == [tool_message]
+    assert converter.raw2msgs(array_raw) == [array_message]
