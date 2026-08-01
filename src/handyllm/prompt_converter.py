@@ -2,6 +2,7 @@ from copy import deepcopy
 import json
 import re
 from typing import (
+    Any,
     IO,
     Dict,
     Generator,
@@ -10,6 +11,7 @@ from typing import (
     MutableMapping,
     MutableSequence,
     Optional,
+    Tuple,
     cast,
 )
 
@@ -63,40 +65,71 @@ class PromptConverter:
             obj = self.parse_content(content)
             msg = {"role": role, **obj}
             if extra:
-                key_values_pairs = re.findall(
-                    r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')|(?:(?<=\s)|^)(?:(tool)|(array))(?=\s|$)',
-                    extra,
-                )
-                # parse extra properties
-                extra_properties = {}
-                for matches in key_values_pairs:
-                    key, value, tool, array = matches
-                    if tool:
-                        extra_properties["type"] = "tool_calls"
-                    elif array:
-                        extra_properties["type"] = "content_array"
-                    else:
-                        # convert single quoted to double quoted
-                        if value.startswith("'"):
-                            inner = value[1:-1]
-                            inner = inner.replace(r"\'", "'")
-                            inner = inner.replace('"', r"\"")
-                            value = f'"{inner}"'
-                        # decode escaped string
-                        extra_properties[key] = json.loads(value)
-                if "type" in extra_properties:
-                    type_of_msg = extra_properties.pop("type")
-                    if type_of_msg == "tool_calls":
-                        msg["tool_calls"] = yaml_load(content)
-                        msg["content"] = None
-                    elif type_of_msg == "content_array":
-                        # parse content array
-                        msg["content"] = yaml_load(content)
+                extra_properties, type_of_msg = self._parse_extra(extra)
+                if type_of_msg == "tool_calls":
+                    msg["tool_calls"] = yaml_load(content)
+                    msg["content"] = None
+                elif type_of_msg == "content_array":
+                    # parse content array
+                    msg["content"] = yaml_load(content)
                 for key in extra_properties:
                     msg[key] = extra_properties[key]
             msgs.append(msg)
 
         return msgs
+
+    @staticmethod
+    def _parse_extra(extra: str) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Parse message header properties and standalone type keywords."""
+        decoder = json.JSONDecoder()
+        extra_properties = {}
+        type_of_msg = None
+        pos = 0
+        while pos < len(extra):
+            while pos < len(extra) and extra[pos].isspace():
+                pos += 1
+            if pos == len(extra):
+                break
+
+            type_match = re.match(r"(tool|array)(?=\s|$)", extra[pos:])
+            if type_match:
+                type_of_msg = (
+                    "tool_calls" if type_match.group(1) == "tool" else "content_array"
+                )
+                pos += type_match.end()
+                continue
+
+            key_match = re.match(r"(\w+)\s*=\s*", extra[pos:])
+            if key_match is None:
+                raise ValueError(f"Invalid message header properties: {extra[pos:]}")
+            key = key_match.group(1)
+            pos += key_match.end()
+
+            if pos < len(extra) and extra[pos] == "'":
+                value_match = re.match(r"'(?:[^'\\]|\\.)*'", extra[pos:])
+                if value_match is None:
+                    raise ValueError(
+                        f"Invalid value for message header property: {key}"
+                    )
+                value = value_match.group(0)
+                inner = value[1:-1]
+                inner = inner.replace(r"\'", "'")
+                inner = inner.replace('"', r"\"")
+                value = json.loads(f'"{inner}"')
+                pos += value_match.end()
+            else:
+                try:
+                    value, pos = decoder.raw_decode(extra, pos)
+                except json.JSONDecodeError as e:
+                    raise ValueError(
+                        f"Invalid JSON value for message header property: {key}"
+                    ) from e
+            extra_properties[key] = value
+
+        legacy_type = extra_properties.get("type")
+        if type_of_msg is None and legacy_type in ["tool_calls", "content_array"]:
+            type_of_msg = extra_properties.pop("type")
+        return extra_properties, type_of_msg
 
     @staticmethod
     def parse_content(content: str):

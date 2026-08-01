@@ -5,6 +5,13 @@ All notable changes to HandyLLM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
+## [Unreleased]
+
+### Fixed
+
+- `PromptConverter`: parse JSON-valued message header properties without treating nested `tool` or `array` words as message type markers.
+
+
 ## [0.10.0] - 2026-01-25
 
 ### Added
@@ -240,5 +247,4 @@ Check 🌟s for attractive new features!
 ### Fixed
 
 - non-stream mode prioritize `RunConfig.output_fd` over `RunConfig.output_path`
-
 
